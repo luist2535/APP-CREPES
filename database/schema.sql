@@ -156,6 +156,7 @@ CREATE TABLE IF NOT EXISTS evidencias (
   tipo TEXT NOT NULL DEFAULT 'foto',
   ruta_archivo TEXT NOT NULL,
   nombre_archivo TEXT,
+  etiqueta TEXT DEFAULT 'soporte', -- 'antes', 'despues', 'soporte'
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (visita_id) REFERENCES visitas(id)
 );
@@ -165,6 +166,7 @@ CREATE TABLE IF NOT EXISTS eventos_calendario (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   pdv_id INTEGER NOT NULL,
   user_id INTEGER NOT NULL,
+  area_id INTEGER,
   titulo TEXT NOT NULL,
   descripcion TEXT,
   fecha DATE NOT NULL,
@@ -176,7 +178,8 @@ CREATE TABLE IF NOT EXISTS eventos_calendario (
   confirmado INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (pdv_id) REFERENCES pdv(id),
-  FOREIGN KEY (user_id) REFERENCES users(id)
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (area_id) REFERENCES areas(id)
 );
 
 -- Bloqueos de Horario
@@ -230,3 +233,22 @@ CREATE INDEX IF NOT EXISTS idx_bloqueos_pdv ON bloqueos_horario(pdv_id);
 CREATE INDEX IF NOT EXISTS idx_bloqueos_fecha ON bloqueos_horario(fecha);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_rol ON users(rol_id);
+
+-- Tabla de Equipos (Escaner QR)
+CREATE TABLE IF NOT EXISTS equipos (
+  id TEXT PRIMARY KEY,            -- ID del QR (Ej: EQ-1002)
+  nombre TEXT NOT NULL,           -- Licuadora, Nevera, Plancha, etc.
+  marca TEXT,
+  modelo TEXT,
+  serie TEXT,
+  pdv_id INTEGER NOT NULL,
+  datos_tecnicos TEXT,            -- Especificaciones técnicas (JSON)
+  ultimo_mantenimiento DATE,
+  proximo_mantenimiento DATE,
+  activo INTEGER DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (pdv_id) REFERENCES pdv(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_equipos_pdv ON equipos(pdv_id);
+

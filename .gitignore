@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# SQLite WAL and temp files
+*.db-wal
+*.db-shm
+*.db-journal
+
+# user uploads folder
+/public/uploads/*
+!/public/uploads/.gitkeep
