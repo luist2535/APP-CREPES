@@ -11,7 +11,20 @@ export default function VisitasPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [userRole, setUserRole] = useState(null);
   
+  const getAreaIdFromRol = (rolId) => {
+    const rol = parseInt(rolId);
+    if (rol === 1) return 'admin'; // Admin has master override
+    if (rol === 2) return 1; // Coordinator -> Operaciones
+    if (rol === 3) return 2; // SST
+    if (rol === 4) return 3; // Mantenimiento
+    if (rol === 5) return 4; // Calidad
+    if (rol === 6) return 5; // VRH
+    if (rol === 7) return 6; // Formación
+    return null;
+  };
+
   // Navigation tabs
   const [activeTab, setActiveTab] = useState('list'); // 'list' or 'new'
 
@@ -117,7 +130,41 @@ export default function VisitasPage() {
 
   useEffect(() => {
     loadData();
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const u = JSON.parse(storedUser);
+          setUserRole(parseInt(u.rol_id));
+          
+          // Auto-select area based on role (unless overridden by query param)
+          const params = new URLSearchParams(window.location.search);
+          const areaIdParam = params.get('area_id');
+          if (!areaIdParam) {
+            const mappedArea = getAreaIdFromRol(u.rol_id);
+            if (mappedArea && mappedArea !== 'admin') {
+              setSelectedAreaId(String(mappedArea));
+            }
+          }
+        } catch (e) {}
+      }
+    }
   }, []);
+
+  // Pre-select first type of visit when area changes
+  useEffect(() => {
+    if (selectedAreaId && tiposVisita.length > 0) {
+      const filtered = tiposVisita.filter(t => t.area_id === parseInt(selectedAreaId));
+      if (filtered.length > 0) {
+        const exists = filtered.some(t => String(t.id) === selectedTipoId);
+        if (!exists) {
+          setSelectedTipoId(String(filtered[0].id));
+        }
+      } else {
+        setSelectedTipoId('');
+      }
+    }
+  }, [selectedAreaId, tiposVisita]);
 
   // Update dynamic fields when Area / Type changes
   useEffect(() => {
@@ -427,6 +474,7 @@ export default function VisitasPage() {
                     value={selectedAreaId}
                     onChange={(e) => handleAreaChange(e.target.value)}
                     required
+                    disabled={userRole !== 1 && userRole !== 2 && userRole !== null}
                   >
                     <option value="">-- Seleccionar Área --</option>
                     {areas.map(a => (
