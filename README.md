@@ -1,36 +1,145 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🥞 Crepes en Punto — Sistema de Control y Gestión Operativa
 
-## Getting Started
+**Crepes en Punto** es una plataforma web integral diseñada para la gestión, auditoría y control operativo en tiempo real de los Puntos de Venta (PDV) de la red. La plataforma permite coordinar actividades de mantenimiento, calidad, sistemas y seguridad y salud en el trabajo (SST), asegurando trazabilidad absoluta en cada proceso.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 🛠️ Stack Tecnológico
+
+- **Frontend & Backend API**: [Next.js](https://nextjs.org/) (App Router).
+- **Base de Datos**: [SQLite](https://www.sqlite.org/) local a través de la librería ultra-rápida `better-sqlite3`.
+- **Estilos**: CSS nativo (Vanilla CSS) personalizado para mantener la identidad visual corporativa de la marca (tonos marrón, crema y dorado) de forma responsiva y móvil-first.
+- **Autenticación**: JSON Web Tokens (JWT) almacenados en cookies seguras `HTTP-only`.
+- **Escaner QR**: Integración directa con cámaras web y dispositivos móviles mediante `html5-qrcode`.
+
+---
+
+## 🚀 Funcionalidades Principales
+
+### 1. 🔑 Control de Acceso y Seguridad por Roles
+- Flujo de sesión seguro basado en JWT.
+- **Roles del Sistema**:
+  - **Administrador**: Acceso total a variables maestras, configuraciones y reportes.
+  - **Coordinador**: Gestión territorial de PDVs por ciudad, asignación de bloqueos y visualización de auditorías.
+  - **Supervisor de Área (Mantenimiento, Calidad, SST, Sistemas)**: Programación y ejecución de auditorías ("Modo Visita") restringidas a su especialidad.
+- **Acceso Rápido de Pruebas**: Panel de login con botones interactivos que autocompletan las credenciales de prueba preconfiguradas (contraseña única: `admin123`).
+
+### 2. 📊 Dashboard Ejecutivo en Tiempo Real
+- Indicadores numéricos del estado de la red (Activos, Alertas, Fuera de Servicio).
+- Gráfico dinámico de distribución de visitas completadas por área operativa.
+- Resumen porcentual de operatividad por ciudad (Cartagena, Barranquilla, Santa Marta).
+- **Línea de Tiempo de Trazabilidad (Timeline)**: Registro cronológico e histórico de cada cambio de estado realizado en los PDVs, indicando fecha, responsable y justificación.
+
+### 3. 📍 Semáforo Operativo y Gestión Territorial
+- Cuadrícula interactiva de todos los puntos de venta filtrable por ciudad y estado de salud operativa.
+- Modales informativos que despliegan la información detallada del PDV y su historial de novedades.
+- **Cambio de Estado con Justificación Obligatoria**: Restricción para que solo los Coordinadores o Administradores puedan alternar el estado operativo del PDV, requiriendo un texto de justificación que alimenta la trazabilidad del sistema.
+
+### 4. 📅 Calendario de Operaciones Inteligente
+- Agenda visual interactiva en formato mensual, semanal y diario.
+- **Validación de Cruce de Horarios**: El sistema impide programar dos visitas en el mismo rango de horas para un mismo PDV.
+- **Lógica de Permisos de Área**: 
+  - Todos los usuarios pueden visualizar la agenda completa.
+  - El botón para ejecutar el **"Modo Visita / Auditoría"** solo se despliega si el usuario conectado pertenece al área asignada del evento, o si es un Administrador/Coordinador.
+
+### 5. 📋 Modo Visita & Gestión de Evidencias (Checklists)
+- Flujo autocompletado al presionar "Realizar Auditoría" desde el calendario (asocia automáticamente PDV, área y tipo de checklist).
+- **Archivos y Fotos (Antes / Después)**: Permite cargar evidencias fotográficas y archivos PDF locales en el servidor, visualizando las fotos del "Antes" y "Después" una al lado de la otra para comparación directa.
+- **Autocierre de Tareas**: Una vez finalizada y guardada la auditoría, el evento del calendario se marca automáticamente como **Completado (✓)**.
+- **Exportación en PDF**: Hojas de estilos optimizadas para impresión (`@media print`) que permiten generar un reporte formal y limpio de la auditoría pulsando un botón, ideal para firmas físicas o archivo.
+
+### 6. 📷 Fichas de Equipos y Escáner de Códigos QR
+- Acceso directo a la cámara del dispositivo móvil para escanear etiquetas QR adheridas a la maquinaria física.
+- Buscador manual alternativo por identificadores de equipos (ej: `EQ-1001`, `EQ-1002`).
+- **Ficha Técnica Digital**: Despliegue de marca, modelo, serie y especificaciones del equipo.
+- Semáforo preventivo de mantenimiento según la última fecha de servicio y alertas de expiración.
+- Historial detallado de todas las intervenciones previas del área de Mantenimiento sobre el equipo consultado.
+
+### 7. 🔒 Control de Bloqueos de Horario
+- Permite programar la suspensión temporal de un PDV por eventos especiales, limpiezas profundas o fallas críticas.
+- Al activarse un bloqueo, el PDV cambia automáticamente su semáforo a `Provisional / Bloqueado` y se incluye la justificación.
+- Los coordinadores pueden dar de alta o finalizar el bloqueo manualmente para restaurar el estado original del PDV (`Trabajando en sitio`).
+
+### ⚙️ Panel de Control del Administrador
+- Sección dedicada a la administración de variables maestras del negocio:
+  - Creación, edición y suspensión de **Usuarios** (roles y ciudades).
+  - Gestión de **Puntos de Venta (PDVs)** con sus horarios y ubicaciones.
+  - Registro de nuevas **Ciudades**.
+  - Alta y personalización visual (colores CSS hexadecimales) de **Áreas Operativas**.
+
+---
+
+## 📂 Estructura del Proyecto
+
+```text
+crepes-app/
+├── database/            # Archivos relacionados con la Base de Datos SQLite
+│   ├── crepes.db        # Base de datos activa
+│   ├── schema.sql       # Estructura de tablas y triggers
+│   └── seed.sql         # Datos semilla iniciales (usuarios, PDVs, equipos)
+├── public/              # Recursos estáticos (Logos, archivos multimedia)
+│   └── uploads/         # Carpeta física de almacenamiento de fotos subidas
+├── src/
+│   ├── app/             # Rutas y páginas de la aplicación Next.js
+│   │   ├── (dashboard)/ # Vistas protegidas por autenticación
+│   │   ├── api/         # Servicios backend (endpoints JSON)
+│   │   ├── globals.css  # Diseño de estilos global (CSS corporativo)
+│   │   └── page.js      # Pantalla de Login de acceso principal
+│   └── lib/             # Helpers de base de datos y utilidades JWT
+├── init-db.js           # Inicializador de Base de Datos
+├── reset-passwords.js   # Script para resetear claves de prueba a Bcrypt
+└── next.config.mjs      # Configuración de Next.js
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## 🛠️ Instrucciones de Despliegue Local
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Sigue estos pasos para levantar la aplicación en tu entorno de desarrollo local o servidor:
 
-## Learn More
+### 1. Prerrequisitos
+Tener instalado [Node.js](https://nodejs.org/) (versión 18 o superior recomendada).
 
-To learn more about Next.js, take a look at the following resources:
+### 2. Instalación de Dependencias
+Descarga las librerías necesarias del proyecto:
+```bash
+npm install
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 3. Inicializar la Base de Datos
+Crea el archivo de base de datos SQLite y carga las tablas iniciales con el script autoprogramado:
+```bash
+node init-db.js
+```
+*(Opcional)* Si necesitas restaurar las contraseñas de todos los usuarios semilla al formato encriptado de prueba (`admin123`), ejecuta:
+```bash
+node reset-passwords.js
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 4. Iniciar Servidor de Desarrollo
+Corre el entorno local en el puerto `3000`:
+```bash
+npm run dev
+```
+Abre tu navegador en [http://localhost:3000](http://localhost:3000).
 
-## Deploy on Vercel
+### 5. Compilación y Servidor de Producción
+Para desplegar la aplicación optimizada para producción:
+```bash
+npm run build
+npm run start
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 👥 Credenciales de Prueba Preconfiguradas
+Todos los usuarios semilla comparten la contraseña genérica: **`admin123`**
+
+| Rol | Correo Electrónico | Ciudad / Alcance |
+| :--- | :--- | :--- |
+| **Administrador** | `admin@crepesenpunto.com` | Global |
+| **Coordinador** | `carlos@crepesenpunto.com` | Cartagena |
+| **Coordinadora** | `maria@crepesenpunto.com` | Barranquilla |
+| **Supervisor SST** | `ana@crepesenpunto.com` | Global |
+| **Supervisor Mantenimiento** | `luis@crepesenpunto.com` | Global |
+| **Supervisor Calidad** | `sandra@crepesenpunto.com` | Global |
