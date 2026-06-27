@@ -21,6 +21,15 @@ export default function AdminPage() {
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
 
+  // SMTP Mail Server States
+  const [smtpHost, setSmtpHost] = useState('smtp.gmail.com');
+  const [smtpPort, setSmtpPort] = useState(587);
+  const [smtpUser, setSmtpUser] = useState('');
+  const [smtpPass, setSmtpPass] = useState('');
+  const [smtpSuccess, setSmtpSuccess] = useState('');
+  const [smtpError, setSmtpError] = useState('');
+  const [smtpLoading, setSmtpLoading] = useState(false);
+
   // Form Fields - User
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
@@ -82,8 +91,56 @@ export default function AdminPage() {
     }
   };
 
+  const fetchSmtpSettings = async () => {
+    try {
+      const res = await fetch('/api/admin/email-settings');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.settings) {
+          setSmtpHost(data.settings.smtp_host || 'smtp.gmail.com');
+          setSmtpPort(parseInt(data.settings.smtp_port) || 587);
+          setSmtpUser(data.settings.smtp_user || '');
+          setSmtpPass(data.settings.smtp_pass || '');
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching SMTP settings:', e);
+    }
+  };
+
+  const handleSaveSmtp = async (e) => {
+    e.preventDefault();
+    setSmtpError('');
+    setSmtpSuccess('');
+    setSmtpLoading(true);
+
+    try {
+      const res = await fetch('/api/admin/email-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          smtp_host: smtpHost,
+          smtp_port: smtpPort,
+          smtp_user: smtpUser,
+          smtp_pass: smtpPass
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al guardar configuraciones');
+
+      setSmtpSuccess('Configuración de correo guardada con éxito.');
+      setTimeout(() => setSmtpSuccess(''), 3000);
+    } catch (err) {
+      setSmtpError(err.message);
+    } finally {
+      setSmtpLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadAllData();
+    fetchSmtpSettings();
   }, []);
 
   const handleToggleActive = async (entity, id, currentStatus) => {
@@ -212,6 +269,9 @@ export default function AdminPage() {
         <button className={`tab-btn ${activeTab === 'areas' ? 'active' : ''}`} onClick={() => { setActiveTab('areas'); setShowAddForm(false); }}>
           🛡️ Áreas de Inspección
         </button>
+        <button className={`tab-btn ${activeTab === 'correo' ? 'active' : ''}`} onClick={() => { setActiveTab('correo'); setShowAddForm(false); }}>
+          📧 Configuración de Correo
+        </button>
       </div>
 
       <div className="admin-actions-row">
@@ -220,409 +280,488 @@ export default function AdminPage() {
           {activeTab === 'pdvs' && 'Lista de Puntos de Venta (PDVs)'}
           {activeTab === 'ciudades' && 'Lista de Ciudades'}
           {activeTab === 'areas' && 'Áreas Funcionales'}
+          {activeTab === 'correo' && 'Configuración de Servidor de Correo (SMTP)'}
         </h3>
-        {!showAddForm && (
+        {!showAddForm && activeTab !== 'correo' && (
           <button className="btn btn-primary btn-sm" onClick={() => setShowAddForm(true)}>
             + Agregar Nuevo
           </button>
         )}
       </div>
 
-      <div className="admin-layout-grid">
-        
-        {/* Left/Main Column: Data table list */}
-        <div className="admin-list-col">
-          <div className="card shadow-md">
-            <div className="card-body px-0 py-0">
-              
-              {/* Users Table */}
-              {activeTab === 'usuarios' && (
-                <div className="table-responsive">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Nombre</th>
-                        <th>Email</th>
-                        <th>Rol</th>
-                        <th>Ciudad Asignada</th>
-                        <th>Estado</th>
-                        <th>Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {users.map((u) => (
-                        <tr key={u.id} className={!u.activo ? 'row-inactive' : ''}>
-                          <td className="font-semibold">{u.nombre}</td>
-                          <td>{u.email}</td>
-                          <td><span className="admin-role-badge">{u.rol_nombre}</span></td>
-                          <td>{u.ciudad_nombre || 'Nivel Nacional'}</td>
-                          <td>
-                            <span className={`status-dot-pill ${u.activo ? 'active' : 'inactive'}`}>
-                              {u.activo ? 'Activo' : 'Inactivo'}
-                            </span>
-                          </td>
-                          <td>
-                            <button
-                              className={`btn btn-sm ${u.activo ? 'btn-secondary btn-danger' : 'btn-success'}`}
-                              onClick={() => handleToggleActive('user', u.id, u.activo)}
-                              disabled={u.id === 1} // Can't deactivate main admin
-                            >
-                              {u.activo ? 'Desactivar' : 'Activar'}
-                            </button>
-                          </td>
+      {activeTab !== 'correo' && (
+        <div className="admin-layout-grid">
+          
+          {/* Left/Main Column: Data table list */}
+          <div className="admin-list-col">
+            <div className="card shadow-md">
+              <div className="card-body px-0 py-0">
+                
+                {/* Users Table */}
+                {activeTab === 'usuarios' && (
+                  <div className="table-responsive">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Nombre</th>
+                          <th>Email</th>
+                          <th>Rol</th>
+                          <th>Ciudad Asignada</th>
+                          <th>Estado</th>
+                          <th>Acción</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody>
+                        {users.map((u) => (
+                          <tr key={u.id} className={!u.activo ? 'row-inactive' : ''}>
+                            <td className="font-semibold">{u.nombre}</td>
+                            <td>{u.email}</td>
+                            <td><span className="admin-role-badge">{u.rol_nombre}</span></td>
+                            <td>{u.ciudad_nombre || 'Nivel Nacional'}</td>
+                            <td>
+                              <span className={`status-dot-pill ${u.activo ? 'active' : 'inactive'}`}>
+                                <span className="dot"></span>
+                                {u.activo ? 'Activo' : 'Inactivo'}
+                              </span>
+                            </td>
+                            <td>
+                              <button 
+                                className={`btn btn-sm ${u.activo ? 'btn-danger' : 'btn-success'}`}
+                                onClick={() => handleToggleActive('user', u.id, u.activo)}
+                                disabled={u.id === 1} // Prevent deactivating admin
+                              >
+                                {u.activo ? 'Desactivar 🔒' : 'Activar 🔓'}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
-              {/* PDV Table */}
-              {activeTab === 'pdvs' && (
-                <div className="table-responsive">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>PDV</th>
-                        <th>Ciudad</th>
-                        <th>Dirección</th>
-                        <th>Horario</th>
-                        <th>Estado Config</th>
-                        <th>Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pdvs.map((p) => (
-                        <tr key={p.id} className={!p.activo ? 'row-inactive' : ''}>
-                          <td className="font-semibold">{p.nombre}</td>
-                          <td>{p.ciudad_nombre}</td>
-                          <td>{p.direccion || 'Sin dirección'}</td>
-                          <td>{p.hora_apertura} - {p.hora_cierre}</td>
-                          <td>
-                            <span className={`status-dot-pill ${p.activo ? 'active' : 'inactive'}`}>
-                              {p.activo ? 'Activo' : 'Desactivado'}
-                            </span>
-                          </td>
-                          <td>
-                            <button
-                              className={`btn btn-sm ${p.activo ? 'btn-secondary btn-danger' : 'btn-success'}`}
-                              onClick={() => handleToggleActive('pdv', p.id, p.activo)}
-                            >
-                              {p.activo ? 'Desactivar' : 'Activar'}
-                            </button>
-                          </td>
+                {/* PDVs Table */}
+                {activeTab === 'pdvs' && (
+                  <div className="table-responsive">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Nombre PDV</th>
+                          <th>Ciudad</th>
+                          <th>Dirección</th>
+                          <th>Horario</th>
+                          <th>Estado</th>
+                          <th>Acción</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody>
+                        {pdvs.map((p) => (
+                          <tr key={p.id} className={!p.activo ? 'row-inactive' : ''}>
+                            <td className="font-semibold">{p.nombre}</td>
+                            <td>{p.ciudad_nombre}</td>
+                            <td>{p.direccion || 'Sin dirección'}</td>
+                            <td>{p.hora_apertura} - {p.hora_cierre}</td>
+                            <td>
+                              <span className={`status-dot-pill ${p.activo ? 'active' : 'inactive'}`}>
+                                <span className="dot"></span>
+                                {p.activo ? 'Activo' : 'Inactivo'}
+                              </span>
+                            </td>
+                            <td>
+                              <button 
+                                className={`btn btn-sm ${p.activo ? 'btn-danger' : 'btn-success'}`}
+                                onClick={() => handleToggleActive('pdv', p.id, p.activo)}
+                              >
+                                {p.activo ? 'Desactivar' : 'Activar'}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
-              {/* Cities Table */}
-              {activeTab === 'ciudades' && (
-                <div className="table-responsive">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Ciudad</th>
-                        <th>Estado Config</th>
-                        <th>Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ciudades.map((c) => (
-                        <tr key={c.id} className={!c.activa ? 'row-inactive' : ''}>
-                          <td className="font-semibold">{c.nombre}</td>
-                          <td>
-                            <span className={`status-dot-pill ${c.activa ? 'active' : 'inactive'}`}>
-                              {c.activa ? 'Activa' : 'Desactivada'}
-                            </span>
-                          </td>
-                          <td>
-                            <button
-                              className={`btn btn-sm ${c.activa ? 'btn-secondary btn-danger' : 'btn-success'}`}
-                              onClick={() => handleToggleActive('ciudad', c.id, c.activa)}
-                            >
-                              {c.activa ? 'Desactivar' : 'Activar'}
-                            </button>
-                          </td>
+                {/* Cities Table */}
+                {activeTab === 'ciudades' && (
+                  <div className="table-responsive">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Ciudad</th>
+                          <th>Estado</th>
+                          <th>Acción</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody>
+                        {ciudades.map((c) => (
+                          <tr key={c.id} className={!c.activa ? 'row-inactive' : ''}>
+                            <td>{c.id}</td>
+                            <td className="font-semibold">{c.nombre}</td>
+                            <td>
+                              <span className={`status-dot-pill ${c.activa ? 'active' : 'inactive'}`}>
+                                <span className="dot"></span>
+                                {c.activa ? 'Activa' : 'Inactiva'}
+                              </span>
+                            </td>
+                            <td>
+                              <button 
+                                className={`btn btn-sm ${c.activa ? 'btn-danger' : 'btn-success'}`}
+                                onClick={() => handleToggleActive('ciudad', c.id, c.activa)}
+                              >
+                                {c.activa ? 'Desactivar' : 'Activar'}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
-              {/* Areas Table */}
-              {activeTab === 'areas' && (
-                <div className="table-responsive">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Área Inspectora</th>
-                        <th>Color Identificativo</th>
-                        <th>Descripción</th>
-                        <th>Estado Config</th>
-                        <th>Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {areas.map((a) => (
-                        <tr key={a.id} className={!a.activa ? 'row-inactive' : ''}>
-                          <td className="font-semibold">{a.nombre}</td>
-                          <td>
-                            <span className="color-strip-badge" style={{ backgroundColor: a.color }}>
-                              {a.color}
-                            </span>
-                          </td>
-                          <td>{a.descripcion || 'Sin descripción'}</td>
-                          <td>
-                            <span className={`status-dot-pill ${a.activa ? 'active' : 'inactive'}`}>
-                              {a.activa ? 'Activa' : 'Desactivada'}
-                            </span>
-                          </td>
-                          <td>
-                            <button
-                              className={`btn btn-sm ${a.activa ? 'btn-secondary btn-danger' : 'btn-success'}`}
-                              onClick={() => handleToggleActive('area', a.id, a.activa)}
-                            >
-                              {a.activa ? 'Desactivar' : 'Activar'}
-                            </button>
-                          </td>
+                {/* Areas Table */}
+                {activeTab === 'areas' && (
+                  <div className="table-responsive">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Nombre Área</th>
+                          <th>Descripción</th>
+                          <th>Tipo Flujo</th>
+                          <th>Estado</th>
+                          <th>Acción</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody>
+                        {areas.map((a) => (
+                          <tr key={a.id} className={!a.activa ? 'row-inactive' : ''}>
+                            <td className="font-semibold">
+                              <span className="area-indicator-color-dot" style={{ backgroundColor: a.color }}></span>
+                              {a.nombre}
+                            </td>
+                            <td>{a.descripcion || 'Sin descripción'}</td>
+                            <td>
+                              <span className={`admin-role-badge`} style={{ backgroundColor: a.tipo_flujo === 'tecnico' ? '#E0F2FE' : '#F3E8FF' }}>
+                                {a.tipo_flujo.toUpperCase()}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`status-dot-pill ${a.activa ? 'active' : 'inactive'}`}>
+                                <span className="dot"></span>
+                                {a.activa ? 'Activa' : 'Inactiva'}
+                              </span>
+                            </td>
+                            <td>
+                              <button 
+                                className={`btn btn-sm ${a.activa ? 'btn-danger' : 'btn-success'}`}
+                                onClick={() => handleToggleActive('area', a.id, a.activa)}
+                              >
+                                {a.activa ? 'Desactivar' : 'Activar'}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
+              </div>
             </div>
+          </div>
+
+          {/* Right/Secondary Column: Add New Form */}
+          {showAddForm && (
+            <div className="admin-form-col">
+              <div className="card shadow-md">
+                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4>➕ Crear {activeTab.slice(0, -1).toUpperCase()}</h4>
+                  <button className="modal-close-btn" style={{ fontSize: '1.2rem' }} onClick={() => setShowAddForm(false)}>×</button>
+                </div>
+                <div className="card-body">
+                  {formError && <div className="error-alert">{formError}</div>}
+                  {formSuccess && <div className="success-alert">{formSuccess}</div>}
+
+                  <form onSubmit={handleCreateEntity} className="admin-create-form">
+                    
+                    {/* User fields */}
+                    {activeTab === 'usuarios' && (
+                      <>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="user-name">Nombre Completo</label>
+                          <input
+                            id="user-name"
+                            type="text"
+                            className="form-input"
+                            value={userName}
+                            onChange={(e) => setUserName(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="user-email">Correo Electrónico</label>
+                          <input
+                            id="user-email"
+                            type="email"
+                            className="form-input"
+                            value={userEmail}
+                            onChange={(e) => setUserEmail(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="user-pass">Contraseña</label>
+                          <input
+                            id="user-pass"
+                            type="password"
+                            className="form-input"
+                            value={userPassword}
+                            onChange={(e) => setUserPassword(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="user-rol">Rol asignado</label>
+                          <select
+                            id="user-rol"
+                            className="form-select"
+                            value={userRolId}
+                            onChange={(e) => setUserRolId(e.target.value)}
+                            required
+                          >
+                            {roles.map(r => (
+                              <option key={r.id} value={r.id}>{r.nombre}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="user-ciudad">Ciudad de Operación (Opcional)</label>
+                          <select
+                            id="user-ciudad"
+                            className="form-select"
+                            value={userCiudadId}
+                            onChange={(e) => setUserCiudadId(e.target.value)}
+                          >
+                            <option value="">Nivel Nacional</option>
+                            {ciudades.map(c => (
+                              <option key={c.id} value={c.id}>{c.nombre}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </>
+                    )}
+
+                    {/* PDV Fields */}
+                    {activeTab === 'pdvs' && (
+                      <>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="pdv-name">Nombre del PDV</label>
+                          <input
+                            id="pdv-name"
+                            type="text"
+                            className="form-input"
+                            value={pdvName}
+                            onChange={(e) => setPdvName(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="pdv-ciudad">Ciudad</label>
+                          <select
+                            id="pdv-ciudad"
+                            className="form-select"
+                            value={pdvCiudadId}
+                            onChange={(e) => setPdvCiudadId(e.target.value)}
+                            required
+                          >
+                            {ciudades.map(c => (
+                              <option key={c.id} value={c.id}>{c.nombre}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="pdv-dir">Dirección física</label>
+                          <input
+                            id="pdv-dir"
+                            type="text"
+                            className="form-input"
+                            value={pdvDireccion}
+                            onChange={(e) => setPdvDireccion(e.target.value)}
+                          />
+                        </div>
+                        <div className="form-row-split">
+                          <div className="form-group">
+                            <label className="form-label" htmlFor="pdv-apertura">Apertura</label>
+                            <input
+                              id="pdv-apertura"
+                              type="time"
+                              className="form-input"
+                              value={pdvApertura}
+                              onChange={(e) => setPdvApertura(e.target.value)}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label" htmlFor="pdv-cierre">Cierre</label>
+                            <input
+                              id="pdv-cierre"
+                              type="time"
+                              className="form-input"
+                              value={pdvCierre}
+                              onChange={(e) => setPdvCierre(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Ciudad Fields */}
+                    {activeTab === 'ciudades' && (
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="ciudad-name">Nombre de la Ciudad</label>
+                        <input
+                          id="ciudad-name"
+                          type="text"
+                          className="form-input"
+                          placeholder="Ej: Barranquilla"
+                          value={ciudadName}
+                          onChange={(e) => setCiudadName(e.target.value)}
+                          required
+                        />
+                      </div>
+                    )}
+
+                    {/* Area Fields */}
+                    {activeTab === 'areas' && (
+                      <>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="area-name">Nombre del Área</label>
+                          <input
+                            id="area-name"
+                            type="text"
+                            className="form-input"
+                            placeholder="Ej: Sistemas"
+                            value={areaName}
+                            onChange={(e) => setAreaName(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="area-desc">Descripción</label>
+                          <textarea
+                            id="area-desc"
+                            className="form-textarea"
+                            placeholder="Breve descripción de las funciones..."
+                            value={areaDesc}
+                            onChange={(e) => setAreaDesc(e.target.value)}
+                          ></textarea>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="area-color">Color identificativo</label>
+                          <input
+                            id="area-color"
+                            type="color"
+                            className="form-input"
+                            value={areaColor}
+                            onChange={(e) => setAreaColor(e.target.value)}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <button type="submit" className="btn btn-primary btn-block" disabled={formLoading}>
+                      {formLoading ? 'Guardando...' : `Guardar ${activeTab.slice(0, -1)}`}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* SMTP Email Settings Form */}
+      {activeTab === 'correo' && (
+        <div className="card shadow-md animate-fade-in" style={{ maxWidth: '600px', margin: '0 auto' }}>
+          <div className="card-header">
+            <h4>📧 Servidor de Correo Saliente (SMTP)</h4>
+          </div>
+          <div className="card-body">
+            {smtpSuccess && <div className="success-alert">{smtpSuccess}</div>}
+            {smtpError && <div className="error-alert">{smtpError}</div>}
+
+            <form onSubmit={handleSaveSmtp} className="smtp-form" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="smtp-host">Host Servidor SMTP</label>
+                <input
+                  id="smtp-host"
+                  type="text"
+                  className="form-input"
+                  placeholder="Ej: smtp.gmail.com o smtp.office365.com"
+                  value={smtpHost}
+                  onChange={(e) => setSmtpHost(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-row-split">
+                <div className="form-group">
+                  <label className="form-label" htmlFor="smtp-port">Puerto SMTP</label>
+                  <input
+                    id="smtp-port"
+                    type="number"
+                    className="form-input"
+                    placeholder="Ej: 587"
+                    value={smtpPort}
+                    onChange={(e) => setSmtpPort(parseInt(e.target.value) || 587)}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Cifrado</label>
+                  <select className="form-select" disabled value={smtpPort === 465 ? 'ssl' : 'tls'}>
+                    <option value="tls">TLS / STARTTLS (Recomendado - 587)</option>
+                    <option value="ssl">SSL implícito (Puerto 465)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="smtp-user">Correo Emisor (Cuenta de Envío)</label>
+                <input
+                  id="smtp-user"
+                  type="email"
+                  className="form-input"
+                  placeholder="Ej: notificaciones@crepesenpunto.com"
+                  value={smtpUser}
+                  onChange={(e) => setSmtpUser(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="smtp-pass">Contraseña o Token de Aplicación</label>
+                <input
+                  id="smtp-pass"
+                  type="password"
+                  className="form-input"
+                  placeholder="••••••••••••••••"
+                  value={smtpPass}
+                  onChange={(e) => setSmtpPass(e.target.value)}
+                />
+                <span className="text-muted italic" style={{ fontSize: '0.72rem', display: 'block', marginTop: '4px' }}>
+                  Nota: Si utilizas cuentas de Outlook o Gmail con doble factor de autenticación (2FA), debes configurar una <strong>Contraseña de Aplicación</strong> y no tu contraseña personal regular.
+                </span>
+              </div>
+
+              <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={smtpLoading}>
+                {smtpLoading ? 'Guardando...' : 'Guardar Configuración 💾'}
+              </button>
+            </form>
           </div>
         </div>
-
-        {/* Right/Floating: Add new form */}
-        {showAddForm && (
-          <div className="admin-form-col">
-            <div className="card shadow-lg animate-fade-in">
-              <div className="card-header">
-                <h3>
-                  Agregar nuevo
-                  {activeTab === 'usuarios' && ' Usuario'}
-                  {activeTab === 'pdvs' && ' PDV'}
-                  {activeTab === 'ciudades' && ' Ciudad'}
-                  {activeTab === 'areas' && ' Área'}
-                </h3>
-                <button className="btn btn-ghost btn-sm" onClick={() => setShowAddForm(false)}>Cerrar</button>
-              </div>
-              <div className="card-body">
-                {formError && <div className="error-alert">{formError}</div>}
-                {formSuccess && <div className="success-alert">{formSuccess}</div>}
-
-                <form onSubmit={handleCreateEntity} className="admin-create-form">
-                  
-                  {/* User Form */}
-                  {activeTab === 'usuarios' && (
-                    <>
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="user-name">Nombre Completo</label>
-                        <input
-                          id="user-name"
-                          type="text"
-                          className="form-input"
-                          placeholder="Juan Pérez"
-                          value={userName}
-                          onChange={(e) => setUserName(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="user-email">Correo Electrónico</label>
-                        <input
-                          id="user-email"
-                          type="email"
-                          className="form-input"
-                          placeholder="juan@crepesenpunto.com"
-                          value={userEmail}
-                          onChange={(e) => setUserEmail(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="user-pass">Contraseña Temporal</label>
-                        <input
-                          id="user-pass"
-                          type="password"
-                          className="form-input"
-                          value={userPassword}
-                          onChange={(e) => setUserPassword(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="user-rol">Rol / Perfil</label>
-                        <select
-                          id="user-rol"
-                          className="form-select"
-                          value={userRolId}
-                          onChange={(e) => setUserRolId(e.target.value)}
-                          required
-                        >
-                          {roles.map(r => (
-                            <option key={r.id} value={r.id}>{r.nombre}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="user-ciudad">Ciudad de Operación (Opcional)</label>
-                        <select
-                          id="user-ciudad"
-                          className="form-select"
-                          value={userCiudadId}
-                          onChange={(e) => setUserCiudadId(e.target.value)}
-                        >
-                          <option value="">-- Nivel Nacional / Administrativo --</option>
-                          {ciudades.map(c => (
-                            <option key={c.id} value={c.id}>{c.nombre}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </>
-                  )}
-
-                  {/* PDV Form */}
-                  {activeTab === 'pdvs' && (
-                    <>
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="pdv-name">Nombre del PDV</label>
-                        <input
-                          id="pdv-name"
-                          type="text"
-                          className="form-input"
-                          placeholder="Ej: Caribe Plaza II"
-                          value={pdvName}
-                          onChange={(e) => setPdvName(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="pdv-ciudad">Ciudad</label>
-                        <select
-                          id="pdv-ciudad"
-                          className="form-select"
-                          value={pdvCiudadId}
-                          onChange={(e) => setPdvCiudadId(e.target.value)}
-                          required
-                        >
-                          {ciudades.map(c => (
-                            <option key={c.id} value={c.id}>{c.nombre}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="pdv-dir">Dirección</label>
-                        <input
-                          id="pdv-dir"
-                          type="text"
-                          className="form-input"
-                          placeholder="Ej: Calle 32 #12-43"
-                          value={pdvDireccion}
-                          onChange={(e) => setPdvDireccion(e.target.value)}
-                        />
-                      </div>
-                      <div className="form-row-split">
-                        <div className="form-group">
-                          <label className="form-label" htmlFor="pdv-apertura">Hora Apertura</label>
-                          <input
-                            id="pdv-apertura"
-                            type="time"
-                            className="form-input"
-                            value={pdvApertura}
-                            onChange={(e) => setPdvApertura(e.target.value)}
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label" htmlFor="pdv-cierre">Hora Cierre</label>
-                          <input
-                            id="pdv-cierre"
-                            type="time"
-                            className="form-input"
-                            value={pdvCierre}
-                            onChange={(e) => setPdvCierre(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Ciudad Form */}
-                  {activeTab === 'ciudades' && (
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="ciudad-name">Nombre de la Ciudad</label>
-                      <input
-                        id="ciudad-name"
-                        type="text"
-                        className="form-input"
-                        placeholder="Ej: Santa Marta"
-                        value={ciudadName}
-                        onChange={(e) => setCiudadName(e.target.value)}
-                        required
-                      />
-                    </div>
-                  )}
-
-                  {/* Area Form */}
-                  {activeTab === 'areas' && (
-                    <>
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="area-name">Nombre de Área Inspectora</label>
-                        <input
-                          id="area-name"
-                          type="text"
-                          className="form-input"
-                          placeholder="Ej: SST o Formación"
-                          value={areaName}
-                          onChange={(e) => setAreaName(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="area-color">Color Identificativo (Código Hexadecimal)</label>
-                        <input
-                          id="area-color"
-                          type="color"
-                          className="form-input"
-                          value={areaColor}
-                          onChange={(e) => setAreaColor(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="area-desc">Descripción</label>
-                        <textarea
-                          id="area-desc"
-                          className="form-textarea"
-                          placeholder="Definición del propósito de esta área de inspección..."
-                          value={areaDesc}
-                          onChange={(e) => setAreaDesc(e.target.value)}
-                        ></textarea>
-                      </div>
-                    </>
-                  )}
-
-                  <button
-                    type="submit"
-                    className="btn btn-primary btn-block btn-lg"
-                    disabled={formLoading}
-                  >
-                    {formLoading ? 'Guardando...' : 'Confirmar Registro'}
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
-        )}
-
-      </div>
+      )}
 
       <style jsx>{`
         .admin-page-container {

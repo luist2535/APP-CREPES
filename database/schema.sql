@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS areas (
   nombre TEXT NOT NULL UNIQUE,
   descripcion TEXT,
   color TEXT DEFAULT '#8B6914',
+  tipo_flujo TEXT DEFAULT 'administrativo',
   activa INTEGER DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -140,6 +141,13 @@ CREATE TABLE IF NOT EXISTS visitas (
   fecha_compromiso DATE,
   estado TEXT DEFAULT 'pendiente',
   observaciones TEXT,
+  repuestos TEXT,
+  firma_auxiliar TEXT,
+  firma_jefe TEXT,
+  comentarios_jefe TEXT,
+  hallazgos TEXT,
+  acciones_correctivas TEXT,
+  evento_id INTEGER,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (pdv_id) REFERENCES pdv(id),
   FOREIGN KEY (user_id) REFERENCES users(id),

@@ -11,7 +11,8 @@ function generateToken(user) {
       email: user.email, 
       rol_id: user.rol_id,
       nombre: user.nombre,
-      ciudad_id: user.ciudad_id
+      ciudad_id: user.ciudad_id,
+      pdv_id: user.pdv_id
     },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN }

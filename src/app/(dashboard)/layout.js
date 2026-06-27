@@ -87,19 +87,26 @@ export default function DashboardLayout({ children }) {
     const rol = parseInt(user.rol_id);
     if (rol === 1) return true; // Admin has access to all
     
+    // Roles list groupings
+    const jefesYCoordinador = [2, 3, 4, 5, 6, 7, 9];
+    const auxiliares = [10, 11, 12, 13, 14, 15, 16];
+    const todosOperacionales = [...jefesYCoordinador, ...auxiliares];
+
     switch (path) {
       case '/dashboard':
         return true; // All roles can see dashboard
       case '/territorial':
         return [2, 8].includes(rol); // Coordinator, Visualizador
       case '/calendario':
-        return [2, 8].includes(rol); // Coordinator, Visualizador
+        return [2, 8, 17, ...todosOperacionales].includes(rol); // Coordinator, Visualizador, PDV, and operational staff
       case '/visitas':
-        return [2, 3, 4, 5, 6, 7].includes(rol); // Coordinator and supervisors
+        return [2, 17, ...todosOperacionales].includes(rol); // Coordinator, PDV, Supervisors, and Auxiliares
       case '/bloqueos':
         return [2].includes(rol); // Coordinator
       case '/equipos':
-        return [2, 3, 4, 5, 6, 7].includes(rol); // Coordinator and supervisors can scan
+        return [2, ...todosOperacionales].includes(rol); // Coordinator, Supervisors, and Auxiliares can scan
+      case '/solicitudes':
+        return [1, 2, 4, 9, 12, 16, 17].includes(rol); // Admin, Coordinator, Mantenimiento, Sistemas, and PDVs
       case '/admin':
         return rol === 1; // Admin only
       default:
@@ -112,6 +119,7 @@ export default function DashboardLayout({ children }) {
     { name: '📍 Gestión Territorial', path: '/territorial' },
     { name: '📅 Calendario', path: '/calendario' },
     { name: '📋 Modo Visita', path: '/visitas' },
+    { name: '📨 Solicitudes Soporte', path: '/solicitudes' },
     { name: '📷 Escanear Equipo', path: '/equipos' },
     { name: '🔒 Bloqueos Horario', path: '/bloqueos' },
     { name: '⚙️ Administración', path: '/admin' },
@@ -122,6 +130,7 @@ export default function DashboardLayout({ children }) {
     if (pathname === '/territorial') return 'Estado Territorial de PDV';
     if (pathname === '/calendario') return 'Calendario de Visitas';
     if (pathname === '/visitas') return 'Modo Visita Inteligente';
+    if (pathname === '/solicitudes') return 'Solicitudes de Soporte Técnico';
     if (pathname === '/equipos') return 'Equipos & Escaneo QR';
     if (pathname === '/bloqueos') return 'Gestión de Bloqueos de Horario';
     if (pathname === '/admin') return 'Panel de Administración';

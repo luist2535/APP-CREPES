@@ -1,14 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function CalendarioPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   
   const [eventos, setEventos] = useState([]);
   const [pdvs, setPdvs] = useState([]);
   const [areas, setAreas] = useState([]);
+  const [tiposVisita, setTiposVisita] = useState([]);
+  const [plantillas, setPlantillas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
@@ -24,6 +27,7 @@ export default function CalendarioPage() {
   const [formDesc, setFormDesc] = useState('');
   const [formPdvId, setFormPdvId] = useState('');
   const [formAreaId, setFormAreaId] = useState('');
+  const [formTipoVisitaId, setFormTipoVisitaId] = useState('');
   const [formHoraInicio, setFormHoraInicio] = useState('08:00');
   const [formHoraFin, setFormHoraFin] = useState('09:00');
   const [formTipo, setFormTipo] = useState('visita');
@@ -39,12 +43,13 @@ export default function CalendarioPage() {
   const getAreaIdFromRol = (rolId) => {
     const rol = parseInt(rolId);
     if (rol === 1) return 'admin'; // Admin has master override
-    if (rol === 2) return 1; // Coordinator -> Operaciones
-    if (rol === 3) return 2; // SST
-    if (rol === 4) return 3; // Mantenimiento
-    if (rol === 5) return 4; // Calidad
-    if (rol === 6) return 5; // VRH
-    if (rol === 7) return 6; // Formación
+    if (rol === 2 || rol === 10) return 1; // Coordinator / Auxiliar Operaciones -> Operaciones
+    if (rol === 3 || rol === 11) return 2; // SST / Auxiliar SST -> SST
+    if (rol === 4 || rol === 12) return 3; // Mantenimiento / Auxiliar Mantenimiento -> Mantenimiento
+    if (rol === 5 || rol === 13) return 4; // Calidad / Auxiliar Calidad -> Calidad
+    if (rol === 6 || rol === 14) return 5; // VRH / Auxiliar VRH -> VRH
+    if (rol === 7 || rol === 15) return 6; // Formación / Auxiliar Formación -> Formación
+    if (rol === 9 || rol === 16) return 7; // Jefe Sistemas / Auxiliar Sistemas -> Sistemas
     return null;
   };
 
@@ -72,7 +77,9 @@ export default function CalendarioPage() {
       const resVisitas = await fetch('/api/visitas');
       if (resVisitas.ok) {
         const dataVisitas = await resVisitas.json();
-        setAreas(dataVisitas.areas);
+        setAreas(dataVisitas.areas || []);
+        setTiposVisita(dataVisitas.tiposVisita || []);
+        setPlantillas(dataVisitas.plantillas || []);
       }
     } catch (err) {
       setError(err.message);
@@ -97,6 +104,39 @@ export default function CalendarioPage() {
       } catch (e) {}
     }
   }, []);
+
+  // Prefill scheduling form from query parameters (for redirections from solicitudes page)
+  useEffect(() => {
+    if (!loading && searchParams) {
+      const pdv = searchParams.get('pdv_id');
+      const area = searchParams.get('area_id');
+      const title = searchParams.get('titulo');
+      const desc = searchParams.get('descripcion');
+      const date = searchParams.get('fecha');
+      const show = searchParams.get('show_form');
+      
+      if (pdv) setFormPdvId(pdv);
+      if (area) setFormAreaId(area);
+      if (title) setFormTitle(title);
+      if (desc) setFormDesc(desc);
+      if (date) setSelectedDateStr(date);
+      if (show === 'true') setShowForm(true);
+    }
+  }, [loading, searchParams]);
+
+  // Reset or pre-select visit type when area changes
+  useEffect(() => {
+    if (formAreaId && tiposVisita.length > 0) {
+      const filtered = tiposVisita.filter(t => t.area_id === parseInt(formAreaId));
+      if (filtered.length > 0) {
+        setFormTipoVisitaId(String(filtered[0].id));
+      } else {
+        setFormTipoVisitaId('');
+      }
+    } else {
+      setFormTipoVisitaId('');
+    }
+  }, [formAreaId, tiposVisita]);
 
   // Update default selected area if Admin or Coordinator once areas are loaded
   useEffect(() => {
@@ -128,6 +168,15 @@ export default function CalendarioPage() {
     setSubmitSuccess('');
     setSubmitLoading(true);
 
+    // Find matching template
+    let selectedPlantillaId = null;
+    if (formAreaId && formTipoVisitaId) {
+      const template = plantillas.find(
+        (p) => p.area_id === parseInt(formAreaId) && p.tipo_visita_id === parseInt(formTipoVisitaId)
+      );
+      if (template) selectedPlantillaId = template.id;
+    }
+
     try {
       const res = await fetch('/api/calendario', {
         method: 'POST',
@@ -141,6 +190,8 @@ export default function CalendarioPage() {
           hora_inicio: formHoraInicio,
           hora_fin: formHoraFin,
           tipo_evento: formTipo,
+          tipo_visita_id: formTipoVisitaId ? parseInt(formTipoVisitaId) : null,
+          plantilla_id: selectedPlantillaId,
         }),
       });
 
@@ -301,7 +352,7 @@ export default function CalendarioPage() {
           <div className="card shadow-md">
             <div className="card-header">
               <h3>📅 Visitas para el {selectedDateStr}</h3>
-              {(!showForm && userRole !== 8) && (
+              {(!showForm && userRole !== 8 && userRole !== 17) && (
                 <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
                   + Programar
                 </button>
@@ -369,119 +420,142 @@ export default function CalendarioPage() {
             </div>
           </div>
 
-          {/* Scheduling form */}
+          {/* Scheduling form Modal */}
           {showForm && (
-            <div className="card shadow-md scheduling-card animate-fade-in">
-              <div className="card-header">
-                <h3>📝 Programar Visita</h3>
-                <button className="btn btn-ghost btn-sm" onClick={() => setShowForm(false)}>Cerrar</button>
-              </div>
-              <div className="card-body">
-                
-                {submitError && <div className="error-alert">{submitError}</div>}
+            <div className="modal-backdrop no-print">
+              <div className="modal-content card shadow-md animate-fade-in" style={{ maxWidth: '500px' }}>
+                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3>📝 Programar Visita</h3>
+                  <button className="modal-close-btn" onClick={() => setShowForm(false)}>×</button>
+                </div>
+                <div className="card-body modal-scrollable-body">
+                  
+                  {submitError && <div className="error-alert">{submitError}</div>}
 
-                <form onSubmit={handleScheduleVisit} className="scheduling-form">
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="form-title">Título de la Visita</label>
-                    <input
-                      id="form-title"
-                      type="text"
-                      className="form-input"
-                      placeholder="Ej: Inspección Mensual SST o Visita Calidad"
-                      value={formTitle}
-                      onChange={(e) => setFormTitle(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="form-pdv">Punto de Venta (PDV)</label>
-                    <select
-                      id="form-pdv"
-                      className="form-select"
-                      value={formPdvId}
-                      onChange={(e) => setFormPdvId(e.target.value)}
-                      required
-                    >
-                      {pdvs.map(p => (
-                        <option key={p.id} value={p.id}>{p.nombre} ({p.ciudad_nombre})</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="form-area">Área Responsable</label>
-                    <select
-                      id="form-area"
-                      className="form-select"
-                      value={formAreaId}
-                      onChange={(e) => setFormAreaId(e.target.value)}
-                      required
-                      disabled={isAreaLocked}
-                    >
-                      {areas.map(a => (
-                        <option key={a.id} value={a.id}>{a.nombre}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-row-split">
+                  <form onSubmit={handleScheduleVisit} className="scheduling-form">
                     <div className="form-group">
-                      <label className="form-label" htmlFor="form-start-time">Hora Inicio</label>
+                      <label className="form-label" htmlFor="form-title">Título de la Visita</label>
                       <input
-                        id="form-start-time"
-                        type="time"
+                        id="form-title"
+                        type="text"
                         className="form-input"
-                        value={formHoraInicio}
-                        onChange={(e) => setFormHoraInicio(e.target.value)}
+                        placeholder="Ej: Inspección Mensual SST o Visita Calidad"
+                        value={formTitle}
+                        onChange={(e) => setFormTitle(e.target.value)}
                         required
                       />
                     </div>
+
                     <div className="form-group">
-                      <label className="form-label" htmlFor="form-end-time">Hora Fin</label>
-                      <input
-                        id="form-end-time"
-                        type="time"
-                        className="form-input"
-                        value={formHoraFin}
-                        onChange={(e) => setFormHoraFin(e.target.value)}
+                      <label className="form-label" htmlFor="form-pdv">Punto de Venta (PDV)</label>
+                      <select
+                        id="form-pdv"
+                        className="form-select"
+                        value={formPdvId}
+                        onChange={(e) => setFormPdvId(e.target.value)}
                         required
-                      />
+                      >
+                        {pdvs.map(p => (
+                          <option key={p.id} value={p.id}>{p.nombre} ({p.ciudad_nombre})</option>
+                        ))}
+                      </select>
                     </div>
-                  </div>
 
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="form-desc">Descripción / Observaciones</label>
-                    <textarea
-                      id="form-desc"
-                      className="form-textarea"
-                      placeholder="Detalles sobre los puntos clave de la visita..."
-                      value={formDesc}
-                      onChange={(e) => setFormDesc(e.target.value)}
-                    ></textarea>
-                  </div>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="form-area">Área Responsable</label>
+                      <select
+                        id="form-area"
+                        className="form-select"
+                        value={formAreaId}
+                        onChange={(e) => setFormAreaId(e.target.value)}
+                        required
+                        disabled={isAreaLocked}
+                      >
+                        {areas.map(a => (
+                          <option key={a.id} value={a.id}>{a.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <div className="form-checkbox-group">
-                    <input
-                      id="form-sync"
-                      type="checkbox"
-                      className="form-checkbox"
-                      checked={formSyncOutlook}
-                      onChange={(e) => setFormSyncOutlook(e.target.checked)}
-                    />
-                    <label htmlFor="form-sync" className="checkbox-label">
-                      📧 Sincronizar automáticamente con Microsoft Outlook
-                    </label>
-                  </div>
+                    {/* Tipo de Visita Selection */}
+                    {formAreaId && (
+                      <div className="form-group animate-fade-in">
+                        <label className="form-label" htmlFor="form-tipo-visita">Tipo de Visita</label>
+                        <select
+                          id="form-tipo-visita"
+                          className="form-select"
+                          value={formTipoVisitaId}
+                          onChange={(e) => setFormTipoVisitaId(e.target.value)}
+                          required
+                        >
+                          <option value="">-- Seleccionar Tipo --</option>
+                          {tiposVisita
+                            .filter((t) => t.area_id === parseInt(formAreaId))
+                            .map((t) => (
+                              <option key={t.id} value={t.id}>{t.nombre}</option>
+                            ))}
+                        </select>
+                      </div>
+                    )}
 
-                  <button
-                    type="submit"
-                    className="btn btn-primary btn-block"
-                    disabled={submitLoading}
-                  >
-                    {submitLoading ? 'Programando...' : 'Confirmar Programación'}
-                  </button>
-                </form>
+                    <div className="form-row-split">
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="form-start-time">Hora Inicio</label>
+                        <input
+                          id="form-start-time"
+                          type="time"
+                          className="form-input"
+                          value={formHoraInicio}
+                          onChange={(e) => setFormHoraInicio(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="form-end-time">Hora Fin</label>
+                        <input
+                          id="form-end-time"
+                          type="time"
+                          className="form-input"
+                          value={formHoraFin}
+                          onChange={(e) => setFormHoraFin(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="form-desc">Descripción / Observaciones</label>
+                      <textarea
+                        id="form-desc"
+                        className="form-textarea"
+                        placeholder="Detalles sobre los puntos clave de la visita..."
+                        value={formDesc}
+                        onChange={(e) => setFormDesc(e.target.value)}
+                      ></textarea>
+                    </div>
+
+                    <div className="form-checkbox-group">
+                      <input
+                        id="form-sync"
+                        type="checkbox"
+                        className="form-checkbox"
+                        checked={formSyncOutlook}
+                        onChange={(e) => setFormSyncOutlook(e.target.checked)}
+                      />
+                      <label htmlFor="form-sync" className="checkbox-label">
+                        📧 Sincronizar automáticamente con Microsoft Outlook
+                      </label>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="btn btn-primary btn-block"
+                      disabled={submitLoading}
+                    >
+                      {submitLoading ? 'Programando...' : 'Confirmar Programación'}
+                    </button>
+                  </form>
+                </div>
               </div>
             </div>
           )}
@@ -707,9 +781,50 @@ export default function CalendarioPage() {
           border-left: 3px solid var(--color-primary);
         }
 
-        /* Scheduling form styling */
-        .scheduling-card {
-          margin-top: var(--spacing-lg);
+        /* Modal Overlay Styling */
+        .modal-backdrop {
+          position: fixed;
+          inset: 0;
+          background-color: rgba(0,0,0,0.5);
+          backdrop-filter: blur(4px);
+          z-index: 100;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: var(--spacing-md);
+        }
+
+        .modal-content {
+          width: 100%;
+          max-width: 500px;
+          max-height: 90vh;
+          background-color: var(--color-bg-card);
+          border-radius: var(--radius-xl);
+          box-shadow: var(--shadow-xl);
+          display: flex;
+          flex-direction: column;
+        }
+
+        .modal-scrollable-body {
+          overflow-y: auto;
+          max-height: calc(90vh - 80px);
+          padding: var(--spacing-md);
+          display: flex;
+          flex-direction: column;
+          gap: var(--spacing-md);
+        }
+
+        .modal-close-btn {
+          background: none;
+          border: none;
+          font-size: 1.75rem;
+          cursor: pointer;
+          color: var(--color-text-muted);
+          transition: color var(--transition-fast);
+        }
+
+        .modal-close-btn:hover {
+          color: var(--color-error);
         }
 
         .scheduling-form {

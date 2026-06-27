@@ -11,7 +11,15 @@ INSERT INTO roles (nombre, descripcion, permisos) VALUES
   ('Supervisor Calidad', 'Calidad y aseo general', '{"visitas": true, "dashboard_area": true}'),
   ('VRH', 'Recursos Humanos - Acompañamiento', '{"visitas": true, "dashboard_area": true}'),
   ('Formación', 'Entrenamiento y seguimiento', '{"visitas": true, "dashboard_area": true}'),
-  ('Visualizador', 'Solo lectura de dashboard y reportes', '{"dashboard": true}');
+  ('Visualizador', 'Solo lectura de dashboard y reportes', '{"dashboard": true}'),
+  ('Jefe de Sistemas', 'Jefe de la división de sistemas y soporte', '{"visitas": true, "dashboard_area": true}'),
+  ('Auxiliar de Operaciones', 'Auxiliar de operaciones', '{"visitas": true}'),
+  ('Auxiliar SST', 'Auxiliar de seguridad y salud en el trabajo', '{"visitas": true}'),
+  ('Auxiliar de Mantenimiento', 'Auxiliar de mantenimiento físico', '{"visitas": true}'),
+  ('Auxiliar de Calidad', 'Auxiliar de calidad y aseo', '{"visitas": true}'),
+  ('Auxiliar VRH', 'Auxiliar de recursos humanos', '{"visitas": true}'),
+  ('Auxiliar Formación', 'Auxiliar de capacitación', '{"visitas": true}'),
+  ('Auxiliar de Sistemas', 'Auxiliar técnico de sistemas', '{"visitas": true}');
 
 -- Ciudades
 INSERT INTO ciudades (nombre) VALUES
@@ -57,13 +65,14 @@ INSERT INTO pdv (nombre, ciudad_id, hora_apertura, hora_cierre, estado_id) VALUE
   ('Buena Vista', 3, '08:00', '22:00', 1);
 
 -- Áreas Funcionales
-INSERT INTO areas (nombre, descripcion, color) VALUES
-  ('Operaciones', 'Área de operaciones generales', '#8B6914'),
-  ('SST', 'Seguridad y Salud en el Trabajo', '#D4760A'),
-  ('Mantenimiento', 'Mantenimiento preventivo y correctivo', '#6B4226'),
-  ('Calidad', 'Control de calidad y aseo', '#A0522D'),
-  ('VRH', 'Vicepresidencia de Recursos Humanos', '#CD853F'),
-  ('Formación', 'Capacitación y entrenamiento', '#DEB887');
+INSERT INTO areas (nombre, descripcion, color, tipo_flujo) VALUES
+  ('Operaciones', 'Área de operaciones generales', '#8B6914', 'administrativo'),
+  ('SST', 'Seguridad y Salud en el Trabajo', '#D4760A', 'administrativo'),
+  ('Mantenimiento', 'Mantenimiento preventivo y correctivo', '#6B4226', 'tecnico'),
+  ('Calidad', 'Control de calidad y aseo', '#A0522D', 'administrativo'),
+  ('VRH', 'Vicepresidencia de Recursos Humanos', '#CD853F', 'administrativo'),
+  ('Formación', 'Capacitación y entrenamiento', '#DEB887', 'administrativo'),
+  ('Sistemas', 'Área de sistemas y soporte técnico', '#4B0082', 'tecnico');
 
 -- Tipos de Visita
 INSERT INTO tipos_visita (area_id, nombre) VALUES
@@ -73,7 +82,8 @@ INSERT INTO tipos_visita (area_id, nombre) VALUES
   (3, 'Correctivo'),
   (4, 'Aseo general'),
   (5, 'Acompañamiento'),
-  (6, 'Entrenamiento');
+  (6, 'Entrenamiento'),
+  (7, 'Soporte Técnico');
 
 -- Plantillas de Visita
 INSERT INTO plantillas (area_id, tipo_visita_id, nombre, campos) VALUES
@@ -83,7 +93,8 @@ INSERT INTO plantillas (area_id, tipo_visita_id, nombre, campos) VALUES
   (3, 4, 'Cuadro acción correctiva', '[{"nombre":"hallazgo","tipo":"textarea","label":"Descripción del hallazgo","requerido":true},{"nombre":"causa","tipo":"textarea","label":"Causa raíz","requerido":true},{"nombre":"accion","tipo":"textarea","label":"Acción correctiva","requerido":true},{"nombre":"responsable","tipo":"text","label":"Responsable","requerido":true},{"nombre":"fecha_cierre","tipo":"date","label":"Fecha de cierre","requerido":true}]'),
   (4, 5, 'Cuadro hallazgos', '[{"nombre":"area_inspeccionada","tipo":"text","label":"Área inspeccionada","requerido":true},{"nombre":"item","tipo":"checkbox","label":"Pisos limpios","requerido":true},{"nombre":"item2","tipo":"checkbox","label":"Superficies desinfectadas","requerido":true},{"nombre":"item3","tipo":"checkbox","label":"Baños limpios","requerido":true},{"nombre":"item4","tipo":"checkbox","label":"Cocina en orden","requerido":true},{"nombre":"hallazgos","tipo":"textarea","label":"Hallazgos","requerido":false}]'),
   (5, 6, 'Check list visita', '[{"nombre":"item","tipo":"checkbox","label":"Ambiente laboral adecuado","requerido":true},{"nombre":"item2","tipo":"checkbox","label":"Personal completo","requerido":true},{"nombre":"item3","tipo":"checkbox","label":"Dotación entregada","requerido":true},{"nombre":"item4","tipo":"checkbox","label":"Documentación al día","requerido":true},{"nombre":"observaciones","tipo":"textarea","label":"Observaciones","requerido":false}]'),
-  (6, 7, 'Seguimiento', '[{"nombre":"tema","tipo":"text","label":"Tema de entrenamiento","requerido":true},{"nombre":"asistentes","tipo":"number","label":"Número de asistentes","requerido":true},{"nombre":"duracion","tipo":"text","label":"Duración","requerido":true},{"nombre":"evaluacion","tipo":"select","label":"Evaluación general","opciones":["Excelente","Bueno","Regular","Deficiente"],"requerido":true},{"nombre":"observaciones","tipo":"textarea","label":"Observaciones","requerido":false}]');
+  (6, 7, 'Seguimiento', '[{"nombre":"tema","tipo":"text","label":"Tema de entrenamiento","requerido":true},{"nombre":"asistentes","tipo":"number","label":"Número de asistentes","requerido":true},{"nombre":"duracion","tipo":"text","label":"Duración","requerido":true},{"nombre":"evaluacion","tipo":"select","label":"Evaluación general","opciones":["Excelente","Bueno","Regular","Deficiente"],"requerido":true},{"nombre":"observaciones","tipo":"textarea","label":"Observaciones","requerido":false}]'),
+  (7, 8, 'Check list Sistemas', '[{"nombre":"hardware","tipo":"checkbox","label":"Revisión de hardware (CPU, Disco Duro, RAM)","requerido":true},{"nombre":"software","tipo":"checkbox","label":"Actualización de software y antivirus","requerido":true},{"nombre":"redes","tipo":"checkbox","label":"Prueba de conectividad de red y cableado","requerido":true},{"nombre":"backup","tipo":"checkbox","label":"Respaldo de información local realizado","requerido":true},{"nombre":"detalles_trabajo","tipo":"textarea","label":"Detalles del soporte realizado","requerido":true}]');
 
 -- Motivos de Bloqueo
 INSERT INTO motivos_bloqueo (nombre) VALUES
@@ -107,7 +118,12 @@ INSERT INTO users (nombre, email, password_hash, rol_id, ciudad_id) VALUES
   ('Sandra Calidad', 'sandra@crepesenpunto.com', '$2b$10$placeholder_hash', 5, NULL),
   ('Jorge VRH', 'jorge@crepesenpunto.com', '$2b$10$placeholder_hash', 6, NULL),
   ('Diana Formación', 'diana@crepesenpunto.com', '$2b$10$placeholder_hash', 7, NULL),
-  ('Visualizador', 'viewer@crepesenpunto.com', '$2b$10$placeholder_hash', 8, NULL);
+  ('Visualizador', 'viewer@crepesenpunto.com', '$2b$10$placeholder_hash', 8, NULL),
+  ('Jefe de Sistemas', 'jefe_sistemas@crepesenpunto.com', '$2b$10$placeholder_hash', 9, NULL),
+  ('Auxiliar de Sistemas', 'aux_sistemas@crepesenpunto.com', '$2b$10$placeholder_hash', 16, NULL),
+  ('Auxiliar Mantenimiento', 'aux_mante@crepesenpunto.com', '$2b$10$placeholder_hash', 12, NULL),
+  ('Auxiliar Calidad', 'aux_calidad@crepesenpunto.com', '$2b$10$placeholder_hash', 13, NULL),
+  ('Auxiliar SST', 'aux_sst@crepesenpunto.com', '$2b$10$placeholder_hash', 11, NULL);
 
 -- Equipos de ejemplo para Escáner QR
 INSERT INTO equipos (id, nombre, marca, modelo, serie, pdv_id, datos_tecnicos, ultimo_mantenimiento, proximo_mantenimiento) VALUES
