@@ -17,6 +17,8 @@ export default function AdminPage() {
 
   // Form Toggles
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [editingPdv, setEditingPdv] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
@@ -36,6 +38,7 @@ export default function AdminPage() {
   const [userPassword, setUserPassword] = useState('admin123');
   const [userRolId, setUserRolId] = useState('');
   const [userCiudadId, setUserCiudadId] = useState('');
+  const [userPdvId, setUserPdvId] = useState('');
 
   // Form Fields - PDV
   const [pdvName, setPdvName] = useState('');
@@ -167,6 +170,91 @@ export default function AdminPage() {
     }
   };
 
+  const handleCloseForm = () => {
+    setShowAddForm(false);
+    setEditingUser(null);
+    setEditingPdv(null);
+    setUserName('');
+    setUserEmail('');
+    setUserPassword('admin123');
+    setUserPdvId('');
+    setPdvName('');
+    setPdvCiudadId(ciudades.length > 0 ? String(ciudades[0].id) : '');
+    setPdvDireccion('');
+    setPdvApertura('08:00');
+    setPdvCierre('22:00');
+    setFormError('');
+    setFormSuccess('');
+  };
+
+  const handleEditUserClick = (user) => {
+    setEditingUser(user);
+    setUserName(user.nombre);
+    setUserEmail(user.email);
+    setUserRolId(String(user.rol_id));
+    setUserCiudadId(user.ciudad_id ? String(user.ciudad_id) : '');
+    setUserPdvId(user.pdv_id ? String(user.pdv_id) : '');
+    setActiveTab('usuarios');
+    setShowAddForm(true);
+  };
+
+  const handleEditPdvClick = (pdv) => {
+    setEditingPdv(pdv);
+    setPdvName(pdv.nombre);
+    setPdvCiudadId(String(pdv.ciudad_id));
+    setPdvDireccion(pdv.direccion || '');
+    setPdvApertura(pdv.hora_apertura || '08:00');
+    setPdvCierre(pdv.hora_cierre || '22:00');
+    setActiveTab('pdvs');
+    setShowAddForm(true);
+  };
+
+  const handleDeletePdv = async (id, name) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar permanentemente el Punto de Venta "${name}"?\nEsta acción no se puede deshacer.`)) {
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/admin?entity=pdv&id=${id}`, {
+        method: 'DELETE',
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al eliminar Punto de Venta');
+      
+      alert(data.message || 'Punto de Venta eliminado con éxito');
+      loadAllData();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (id, name) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar permanentemente al usuario "${name}"?\nEsta acción no se puede deshacer.`)) {
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/admin?entity=user&id=${id}`, {
+        method: 'DELETE',
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al eliminar usuario');
+      
+      alert(data.message || 'Usuario eliminado con éxito');
+      loadAllData();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCreateEntity = async (e) => {
     e.preventDefault();
     setFormError('');
@@ -176,13 +264,24 @@ export default function AdminPage() {
     try {
       let payloadData = {};
       if (activeTab === 'usuarios') {
-        payloadData = {
-          nombre: userName,
-          email: userEmail,
-          password: userPassword,
-          rol_id: parseInt(userRolId),
-          ciudad_id: userCiudadId ? parseInt(userCiudadId) : null,
-        };
+        if (editingUser) {
+          payloadData = {
+            nombre: userName,
+            email: userEmail,
+            rol_id: parseInt(userRolId),
+            ciudad_id: userCiudadId ? parseInt(userCiudadId) : null,
+            pdv_id: userPdvId ? parseInt(userPdvId) : null,
+          };
+        } else {
+          payloadData = {
+            nombre: userName,
+            email: userEmail,
+            password: userPassword,
+            rol_id: parseInt(userRolId),
+            ciudad_id: userCiudadId ? parseInt(userCiudadId) : null,
+            pdv_id: userPdvId ? parseInt(userPdvId) : null,
+          };
+        }
       } else if (activeTab === 'pdvs') {
         payloadData = {
           nombre: pdvName,
@@ -203,14 +302,21 @@ export default function AdminPage() {
         };
       }
 
+      const isEditing = (activeTab === 'usuarios' && editingUser) || (activeTab === 'pdvs' && editingPdv);
       const entityName = activeTab === 'pdvs' ? 'pdv' : activeTab.slice(0, -1); // 'usuarios' -> 'user', 'ciudades' -> 'ciudad'
+      
+      const body = {
+        entity: entityName === 'usuario' ? 'user' : entityName,
+        data: payloadData,
+      };
+      if (isEditing) {
+        body.id = activeTab === 'usuarios' ? editingUser.id : editingPdv.id;
+      }
+
       const res = await fetch('/api/admin', {
-        method: 'POST',
+        method: isEditing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          entity: entityName === 'usuario' ? 'user' : entityName,
-          data: payloadData,
-        }),
+        body: JSON.stringify(body),
       });
 
       const resData = await res.json();
@@ -219,16 +325,7 @@ export default function AdminPage() {
       setFormSuccess(resData.message || 'Registro guardado exitosamente');
       
       // Reset fields
-      setUserName('');
-      setUserEmail('');
-      setUserPassword('admin123');
-      setPdvName('');
-      setPdvDireccion('');
-      setCiudadName('');
-      setAreaName('');
-      setAreaDesc('');
-      
-      setShowAddForm(false);
+      handleCloseForm();
       loadAllData();
     } catch (err) {
       setFormError(err.message);
@@ -257,19 +354,19 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="tabs-header">
-        <button className={`tab-btn ${activeTab === 'usuarios' ? 'active' : ''}`} onClick={() => { setActiveTab('usuarios'); setShowAddForm(false); }}>
+        <button className={`tab-btn ${activeTab === 'usuarios' ? 'active' : ''}`} onClick={() => { setActiveTab('usuarios'); handleCloseForm(); }}>
           👤 Gestión Usuarios
         </button>
-        <button className={`tab-btn ${activeTab === 'pdvs' ? 'active' : ''}`} onClick={() => { setActiveTab('pdvs'); setShowAddForm(false); }}>
+        <button className={`tab-btn ${activeTab === 'pdvs' ? 'active' : ''}`} onClick={() => { setActiveTab('pdvs'); handleCloseForm(); }}>
           🏪 Gestión PDVs
         </button>
-        <button className={`tab-btn ${activeTab === 'ciudades' ? 'active' : ''}`} onClick={() => { setActiveTab('ciudades'); setShowAddForm(false); }}>
+        <button className={`tab-btn ${activeTab === 'ciudades' ? 'active' : ''}`} onClick={() => { setActiveTab('ciudades'); handleCloseForm(); }}>
           📍 Ciudades
         </button>
-        <button className={`tab-btn ${activeTab === 'areas' ? 'active' : ''}`} onClick={() => { setActiveTab('areas'); setShowAddForm(false); }}>
+        <button className={`tab-btn ${activeTab === 'areas' ? 'active' : ''}`} onClick={() => { setActiveTab('areas'); handleCloseForm(); }}>
           🛡️ Áreas de Inspección
         </button>
-        <button className={`tab-btn ${activeTab === 'correo' ? 'active' : ''}`} onClick={() => { setActiveTab('correo'); setShowAddForm(false); }}>
+        <button className={`tab-btn ${activeTab === 'correo' ? 'active' : ''}`} onClick={() => { setActiveTab('correo'); handleCloseForm(); }}>
           📧 Configuración de Correo
         </button>
       </div>
@@ -283,7 +380,7 @@ export default function AdminPage() {
           {activeTab === 'correo' && 'Configuración de Servidor de Correo (SMTP)'}
         </h3>
         {!showAddForm && activeTab !== 'correo' && (
-          <button className="btn btn-primary btn-sm" onClick={() => setShowAddForm(true)}>
+          <button className="btn btn-primary btn-sm" onClick={() => { setEditingUser(null); setEditingPdv(null); setShowAddForm(true); }}>
             + Agregar Nuevo
           </button>
         )}
@@ -324,13 +421,29 @@ export default function AdminPage() {
                                 {u.activo ? 'Activo' : 'Inactivo'}
                               </span>
                             </td>
-                            <td>
+                            <td style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                               <button 
                                 className={`btn btn-sm ${u.activo ? 'btn-danger' : 'btn-success'}`}
                                 onClick={() => handleToggleActive('user', u.id, u.activo)}
                                 disabled={u.id === 1} // Prevent deactivating admin
+                                title={u.activo ? 'Desactivar usuario' : 'Activar usuario'}
                               >
                                 {u.activo ? 'Desactivar 🔒' : 'Activar 🔓'}
+                              </button>
+                              <button 
+                                className="btn btn-sm btn-primary"
+                                onClick={() => handleEditUserClick(u)}
+                                title="Editar datos del usuario"
+                              >
+                                Editar ✏️
+                              </button>
+                              <button 
+                                className="btn btn-sm btn-danger"
+                                onClick={() => handleDeleteUser(u.id, u.nombre)}
+                                disabled={u.id === 1} // Prevent deleting admin
+                                title="Eliminar permanentemente"
+                              >
+                                Eliminar 🗑️
                               </button>
                             </td>
                           </tr>
@@ -367,12 +480,27 @@ export default function AdminPage() {
                                 {p.activo ? 'Activo' : 'Inactivo'}
                               </span>
                             </td>
-                            <td>
+                            <td style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                               <button 
                                 className={`btn btn-sm ${p.activo ? 'btn-danger' : 'btn-success'}`}
                                 onClick={() => handleToggleActive('pdv', p.id, p.activo)}
+                                title={p.activo ? 'Desactivar Punto de Venta' : 'Activar Punto de Venta'}
                               >
-                                {p.activo ? 'Desactivar' : 'Activar'}
+                                {p.activo ? 'Desactivar 🔒' : 'Activar 🔓'}
+                              </button>
+                              <button 
+                                className="btn btn-sm btn-primary"
+                                onClick={() => handleEditPdvClick(p)}
+                                title="Editar datos del PDV"
+                              >
+                                Editar ✏️
+                              </button>
+                              <button 
+                                className="btn btn-sm btn-danger"
+                                onClick={() => handleDeletePdv(p.id, p.nombre)}
+                                title="Eliminar permanentemente"
+                              >
+                                Eliminar 🗑️
                               </button>
                             </td>
                           </tr>
@@ -476,8 +604,12 @@ export default function AdminPage() {
             <div className="admin-form-col">
               <div className="card shadow-md">
                 <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h4>➕ Crear {activeTab.slice(0, -1).toUpperCase()}</h4>
-                  <button className="modal-close-btn" style={{ fontSize: '1.2rem' }} onClick={() => setShowAddForm(false)}>×</button>
+                  <h4>
+                    {activeTab === 'usuarios' && editingUser ? '✏️ Editar USUARIO' : 
+                     activeTab === 'pdvs' && editingPdv ? '✏️ Editar PUNTO DE VENTA' : 
+                     `➕ Crear ${activeTab.slice(0, -1).toUpperCase()}`}
+                  </h4>
+                  <button className="modal-close-btn" style={{ fontSize: '1.2rem' }} onClick={handleCloseForm}>×</button>
                 </div>
                 <div className="card-body">
                   {formError && <div className="error-alert">{formError}</div>}
@@ -510,17 +642,19 @@ export default function AdminPage() {
                             required
                           />
                         </div>
-                        <div className="form-group">
-                          <label className="form-label" htmlFor="user-pass">Contraseña</label>
-                          <input
-                            id="user-pass"
-                            type="password"
-                            className="form-input"
-                            value={userPassword}
-                            onChange={(e) => setUserPassword(e.target.value)}
-                            required
-                          />
-                        </div>
+                        {!editingUser && (
+                          <div className="form-group">
+                            <label className="form-label" htmlFor="user-pass">Contraseña</label>
+                            <input
+                              id="user-pass"
+                              type="password"
+                              className="form-input"
+                              value={userPassword}
+                              onChange={(e) => setUserPassword(e.target.value)}
+                              required
+                            />
+                          </div>
+                        )}
                         <div className="form-group">
                           <label className="form-label" htmlFor="user-rol">Rol asignado</label>
                           <select
@@ -546,6 +680,20 @@ export default function AdminPage() {
                             <option value="">Nivel Nacional</option>
                             {ciudades.map(c => (
                               <option key={c.id} value={c.id}>{c.nombre}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="user-pdv">Punto de Venta Asignado (Opcional)</label>
+                          <select
+                            id="user-pdv"
+                            className="form-select"
+                            value={userPdvId}
+                            onChange={(e) => setUserPdvId(e.target.value)}
+                          >
+                            <option value="">Ninguno</option>
+                            {pdvs.map(p => (
+                              <option key={p.id} value={p.id}>{p.nombre}</option>
                             ))}
                           </select>
                         </div>
@@ -670,7 +818,10 @@ export default function AdminPage() {
                     )}
 
                     <button type="submit" className="btn btn-primary btn-block" disabled={formLoading}>
-                      {formLoading ? 'Guardando...' : `Guardar ${activeTab.slice(0, -1)}`}
+                      {formLoading ? 'Guardando...' : 
+                       (activeTab === 'usuarios' && editingUser ? 'Actualizar Usuario' : 
+                        activeTab === 'pdvs' && editingPdv ? 'Actualizar Punto de Venta' : 
+                        `Guardar ${activeTab.slice(0, -1)}`)}
                     </button>
                   </form>
                 </div>
@@ -911,6 +1062,70 @@ export default function AdminPage() {
           font-size: 0.8rem;
           margin-bottom: var(--spacing-sm);
           border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+
+        /* Mobile responsive overrides for admin page */
+        @media (max-width: 767px) {
+          .tabs-header {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            gap: 2px;
+          }
+
+          .tabs-header::-webkit-scrollbar {
+            display: none;
+          }
+
+          .tab-btn {
+            padding: 8px 10px;
+            font-size: 0.72rem;
+          }
+
+          .admin-actions-row {
+            flex-direction: column;
+            gap: var(--spacing-sm);
+            align-items: flex-start;
+          }
+
+          .admin-actions-row h3 {
+            font-size: 1rem;
+          }
+
+          .admin-table {
+            font-size: 0.72rem;
+            min-width: 600px;
+          }
+
+          .admin-table th,
+          .admin-table td {
+            padding: 8px;
+          }
+
+          .admin-role-badge {
+            font-size: 0.65rem;
+            padding: 1px 6px;
+          }
+
+          .status-dot-pill {
+            font-size: 0.65rem;
+          }
+
+          .admin-layout-grid {
+            grid-template-columns: 1fr !important;
+          }
+
+          .form-row-split {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 479px) {
+          .tab-btn {
+            padding: 6px 8px;
+            font-size: 0.68rem;
+          }
         }
       `}</style>
     </div>

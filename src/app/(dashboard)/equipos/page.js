@@ -654,6 +654,23 @@ export default function EquiposPage() {
           margin: 0 auto var(--spacing-sm) auto;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Mobile responsive overrides for equipos */
+        @media (max-width: 767px) {
+          .equipment-general-grid {
+            grid-template-columns: 1fr;
+            gap: var(--spacing-sm);
+          }
+
+          .equipment-main-header {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .search-form-card .card-body {
+            padding: var(--spacing-md);
+          }
+        }
       `}</style>
     </div>
   );

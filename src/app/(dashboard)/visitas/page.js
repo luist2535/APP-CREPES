@@ -123,6 +123,194 @@ function SignaturePad({ onSave, onClear, label }) {
   );
 }
 
+// Matrix and Simple checklist helper components for Quality Area
+const MatrixChecklistForm = ({ template, answers, onChange, activeTab, onTabChange }) => {
+  return (
+    <div className="matrix-checklist-execution" style={{ maxWidth: '650px', margin: '0 auto' }}>
+      {/* Scrollable sub-area tabs */}
+      <div className="tabs-header scrollable-tabs" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '15px', borderBottom: '1px solid var(--color-border-light)' }}>
+        {template.columnas.map((col) => (
+          <button
+            key={col}
+            type="button"
+            className={`tab-btn ${activeTab === col ? 'active' : ''}`}
+            onClick={() => onTabChange(col)}
+            style={{ whiteSpace: 'nowrap', padding: '6px 12px', borderRadius: 'var(--radius-sm)' }}
+          >
+            📍 {col}
+          </button>
+        ))}
+      </div>
+
+      {/* Checklist items for the active sub-area */}
+      <div className="matrix-items-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {template.secciones.map((sec, sIdx) => (
+          <div key={sIdx} className="section-block" style={{ backgroundColor: 'var(--color-bg-secondary)', padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-light)' }}>
+            <h5 style={{ color: 'var(--color-primary-dark)', borderBottom: '2px solid var(--color-border-light)', paddingBottom: '4px', marginBottom: '10px', textTransform: 'uppercase', fontSize: '0.78rem', fontWeight: 'bold' }}>
+              📁 {sec.nombre}
+            </h5>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {sec.filas.map((fila, fIdx) => {
+                const answerKey = `${fila}__${activeTab}`;
+                const currentValue = answers[answerKey] || '';
+                
+                return (
+                  <div key={fIdx} className="checklist-row-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '15px', padding: '6px 0', borderBottom: '1px dotted var(--color-border-light)' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: '500', color: 'var(--color-text-primary)', flex: '1', lineHeight: '1.2' }}>{fila}</span>
+                    <div className="btn-group" style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={() => onChange(answerKey, currentValue === 'SI' ? '' : 'SI')}
+                        style={{
+                          padding: '4px 10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 'bold',
+                          borderRadius: '15px',
+                          border: '1px solid ' + (currentValue === 'SI' ? 'var(--color-success)' : 'var(--color-border-light)'),
+                          backgroundColor: currentValue === 'SI' ? 'var(--color-success)' : 'transparent',
+                          color: currentValue === 'SI' ? 'white' : 'var(--color-text-secondary)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        SI
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onChange(answerKey, currentValue === 'NO' ? '' : 'NO')}
+                        style={{
+                          padding: '4px 10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 'bold',
+                          borderRadius: '15px',
+                          border: '1px solid ' + (currentValue === 'NO' ? 'var(--color-danger)' : 'var(--color-border-light)'),
+                          backgroundColor: currentValue === 'NO' ? 'var(--color-danger)' : 'transparent',
+                          color: currentValue === 'NO' ? 'white' : 'var(--color-text-secondary)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        NO
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onChange(answerKey, currentValue === 'NA' ? '' : 'NA')}
+                        style={{
+                          padding: '4px 10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 'bold',
+                          borderRadius: '15px',
+                          border: '1px solid ' + (currentValue === 'NA' ? '#6c757d' : 'var(--color-border-light)'),
+                          backgroundColor: currentValue === 'NA' ? '#6c757d' : 'transparent',
+                          color: currentValue === 'NA' ? 'white' : 'var(--color-text-secondary)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        N/A
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const SimpleChecklistForm = ({ template, answers, onChange }) => {
+  return (
+    <div className="simple-checklist-execution" style={{ maxWidth: '650px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+      {template.secciones.map((sec, sIdx) => (
+        <div key={sIdx} className="section-block" style={{ backgroundColor: 'var(--color-bg-secondary)', padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-light)' }}>
+          <h5 style={{ color: 'var(--color-primary-dark)', borderBottom: '2px solid var(--color-border-light)', paddingBottom: '4px', marginBottom: '10px', textTransform: 'uppercase', fontSize: '0.78rem', fontWeight: 'bold' }}>
+              📁 {sec.nombre}
+          </h5>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {sec.filas.map((fila, fIdx) => {
+              const currentValue = answers[fila] || '';
+              const obsKey = `${fila}__obs`;
+              const currentObs = answers[obsKey] || '';
+              
+              return (
+                <div key={fIdx} className="checklist-row-item" style={{ display: 'flex', flexDirection: 'column', gap: '5px', paddingBottom: '8px', borderBottom: '1px solid var(--color-border-light)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '15px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: '500', color: 'var(--color-text-primary)', flex: '1', lineHeight: '1.2' }}>{fila}</span>
+                    <div className="btn-group" style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={() => onChange(fila, currentValue === 'SI' ? '' : 'SI')}
+                        style={{
+                          padding: '4px 10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 'bold',
+                          borderRadius: '15px',
+                          border: '1px solid ' + (currentValue === 'SI' ? 'var(--color-success)' : 'var(--color-border-light)'),
+                          backgroundColor: currentValue === 'SI' ? 'var(--color-success)' : 'transparent',
+                          color: currentValue === 'SI' ? 'white' : 'var(--color-text-secondary)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        SI
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onChange(fila, currentValue === 'NO' ? '' : 'NO')}
+                        style={{
+                          padding: '4px 10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 'bold',
+                          borderRadius: '15px',
+                          border: '1px solid ' + (currentValue === 'NO' ? 'var(--color-danger)' : 'var(--color-border-light)'),
+                          backgroundColor: currentValue === 'NO' ? 'var(--color-danger)' : 'transparent',
+                          color: currentValue === 'NO' ? 'white' : 'var(--color-text-secondary)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        NO
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onChange(fila, currentValue === 'NA' ? '' : 'NA')}
+                        style={{
+                          padding: '4px 10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 'bold',
+                          borderRadius: '15px',
+                          border: '1px solid ' + (currentValue === 'NA' ? '#6c757d' : 'var(--color-border-light)'),
+                          backgroundColor: currentValue === 'NA' ? '#6c757d' : 'transparent',
+                          color: currentValue === 'NA' ? 'white' : 'var(--color-text-secondary)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        N/A
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Escribir comentario / observación..."
+                    style={{ fontSize: '0.74rem', padding: '3px 6px', marginTop: '2px', height: 'auto', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-light)' }}
+                    value={currentObs}
+                    onChange={(e) => onChange(obsKey, e.target.value)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export default function VisitasPage() {
   const [visitas, setVisitas] = useState([]);
   const [areas, setAreas] = useState([]);
@@ -144,6 +332,7 @@ export default function VisitasPage() {
   const [selectedAreaId, setSelectedAreaId] = useState('');
   const [selectedTipoId, setSelectedTipoId] = useState('');
   const [activePlantilla, setActivePlantilla] = useState(null);
+  const [activeMatrixTab, setActiveMatrixTab] = useState('');
   
   // Execution states
   const [activeExecutionVisit, setActiveExecutionVisit] = useState(null);
@@ -202,7 +391,7 @@ export default function VisitasPage() {
   };
 
   const isUserJefe = (rolId) => {
-    return [3, 4, 5, 6, 7, 9].includes(parseInt(rolId));
+    return [3, 4, 5, 6, 7, 9, 17].includes(parseInt(rolId));
   };
 
   const loadData = async () => {
@@ -295,11 +484,30 @@ export default function VisitasPage() {
         try {
           const fields = JSON.parse(template.campos);
           const initialAnswers = {};
-          fields.forEach((f) => {
-            if (f.tipo === 'checkbox') initialAnswers[f.nombre] = false;
-            else if (f.tipo === 'number') initialAnswers[f.nombre] = 0;
-            else initialAnswers[f.nombre] = '';
-          });
+          if (fields[0] && fields[0].tipo === 'matrix') {
+            setActiveMatrixTab(fields[0].columnas[0]);
+            fields[0].secciones.forEach((sec) => {
+              sec.filas.forEach((fila) => {
+                fields[0].columnas.forEach((col) => {
+                  const key = `${fila}__${col}`;
+                  initialAnswers[key] = '';
+                });
+              });
+            });
+          } else if (fields[0] && fields[0].tipo === 'simple_checklist') {
+            fields[0].secciones.forEach((sec) => {
+              sec.filas.forEach((fila) => {
+                initialAnswers[fila] = '';
+                initialAnswers[`${fila}__obs`] = '';
+              });
+            });
+          } else {
+            fields.forEach((f) => {
+              if (f.tipo === 'checkbox') initialAnswers[f.nombre] = false;
+              else if (f.tipo === 'number') initialAnswers[f.nombre] = 0;
+              else initialAnswers[f.nombre] = '';
+            });
+          }
           setFormAnswers(initialAnswers);
         } catch (e) {
           setActivePlantilla(null);
@@ -418,15 +626,34 @@ export default function VisitasPage() {
           const existingAnswers = JSON.parse(visit.datos_formulario || '{}');
           const fields = JSON.parse(template.campos);
           const initialAnswers = {};
-          fields.forEach((f) => {
-            if (f.nombre in existingAnswers) {
-              initialAnswers[f.nombre] = existingAnswers[f.nombre];
-            } else {
-              if (f.tipo === 'checkbox') initialAnswers[f.nombre] = false;
-              else if (f.tipo === 'number') initialAnswers[f.nombre] = 0;
-              else initialAnswers[f.nombre] = '';
-            }
-          });
+          if (fields[0] && fields[0].tipo === 'matrix') {
+            setActiveMatrixTab(fields[0].columnas[0]);
+            fields[0].secciones.forEach((sec) => {
+              sec.filas.forEach((fila) => {
+                fields[0].columnas.forEach((col) => {
+                  const key = `${fila}__${col}`;
+                  initialAnswers[key] = existingAnswers[key] || '';
+                });
+              });
+            });
+          } else if (fields[0] && fields[0].tipo === 'simple_checklist') {
+            fields[0].secciones.forEach((sec) => {
+              sec.filas.forEach((fila) => {
+                initialAnswers[fila] = existingAnswers[fila] || '';
+                initialAnswers[`${fila}__obs`] = existingAnswers[`${fila}__obs`] || existingAnswers[`${fila}_obs`] || '';
+              });
+            });
+          } else {
+            fields.forEach((f) => {
+              if (f.nombre in existingAnswers) {
+                initialAnswers[f.nombre] = existingAnswers[f.nombre];
+              } else {
+                if (f.tipo === 'checkbox') initialAnswers[f.nombre] = false;
+                else if (f.tipo === 'number') initialAnswers[f.nombre] = 0;
+                else initialAnswers[f.nombre] = '';
+              }
+            });
+          }
           setFormAnswers(initialAnswers);
         } catch (e) {
           setActivePlantilla(null);
@@ -679,6 +906,8 @@ export default function VisitasPage() {
       console.error('Error cargando evidencias:', e);
     }
 
+    console.log('Abriendo modal de visita:', { id: visit.id, estado: visit.estado, userRole, isJefe: isUserJefe(userRole) });
+
     setSelectedVisit({
       ...visit,
       fields: parsedFields,
@@ -784,107 +1013,111 @@ export default function VisitasPage() {
                       <h4>📋 Checklist Formulario: {activePlantilla.nombre}</h4>
                     </div>
                     <div className="card-body">
-                      {JSON.parse(activePlantilla.campos).map((field, idx) => (
-                        <div key={idx} className="form-group">
-                          {field.tipo === 'checkbox' && (
-                            <div className="checkbox-field-group">
-                              <input
-                                id={`exec-field-${field.nombre}`}
-                                type="checkbox"
-                                className="form-checkbox"
-                                checked={!!formAnswers[field.nombre]}
-                                onChange={(e) => handleInputChange(field.nombre, e.target.checked)}
-                              />
-                              <label htmlFor={`exec-field-${field.nombre}`} className="checkbox-field-label">
-                                {field.label} {field.requerido && <span className="req-star">*</span>}
-                              </label>
+                      {(() => {
+                        const parsedCampos = JSON.parse(activePlantilla.campos);
+                        const firstField = parsedCampos[0];
+                        if (firstField && firstField.tipo === 'matrix') {
+                          return (
+                            <MatrixChecklistForm
+                              template={firstField}
+                              answers={formAnswers}
+                              onChange={handleInputChange}
+                              activeTab={activeMatrixTab}
+                              onTabChange={setActiveMatrixTab}
+                            />
+                          );
+                        } else if (firstField && firstField.tipo === 'simple_checklist') {
+                          return (
+                            <SimpleChecklistForm
+                              template={firstField}
+                              answers={formAnswers}
+                              onChange={handleInputChange}
+                            />
+                          );
+                        } else {
+                          return parsedCampos.map((field, idx) => (
+                            <div key={idx} className="form-group">
+                              {field.tipo === 'checkbox' && (
+                                <div className="checkbox-field-group">
+                                  <input
+                                    id={`exec-field-${field.nombre}`}
+                                    type="checkbox"
+                                    className="form-checkbox"
+                                    checked={!!formAnswers[field.nombre]}
+                                    onChange={(e) => handleInputChange(field.nombre, e.target.checked)}
+                                  />
+                                  <label htmlFor={`exec-field-${field.nombre}`} className="checkbox-field-label">
+                                    {field.label} {field.requerido && <span className="req-star">*</span>}
+                                  </label>
+                                </div>
+                              )}
+
+                              {field.tipo === 'textarea' && (
+                                <>
+                                  <label className="form-label" htmlFor={`exec-field-${field.nombre}`}>
+                                    {field.label} {field.requerido && <span className="req-star">*</span>}
+                                  </label>
+                                  <textarea
+                                    id={`exec-field-${field.nombre}`}
+                                    className="form-textarea"
+                                    value={formAnswers[field.nombre] || ''}
+                                    onChange={(e) => handleInputChange(field.nombre, e.target.value)}
+                                    required={field.requerido}
+                                  ></textarea>
+                                </>
+                              )}
+
+                              {field.tipo === 'text' && (
+                                <>
+                                  <label className="form-label" htmlFor={`exec-field-${field.nombre}`}>
+                                    {field.label} {field.requerido && <span className="req-star">*</span>}
+                                  </label>
+                                  <input
+                                    id={`exec-field-${field.nombre}`}
+                                    type="text"
+                                    className="form-input"
+                                    value={formAnswers[field.nombre] || ''}
+                                    onChange={(e) => handleInputChange(field.nombre, e.target.value)}
+                                    required={field.requerido}
+                                  />
+                                </>
+                              )}
+
+                              {field.tipo === 'number' && (
+                                <>
+                                  <label className="form-label" htmlFor={`exec-field-${field.nombre}`}>
+                                    {field.label} {field.requerido && <span className="req-star">*</span>}
+                                  </label>
+                                  <input
+                                    id={`exec-field-${field.nombre}`}
+                                    type="number"
+                                    className="form-input"
+                                    value={formAnswers[field.nombre] || 0}
+                                    onChange={(e) => handleInputChange(field.nombre, parseInt(e.target.value) || 0)}
+                                    required={field.requerido}
+                                  />
+                                </>
+                              )}
+
+                              {field.tipo === 'date' && (
+                                <>
+                                  <label className="form-label" htmlFor={`exec-field-${field.nombre}`}>
+                                    {field.label} {field.requerido && <span className="req-star">*</span>}
+                                  </label>
+                                  <input
+                                    id={`exec-field-${field.nombre}`}
+                                    type="date"
+                                    className="form-input"
+                                    value={formAnswers[field.nombre] || ''}
+                                    onChange={(e) => handleInputChange(field.nombre, e.target.value)}
+                                    required={field.requerido}
+                                  />
+                                </>
+                              )}
                             </div>
-                          )}
-
-                          {field.tipo === 'textarea' && (
-                            <>
-                              <label className="form-label" htmlFor={`exec-field-${field.nombre}`}>
-                                {field.label} {field.requerido && <span className="req-star">*</span>}
-                              </label>
-                              <textarea
-                                id={`exec-field-${field.nombre}`}
-                                className="form-textarea"
-                                value={formAnswers[field.nombre] || ''}
-                                onChange={(e) => handleInputChange(field.nombre, e.target.value)}
-                                required={field.requerido}
-                              ></textarea>
-                            </>
-                          )}
-
-                          {field.tipo === 'text' && (
-                            <>
-                              <label className="form-label" htmlFor={`exec-field-${field.nombre}`}>
-                                {field.label} {field.requerido && <span className="req-star">*</span>}
-                              </label>
-                              <input
-                                id={`exec-field-${field.nombre}`}
-                                type="text"
-                                className="form-input"
-                                value={formAnswers[field.nombre] || ''}
-                                onChange={(e) => handleInputChange(field.nombre, e.target.value)}
-                                required={field.requerido}
-                              />
-                            </>
-                          )}
-
-                          {field.tipo === 'number' && (
-                            <>
-                              <label className="form-label" htmlFor={`exec-field-${field.nombre}`}>
-                                {field.label} {field.requerido && <span className="req-star">*</span>}
-                              </label>
-                              <input
-                                id={`exec-field-${field.nombre}`}
-                                type="number"
-                                className="form-input"
-                                value={formAnswers[field.nombre] || 0}
-                                onChange={(e) => handleInputChange(field.nombre, parseInt(e.target.value) || 0)}
-                                required={field.requerido}
-                              />
-                            </>
-                          )}
-
-                          {field.tipo === 'date' && (
-                            <>
-                              <label className="form-label" htmlFor={`exec-field-${field.nombre}`}>
-                                {field.label} {field.requerido && <span className="req-star">*</span>}
-                              </label>
-                              <input
-                                id={`exec-field-${field.nombre}`}
-                                type="date"
-                                className="form-input"
-                                value={formAnswers[field.nombre] || ''}
-                                onChange={(e) => handleInputChange(field.nombre, e.target.value)}
-                                required={field.requerido}
-                              />
-                            </>
-                          )}
-
-                          {field.tipo === 'select' && (
-                            <>
-                              <label className="form-label" htmlFor={`exec-field-${field.nombre}`}>
-                                {field.label} {field.requerido && <span className="req-star">*</span>}
-                              </label>
-                              <select
-                                id={`exec-field-${field.nombre}`}
-                                className="form-select"
-                                value={formAnswers[field.nombre] || ''}
-                                onChange={(e) => handleInputChange(field.nombre, e.target.value)}
-                                required={field.requerido}
-                              >
-                                <option value="">-- Seleccionar opción --</option>
-                                {field.opciones?.map((opt, oIdx) => (
-                                  <option key={oIdx} value={opt}>{opt}</option>
-                                ))}
-                              </select>
-                            </>
-                          )}
-                        </div>
-                      ))}
+                          ));
+                        }
+                      })()}
                     </div>
                   </div>
                 )}
@@ -1357,87 +1590,111 @@ export default function VisitasPage() {
                       <h4>📋 Formulario Checklist: {activePlantilla.nombre}</h4>
                     </div>
                     <div className="card-body">
-                      {JSON.parse(activePlantilla.campos).map((field, idx) => (
-                        <div key={idx} className="form-group">
-                          {field.tipo === 'checkbox' && (
-                            <div className="checkbox-field-group">
-                              <input
-                                id={`field-${field.nombre}`}
-                                type="checkbox"
-                                className="form-checkbox"
-                                checked={!!formAnswers[field.nombre]}
-                                onChange={(e) => handleInputChange(field.nombre, e.target.checked)}
-                              />
-                              <label htmlFor={`field-${field.nombre}`} className="checkbox-field-label">
-                                {field.label} {field.requerido && <span className="req-star">*</span>}
-                              </label>
+                      {(() => {
+                        const parsedCampos = JSON.parse(activePlantilla.campos);
+                        const firstField = parsedCampos[0];
+                        if (firstField && firstField.tipo === 'matrix') {
+                          return (
+                            <MatrixChecklistForm
+                              template={firstField}
+                              answers={formAnswers}
+                              onChange={handleInputChange}
+                              activeTab={activeMatrixTab}
+                              onTabChange={setActiveMatrixTab}
+                            />
+                          );
+                        } else if (firstField && firstField.tipo === 'simple_checklist') {
+                          return (
+                            <SimpleChecklistForm
+                              template={firstField}
+                              answers={formAnswers}
+                              onChange={handleInputChange}
+                            />
+                          );
+                        } else {
+                          return parsedCampos.map((field, idx) => (
+                            <div key={idx} className="form-group">
+                              {field.tipo === 'checkbox' && (
+                                <div className="checkbox-field-group">
+                                  <input
+                                    id={`field-${field.nombre}`}
+                                    type="checkbox"
+                                    className="form-checkbox"
+                                    checked={!!formAnswers[field.nombre]}
+                                    onChange={(e) => handleInputChange(field.nombre, e.target.checked)}
+                                  />
+                                  <label htmlFor={`field-${field.nombre}`} className="checkbox-field-label">
+                                    {field.label} {field.requerido && <span className="req-star">*</span>}
+                                  </label>
+                                </div>
+                              )}
+
+                              {field.tipo === 'textarea' && (
+                                <>
+                                  <label className="form-label" htmlFor={`field-${field.nombre}`}>
+                                    {field.label} {field.requerido && <span className="req-star">*</span>}
+                                  </label>
+                                  <textarea
+                                    id={`field-${field.nombre}`}
+                                    className="form-textarea"
+                                    value={formAnswers[field.nombre] || ''}
+                                    onChange={(e) => handleInputChange(field.nombre, e.target.value)}
+                                    required={field.requerido}
+                                  ></textarea>
+                                </>
+                              )}
+
+                              {field.tipo === 'text' && (
+                                <>
+                                  <label className="form-label" htmlFor={`field-${field.nombre}`}>
+                                    {field.label} {field.requerido && <span className="req-star">*</span>}
+                                  </label>
+                                  <input
+                                    id={`field-${field.nombre}`}
+                                    type="text"
+                                    className="form-input"
+                                    value={formAnswers[field.nombre] || ''}
+                                    onChange={(e) => handleInputChange(field.nombre, e.target.value)}
+                                    required={field.requerido}
+                                  />
+                                </>
+                              )}
+
+                              {field.tipo === 'number' && (
+                                <>
+                                  <label className="form-label" htmlFor={`field-${field.nombre}`}>
+                                    {field.label} {field.requerido && <span className="req-star">*</span>}
+                                  </label>
+                                  <input
+                                    id={`field-${field.nombre}`}
+                                    type="number"
+                                    className="form-input"
+                                    value={formAnswers[field.nombre] || 0}
+                                    onChange={(e) => handleInputChange(field.nombre, parseInt(e.target.value) || 0)}
+                                    required={field.requerido}
+                                  />
+                                </>
+                              )}
+
+                              {field.tipo === 'date' && (
+                                <>
+                                  <label className="form-label" htmlFor={`field-${field.nombre}`}>
+                                    {field.label} {field.requerido && <span className="req-star">*</span>}
+                                  </label>
+                                  <input
+                                    id={`field-${field.nombre}`}
+                                    type="date"
+                                    className="form-input"
+                                    value={formAnswers[field.nombre] || ''}
+                                    onChange={(e) => handleInputChange(field.nombre, e.target.value)}
+                                    required={field.requerido}
+                                  />
+                                </>
+                              )}
                             </div>
-                          )}
-
-                          {field.tipo === 'textarea' && (
-                            <>
-                              <label className="form-label" htmlFor={`field-${field.nombre}`}>
-                                {field.label} {field.requerido && <span className="req-star">*</span>}
-                              </label>
-                              <textarea
-                                id={`field-${field.nombre}`}
-                                className="form-textarea"
-                                value={formAnswers[field.nombre] || ''}
-                                onChange={(e) => handleInputChange(field.nombre, e.target.value)}
-                                required={field.requerido}
-                              ></textarea>
-                            </>
-                          )}
-
-                          {field.tipo === 'text' && (
-                            <>
-                              <label className="form-label" htmlFor={`field-${field.nombre}`}>
-                                {field.label} {field.requerido && <span className="req-star">*</span>}
-                              </label>
-                              <input
-                                id={`field-${field.nombre}`}
-                                type="text"
-                                className="form-input"
-                                value={formAnswers[field.nombre] || ''}
-                                onChange={(e) => handleInputChange(field.nombre, e.target.value)}
-                                required={field.requerido}
-                              />
-                            </>
-                          )}
-
-                          {field.tipo === 'number' && (
-                            <>
-                              <label className="form-label" htmlFor={`field-${field.nombre}`}>
-                                {field.label} {field.requerido && <span className="req-star">*</span>}
-                              </label>
-                              <input
-                                id={`field-${field.nombre}`}
-                                type="number"
-                                className="form-input"
-                                value={formAnswers[field.nombre] || 0}
-                                onChange={(e) => handleInputChange(field.nombre, parseInt(e.target.value) || 0)}
-                                required={field.requerido}
-                              />
-                            </>
-                          )}
-
-                          {field.tipo === 'date' && (
-                            <>
-                              <label className="form-label" htmlFor={`field-${field.nombre}`}>
-                                {field.label} {field.requerido && <span className="req-star">*</span>}
-                              </label>
-                              <input
-                                id={`field-${field.nombre}`}
-                                type="date"
-                                className="form-input"
-                                value={formAnswers[field.nombre] || ''}
-                                onChange={(e) => handleInputChange(field.nombre, e.target.value)}
-                                required={field.requerido}
-                              />
-                            </>
-                          )}
-                        </div>
-                      ))}
+                          ));
+                        }
+                      })()}
                     </div>
                   </div>
                 )}
@@ -1565,6 +1822,16 @@ export default function VisitasPage() {
             <div className="card-header no-print">
               <h3>Auditoría Operativa de Punto de Venta</h3>
               <div className="modal-header-actions">
+                {selectedVisit.fields && selectedVisit.fields[0] && selectedVisit.fields[0].code && (
+                  <a 
+                    href={`/api/visitas/export?id=${selectedVisit.id}`} 
+                    className="btn btn-success btn-sm"
+                    download
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', textDecoration: 'none' }}
+                  >
+                    📥 Exportar Excel
+                  </a>
+                )}
                 <button className="btn btn-primary btn-sm" onClick={handlePrint}>
                   🖨️ Imprimir / PDF
                 </button>
@@ -1597,26 +1864,90 @@ export default function VisitasPage() {
               <div className="visit-responses-section">
                 <h4>📋 Checklist Respuestas de Evaluación</h4>
                 <div className="responses-grid">
-                  {selectedVisit.fields && selectedVisit.fields.length > 0 ? (
-                    selectedVisit.fields.map((f, idx) => {
-                      const answer = selectedVisit.data[f.nombre];
-                      let displayAnswer = String(answer !== undefined && answer !== null ? answer : 'No responde');
-                      if (f.tipo === 'checkbox') {
-                        displayAnswer = answer ? '🟢 CUMPLE / SÍ' : '❌ NO CUMPLE / NO';
-                      }
-                      
+                  {(() => {
+                    const firstField = selectedVisit.fields && selectedVisit.fields[0];
+                    if (firstField && firstField.tipo === 'matrix') {
                       return (
-                        <div key={idx} className="response-row">
-                          <span className="response-label">{f.label}:</span>
-                          <span className={`response-value ${f.tipo === 'checkbox' ? (answer ? 'green-text' : 'red-text') : ''}`}>
-                            {displayAnswer}
-                          </span>
+                        <div className="matrix-results">
+                          {firstField.columnas.map((col) => (
+                            <div key={col} className="matrix-col-section" style={{ marginBottom: '15px' }}>
+                              <h5 style={{ color: 'var(--color-primary-dark)', borderBottom: '2px solid var(--color-border-light)', paddingBottom: '3px', marginBottom: '8px', fontWeight: 'bold' }}>
+                                📍 Sub-área: {col}
+                              </h5>
+                              <div className="responses-grid">
+                                {firstField.secciones.flatMap(sec => sec.filas).map((fila, fIdx) => {
+                                  const answer = selectedVisit.data[`${fila}__${col}`];
+                                  let colorClass = 'text-muted';
+                                  let emoji = '⚪';
+                                  if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
+                                  else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
+                                  
+                                  return (
+                                    <div key={fIdx} className="response-row">
+                                      <span className="response-label">{fila}:</span>
+                                      <span className={`response-value ${colorClass}`}>
+                                        {emoji} {answer || 'No responde'}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       );
-                    })
-                  ) : (
-                    <p className="text-muted">No se cargaron campos dinámicos para esta visita.</p>
-                  )}
+                    } else if (firstField && firstField.tipo === 'simple_checklist') {
+                      return (
+                        <div className="responses-grid">
+                          {firstField.secciones.flatMap(sec => sec.filas).map((fila, fIdx) => {
+                            const answer = selectedVisit.data[fila];
+                            const obs = selectedVisit.data[`${fila}__obs` || `${fila}_obs`];
+                            let colorClass = 'text-muted';
+                            let emoji = '⚪';
+                            if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
+                            else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
+                            
+                            return (
+                              <div key={fIdx} className="response-row" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '8px', borderBottom: '1px solid var(--color-border-light)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                  <span className="response-label">{fila}:</span>
+                                  <span className={`response-value ${colorClass}`}>
+                                    {emoji} {answer || 'No responde'}
+                                  </span>
+                                </div>
+                                {obs && (
+                                  <span className="text-muted" style={{ fontSize: '0.78rem', fontStyle: 'italic', paddingLeft: '8px' }}>
+                                    ↳ Observación: {obs}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="responses-grid">
+                          {selectedVisit.fields.map((f, idx) => {
+                            const answer = selectedVisit.data[f.nombre];
+                            let displayAnswer = String(answer !== undefined && answer !== null ? answer : 'No responde');
+                            if (f.tipo === 'checkbox') {
+                              displayAnswer = answer ? '🟢 CUMPLE / SÍ' : '❌ NO CUMPLE / NO';
+                            }
+                            
+                            return (
+                              <div key={idx} className="response-row">
+                                <span className="response-label">{f.label}:</span>
+                                <span className={`response-value ${f.tipo === 'checkbox' ? (answer ? 'green-text' : 'red-text') : ''}`}>
+                                  {displayAnswer}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    }
+                  })()}
                 </div>
               </div>
 
@@ -1981,11 +2312,13 @@ export default function VisitasPage() {
           background-color: var(--color-bg-card);
           border-radius: var(--radius-xl);
           box-shadow: var(--shadow-xl);
+          display: flex;
+          flex-direction: column;
         }
 
         .modal-scrollable-body {
           overflow-y: auto;
-          max-height: calc(90vh - 80px);
+          flex: 1;
           display: flex;
           flex-direction: column;
           gap: var(--spacing-lg);
@@ -2323,6 +2656,83 @@ export default function VisitasPage() {
           .sig-line p {
             font-size: 0.8rem;
             font-weight: 600;
+          }
+        }
+
+        /* Mobile responsive overrides for visitas */
+        @media (max-width: 767px) {
+          .tabs-header {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+          }
+
+          .tabs-header::-webkit-scrollbar {
+            display: none;
+          }
+
+          .tab-btn {
+            padding: 8px 10px;
+            font-size: 0.72rem;
+          }
+
+          .visitas-table {
+            font-size: 0.72rem;
+            min-width: 600px;
+          }
+
+          .visitas-table th,
+          .visitas-table td {
+            padding: 8px;
+          }
+
+          .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          .modal-content {
+            max-width: 100% !important;
+            margin: 0 var(--spacing-xs);
+            max-height: 95vh;
+            display: flex;
+            flex-direction: column;
+          }
+
+          .modal-scrollable-body {
+            flex: 1;
+          }
+
+          .visit-meta-grid {
+            grid-template-columns: 1fr;
+            font-size: 0.75rem;
+          }
+
+          .upload-fields-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .antes-despues-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .response-row {
+            flex-direction: column;
+            gap: 2px;
+          }
+
+          .visita-form {
+            gap: var(--spacing-sm);
+          }
+
+          .form-row-split {
+            grid-template-columns: 1fr;
+          }
+
+          .status-pill {
+            font-size: 0.62rem;
+            padding: 1px 6px;
           }
         }
       `}</style>

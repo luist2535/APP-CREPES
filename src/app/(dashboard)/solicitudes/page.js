@@ -464,6 +464,44 @@ export default function SolicitudesPage() {
           margin-bottom: var(--spacing-sm);
           border: 1px solid rgba(34, 197, 94, 0.2);
         }
+
+        /* Mobile responsive overrides for solicitudes */
+        @media (max-width: 767px) {
+          .header-actions-row {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: var(--spacing-sm);
+          }
+
+          .solicitudes-table {
+            font-size: 0.72rem;
+            min-width: 550px;
+          }
+
+          .solicitudes-table th,
+          .solicitudes-table td {
+            padding: 8px;
+          }
+
+          .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          .action-buttons-group {
+            flex-direction: column;
+            gap: 4px;
+          }
+
+          .modal-content {
+            max-width: 100% !important;
+            margin: 0 var(--spacing-xs);
+          }
+
+          .modal-scrollable-body {
+            max-height: calc(95vh - 60px);
+          }
+        }
       `}</style>
     </div>
   );

@@ -876,6 +876,69 @@ export default function CalendarioPage() {
           margin-bottom: var(--spacing-sm);
           border: 1px solid rgba(34, 197, 94, 0.2);
         }
+
+        /* Mobile responsive overrides for calendario */
+        @media (max-width: 767px) {
+          .calendar-layout-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .calendar-month-header h2 {
+            font-size: 1rem;
+          }
+
+          .calendar-month-header .btn-sm {
+            padding: 4px 8px;
+            font-size: 0.7rem;
+          }
+
+          .calendar-week-headers {
+            font-size: 0.65rem;
+          }
+
+          .calendar-days-grid {
+            gap: 3px;
+          }
+
+          .calendar-day-btn {
+            height: 45px;
+            padding: 4px 2px;
+            font-size: 0.75rem;
+          }
+
+          .day-number {
+            font-size: 0.75rem;
+          }
+
+          .ev-dot {
+            width: 4px;
+            height: 4px;
+          }
+
+          .event-item-card {
+            padding: var(--spacing-sm);
+            font-size: 0.8rem;
+          }
+
+          .create-event-form {
+            gap: var(--spacing-sm);
+          }
+
+          .form-row-split {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 479px) {
+          .calendar-day-btn {
+            height: 38px;
+            padding: 3px 1px;
+          }
+
+          .day-number {
+            font-size: 0.7rem;
+          }
+        }
       `}</style>
     </div>
   );

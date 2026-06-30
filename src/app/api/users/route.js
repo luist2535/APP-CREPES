@@ -11,11 +11,12 @@ export async function GET(request) {
     const db = getDb();
     
     const users = db.prepare(`
-      SELECT u.id, u.nombre, u.email, u.rol_id, u.ciudad_id, u.activo,
-             r.nombre as rol_nombre, c.nombre as ciudad_nombre
+      SELECT u.id, u.nombre, u.email, u.rol_id, u.ciudad_id, u.pdv_id, u.activo,
+             r.nombre as rol_nombre, c.nombre as ciudad_nombre, p.nombre as pdv_nombre
       FROM users u
       LEFT JOIN roles r ON u.rol_id = r.id
       LEFT JOIN ciudades c ON u.ciudad_id = c.id
+      LEFT JOIN pdv p ON u.pdv_id = p.id
       ORDER BY u.nombre
     `).all();
 

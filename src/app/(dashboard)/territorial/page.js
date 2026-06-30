@@ -548,6 +548,27 @@ export default function TerritorialPage() {
           border-radius: var(--radius-sm);
           color: var(--color-text-secondary);
         }
+
+        /* Mobile responsive overrides for territorial */
+        @media (max-width: 767px) {
+          .modal-content {
+            max-width: 100% !important;
+            margin: 0 var(--spacing-xs);
+          }
+
+          .modal-scrollable-body {
+            max-height: calc(95vh - 60px);
+          }
+
+          .modal-pdv-meta {
+            font-size: 0.78rem;
+          }
+
+          .history-meta {
+            flex-direction: column;
+            gap: 2px;
+          }
+        }
       `}</style>
     </div>
   );

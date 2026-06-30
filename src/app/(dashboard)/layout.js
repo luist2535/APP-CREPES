@@ -256,6 +256,23 @@ export default function DashboardLayout({ children }) {
         .app-layout {
           min-height: 100vh;
         }
+
+        /* Mobile: hide date and city badge, compact header */
+        @media (max-width: 640px) {
+          .header-date {
+            display: none;
+          }
+          .header-city-badge {
+            display: none;
+          }
+          .header-actions {
+            gap: 4px;
+          }
+          .header-actions .btn {
+            padding: 6px 10px;
+            font-size: 0.75rem;
+          }
+        }
       `}</style>
     </div>
   );

@@ -471,6 +471,36 @@ export default function BloqueosPage() {
           padding-top: 3rem;
           padding-bottom: 3rem;
         }
+
+        /* Mobile responsive overrides for bloqueos */
+        @media (max-width: 767px) {
+          .bloqueos-actions-row {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: var(--spacing-sm);
+          }
+
+          .bloqueos-actions-row h2 {
+            font-size: 1rem;
+          }
+
+          .bloqueos-layout-grid {
+            grid-template-columns: 1fr !important;
+          }
+
+          .bloqueo-card-header {
+            flex-wrap: wrap;
+            gap: var(--spacing-sm);
+          }
+
+          .bloqueo-details-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .form-row-split {
+            grid-template-columns: 1fr;
+          }
+        }
       `}</style>
     </div>
   );
