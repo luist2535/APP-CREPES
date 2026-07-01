@@ -367,6 +367,7 @@ export default function VisitasPage() {
 
   // Selected visit details modal
   const [selectedVisit, setSelectedVisit] = useState(null);
+  const [modalTab, setModalTab] = useState('general');
 
   const isTechnicalArea = (areaId) => {
     const area = areas.find(a => a.id === parseInt(areaId));
@@ -780,6 +781,7 @@ export default function VisitasPage() {
       setSelectedVisit(null);
       setJefeComments('');
       setJefeSignature('');
+      setModalTab('general');
       loadData();
     } catch (err) {
       alert('Error: ' + err.message);
@@ -812,6 +814,7 @@ export default function VisitasPage() {
       alert('Visita devuelta al Auxiliar para corregir.');
       setSelectedVisit(null);
       setJefeComments('');
+      setModalTab('general');
       loadData();
     } catch (err) {
       alert('Error: ' + err.message);
@@ -914,6 +917,7 @@ export default function VisitasPage() {
       data: parsedData,
       evidencias: visitEvidences,
     });
+    setModalTab('general');
   };
 
   const handlePrint = () => {
@@ -1835,8 +1839,33 @@ export default function VisitasPage() {
                 <button className="btn btn-primary btn-sm" onClick={handlePrint}>
                   🖨️ Imprimir / PDF
                 </button>
-                <button className="modal-close-btn" onClick={() => { setSelectedVisit(null); setJefeComments(''); setJefeSignature(''); }}>×</button>
+                <button className="modal-close-btn" onClick={() => { setSelectedVisit(null); setJefeComments(''); setJefeSignature(''); setModalTab('general'); }}>×</button>
               </div>
+            </div>
+
+            {/* Modal Sub-Tabs (hide on printing) */}
+            <div className="tabs-header no-print" style={{ display: 'flex', padding: '0 20px', borderBottom: '1px solid var(--color-border-light)', backgroundColor: 'var(--color-bg-secondary)', gap: '10px' }}>
+              <button 
+                type="button" 
+                className={`tab-btn ${modalTab === 'general' ? 'active' : ''}`}
+                onClick={() => setModalTab('general')}
+              >
+                📋 Resumen y Aprobación
+              </button>
+              <button 
+                type="button" 
+                className={`tab-btn ${modalTab === 'checklist' ? 'active' : ''}`}
+                onClick={() => setModalTab('checklist')}
+              >
+                📊 Checklist Respuestas
+              </button>
+              <button 
+                type="button" 
+                className={`tab-btn ${modalTab === 'evidence' ? 'active' : ''}`}
+                onClick={() => setModalTab('evidence')}
+              >
+                📸 Evidencias ({selectedVisit.evidencias ? selectedVisit.evidencias.length : 0})
+              </button>
             </div>
 
             {/* Content to display and print */}
@@ -1849,285 +1878,297 @@ export default function VisitasPage() {
                 <hr className="print-divider" />
               </div>
 
-              <div className="visit-meta-grid">
-                <p><strong>Punto de Venta (PDV):</strong> {selectedVisit.pdv_nombre} ({selectedVisit.ciudad_nombre})</p>
-                <p><strong>Programado por:</strong> {selectedVisit.usuario_nombre}</p>
-                <p><strong>Ejecutado por (Auxiliar):</strong> {selectedVisit.responsable_nombre || 'No asignado'}</p>
-                <p><strong>Fecha:</strong> {selectedVisit.fecha}</p>
-                <p><strong>Hora Inicio/Fin:</strong> {selectedVisit.hora_inicio || '--:--'} a {selectedVisit.hora_fin || '--:--'}</p>
-                <p><strong>Área Inspectora:</strong> {selectedVisit.area_nombre}</p>
-                <p><strong>Tipo de Visita:</strong> {selectedVisit.tipo_visita_nombre || 'Sin definir'}</p>
-                <p><strong>Estado:</strong> <span className={`status-pill ${selectedVisit.estado}`}>{selectedVisit.estado.toUpperCase()}</span></p>
+              {/* TAB 1: GENERAL INFO & APPROVAL */}
+              <div className={`tab-content-general ${modalTab === 'general' ? 'active-tab' : ''}`}>
+                <div className="visit-meta-grid">
+                  <p><strong>Punto de Venta (PDV):</strong> {selectedVisit.pdv_nombre} ({selectedVisit.ciudad_nombre})</p>
+                  <p><strong>Programado por:</strong> {selectedVisit.usuario_nombre}</p>
+                  <p><strong>Ejecutado por (Auxiliar):</strong> {selectedVisit.responsable_nombre || 'No asignado'}</p>
+                  <p><strong>Fecha:</strong> {selectedVisit.fecha}</p>
+                  <p><strong>Hora Inicio/Fin:</strong> {selectedVisit.hora_inicio || '--:--'} a {selectedVisit.hora_fin || '--:--'}</p>
+                  <p><strong>Área Inspectora:</strong> {selectedVisit.area_nombre}</p>
+                  <p><strong>Tipo de Visita:</strong> {selectedVisit.tipo_visita_nombre || 'Sin definir'}</p>
+                  <p><strong>Estado:</strong> <span className={`status-pill ${selectedVisit.estado}`}>{selectedVisit.estado.toUpperCase()}</span></p>
+                </div>
+
+                {selectedVisit.observaciones && (
+                  <div className="visit-obs-section">
+                    <h4>📝 Observaciones Generales</h4>
+                    <p className="obs-content">"{selectedVisit.observaciones}"</p>
+                  </div>
+                )}
+
+                {/* Specific fields depending on flow */}
+                {selectedVisit.area_tipo_flujo !== 'tecnico' && (
+                  <>
+                    {selectedVisit.hallazgos && (
+                      <div className="visit-obs-section">
+                        <h4>🔎 Hallazgos Registrados</h4>
+                        <p className="obs-content" style={{ borderColor: 'var(--color-warning)' }}>"{selectedVisit.hallazgos}"</p>
+                      </div>
+                    )}
+                    {selectedVisit.acciones_correctivas && (
+                      <div className="visit-obs-section">
+                        <h4>🛠️ Acciones Correctivas Recomendadas</h4>
+                        <p className="obs-content" style={{ borderColor: 'var(--color-primary)' }}>"{selectedVisit.acciones_correctivas}"</p>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {selectedVisit.area_tipo_flujo === 'tecnico' && selectedVisit.repuestos && (
+                  <div className="visit-obs-section">
+                    <h4>⚙️ Materiales / Repuestos Utilizados</h4>
+                    <p className="obs-content" style={{ borderColor: 'var(--color-secondary)' }}>{selectedVisit.repuestos}</p>
+                  </div>
+                )}
+
+                {/* Display Signatures if flow is technical */}
+                {selectedVisit.area_tipo_flujo === 'tecnico' && (
+                  <div className="signatures-view-grid">
+                    <div className="signature-view-card">
+                      <h5>Firma Auxiliar (Ejecutor)</h5>
+                      {selectedVisit.firma_auxiliar ? (
+                        <div className="sig-img-container">
+                          <img src={selectedVisit.firma_auxiliar} alt="Firma Auxiliar" />
+                        </div>
+                      ) : (
+                        <p className="text-muted italic">Pendiente de firma</p>
+                      )}
+                    </div>
+                    <div className="signature-view-card">
+                      <h5>Firma Jefe de Área (Aprobador)</h5>
+                      {selectedVisit.firma_jefe ? (
+                        <div className="sig-img-container">
+                          <img src={selectedVisit.firma_jefe} alt="Firma Jefe" />
+                        </div>
+                      ) : (
+                        <p className="text-muted italic">Pendiente de firma</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Comments from Jefe if returned or closed */}
+                {selectedVisit.comentarios_jefe && (
+                  <div className="visit-obs-section">
+                    <h4>💬 Comentarios del Jefe / Supervisor</h4>
+                    <p className="obs-content" style={{ borderLeftColor: '#DC2626', backgroundColor: '#FEF2F2' }}>
+                      "{selectedVisit.comentarios_jefe}"
+                    </p>
+                  </div>
+                )}
+
+                {/* Jefe Review / Approval action panel (no-print) */}
+                {(selectedVisit.estado === 'finalizada' && (isUserJefe(userRole) || userRole === 1 || userRole === 2)) && (
+                  <div className="jefe-approval-panel card shadow-sm no-print" style={{ marginTop: '20px', borderTop: '2px solid var(--color-warning)' }}>
+                    <div className="card-header">
+                      <h4>🛠️ Panel de Aprobación de Visita</h4>
+                    </div>
+                    <div className="card-body">
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="jefe-comments">Observaciones / Comentarios del Jefe</label>
+                        <textarea
+                          id="jefe-comments"
+                          className="form-textarea"
+                          placeholder="Escriba comentarios para aprobar o la razón de devolución si rechaza..."
+                          value={jefeComments}
+                          onChange={(e) => setJefeComments(e.target.value)}
+                        ></textarea>
+                      </div>
+
+                      {selectedVisit.area_tipo_flujo === 'tecnico' && (
+                        <SignaturePad
+                          label="Firma de Aprobación y Cierre (Jefe de Área) *"
+                          onSave={(base64) => setJefeSignature(base64)}
+                          onClear={() => setJefeSignature('')}
+                        />
+                      )}
+
+                      <div className="approval-actions" style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                        <button
+                          type="button"
+                          className="btn btn-success"
+                          style={{ flex: 1 }}
+                          onClick={() => handleApproveVisit(selectedVisit.id)}
+                          disabled={isApproving}
+                        >
+                          ✔ Aprobar y Cerrar Visita
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-danger"
+                          style={{ flex: 1 }}
+                          onClick={() => handleReturnVisit(selectedVisit.id)}
+                          disabled={isApproving}
+                        >
+                          ✖ Devolver para Corregir
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Signature block for PDF printing */}
+                <div className="print-signature-block">
+                  <div className="sig-line">
+                    <div className="line"></div>
+                    <p>Firma Inspector / Auxiliar</p>
+                  </div>
+                  <div className="sig-line">
+                    <div className="line"></div>
+                    <p>Firma Jefe / Aprobador</p>
+                  </div>
+                </div>
               </div>
 
-              {/* Dynamic checklist results */}
-              <div className="visit-responses-section">
-                <h4>📋 Checklist Respuestas de Evaluación</h4>
-                <div className="responses-grid">
-                  {(() => {
-                    const firstField = selectedVisit.fields && selectedVisit.fields[0];
-                    if (firstField && firstField.tipo === 'matrix') {
-                      return (
-                        <div className="matrix-results">
-                          {firstField.columnas.map((col) => (
-                            <div key={col} className="matrix-col-section" style={{ marginBottom: '15px' }}>
-                              <h5 style={{ color: 'var(--color-primary-dark)', borderBottom: '2px solid var(--color-border-light)', paddingBottom: '3px', marginBottom: '8px', fontWeight: 'bold' }}>
-                                📍 Sub-área: {col}
-                              </h5>
-                              <div className="responses-grid">
-                                {firstField.secciones.flatMap(sec => sec.filas).map((fila, fIdx) => {
-                                  const answer = selectedVisit.data[`${fila}__${col}`];
-                                  let colorClass = 'text-muted';
-                                  let emoji = '⚪';
-                                  if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
-                                  else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
-                                  
-                                  return (
-                                    <div key={fIdx} className="response-row">
-                                      <span className="response-label">{fila}:</span>
-                                      <span className={`response-value ${colorClass}`}>
-                                        {emoji} {answer || 'No responde'}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
+              {/* TAB 2: DETAILED CHECKLIST RESPONSES */}
+              <div className={`tab-content-checklist ${modalTab === 'checklist' ? 'active-tab' : ''}`}>
+                <div className="visit-responses-section">
+                  <h4>📋 Checklist Respuestas de Evaluación</h4>
+                  <div className="responses-grid">
+                    {(() => {
+                      const firstField = selectedVisit.fields && selectedVisit.fields[0];
+                      if (firstField && firstField.tipo === 'matrix') {
+                        return (
+                          <div className="matrix-results">
+                            {firstField.columnas.map((col) => (
+                              <div key={col} className="matrix-col-section" style={{ marginBottom: '15px' }}>
+                                <h5 style={{ color: 'var(--color-primary-dark)', borderBottom: '2px solid var(--color-border-light)', paddingBottom: '3px', marginBottom: '8px', fontWeight: 'bold' }}>
+                                  📍 Sub-área: {col}
+                                </h5>
+                                <div className="responses-grid">
+                                  {firstField.secciones.flatMap(sec => sec.filas).map((fila, fIdx) => {
+                                    const answer = selectedVisit.data[`${fila}__${col}`];
+                                    let colorClass = 'text-muted';
+                                    let emoji = '⚪';
+                                    if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
+                                    else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
+                                    
+                                    return (
+                                      <div key={fIdx} className="response-row">
+                                        <span className="response-label">{fila}:</span>
+                                        <span className={`response-value ${colorClass}`}>
+                                          {emoji} {answer || 'No responde'}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    } else if (firstField && firstField.tipo === 'simple_checklist') {
-                      return (
-                        <div className="responses-grid">
-                          {firstField.secciones.flatMap(sec => sec.filas).map((fila, fIdx) => {
-                            const answer = selectedVisit.data[fila];
-                            const obs = selectedVisit.data[`${fila}__obs` || `${fila}_obs`];
-                            let colorClass = 'text-muted';
-                            let emoji = '⚪';
-                            if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
-                            else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
-                            
-                            return (
-                              <div key={fIdx} className="response-row" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '8px', borderBottom: '1px solid var(--color-border-light)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                  <span className="response-label">{fila}:</span>
-                                  <span className={`response-value ${colorClass}`}>
-                                    {emoji} {answer || 'No responde'}
+                            ))}
+                          </div>
+                        );
+                      } else if (firstField && firstField.tipo === 'simple_checklist') {
+                        return (
+                          <div className="responses-grid">
+                            {firstField.secciones.flatMap(sec => sec.filas).map((fila, fIdx) => {
+                              const answer = selectedVisit.data[fila];
+                              const obs = selectedVisit.data[`${fila}__obs` || `${fila}_obs`];
+                              let colorClass = 'text-muted';
+                              let emoji = '⚪';
+                              if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
+                              else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
+                              
+                              return (
+                                <div key={fIdx} className="response-row" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '8px', borderBottom: '1px solid var(--color-border-light)' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                    <span className="response-label">{fila}:</span>
+                                    <span className={`response-value ${colorClass}`}>
+                                      {emoji} {answer || 'No responde'}
+                                    </span>
+                                  </div>
+                                  {obs && (
+                                    <span className="text-muted" style={{ fontSize: '0.78rem', fontStyle: 'italic', paddingLeft: '8px' }}>
+                                      ↳ Observación: {obs}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="responses-grid">
+                            {selectedVisit.fields.map((f, idx) => {
+                              const answer = selectedVisit.data[f.nombre];
+                              let displayAnswer = String(answer !== undefined && answer !== null ? answer : 'No responde');
+                              if (f.tipo === 'checkbox') {
+                                displayAnswer = answer ? '🟢 CUMPLE / SÍ' : '❌ NO CUMPLE / NO';
+                              }
+                              
+                              return (
+                                <div key={idx} className="response-row">
+                                  <span className="response-label">{f.label}:</span>
+                                  <span className={`response-value ${f.tipo === 'checkbox' ? (answer ? 'green-text' : 'red-text') : ''}`}>
+                                    {displayAnswer}
                                   </span>
                                 </div>
-                                {obs && (
-                                  <span className="text-muted" style={{ fontSize: '0.78rem', fontStyle: 'italic', paddingLeft: '8px' }}>
-                                    ↳ Observación: {obs}
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    } else {
-                      return (
-                        <div className="responses-grid">
-                          {selectedVisit.fields.map((f, idx) => {
-                            const answer = selectedVisit.data[f.nombre];
-                            let displayAnswer = String(answer !== undefined && answer !== null ? answer : 'No responde');
-                            if (f.tipo === 'checkbox') {
-                              displayAnswer = answer ? '🟢 CUMPLE / SÍ' : '❌ NO CUMPLE / NO';
-                            }
-                            
-                            return (
-                              <div key={idx} className="response-row">
-                                <span className="response-label">{f.label}:</span>
-                                <span className={`response-value ${f.tipo === 'checkbox' ? (answer ? 'green-text' : 'red-text') : ''}`}>
-                                  {displayAnswer}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    }
-                  })()}
+                              );
+                            })}
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
                 </div>
               </div>
 
-              {selectedVisit.observaciones && (
-                <div className="visit-obs-section">
-                  <h4>📝 Observaciones Generales</h4>
-                  <p className="obs-content">"{selectedVisit.observaciones}"</p>
-                </div>
-              )}
-
-              {/* Specific fields depending on flow */}
-              {selectedVisit.area_tipo_flujo !== 'tecnico' && (
-                <>
-                  {selectedVisit.hallazgos && (
-                    <div className="visit-obs-section">
-                      <h4>🔎 Hallazgos Registrados</h4>
-                      <p className="obs-content" style={{ borderColor: 'var(--color-warning)' }}>"{selectedVisit.hallazgos}"</p>
-                    </div>
-                  )}
-                  {selectedVisit.acciones_correctivas && (
-                    <div className="visit-obs-section">
-                      <h4>🛠️ Acciones Correctivas Recomendadas</h4>
-                      <p className="obs-content" style={{ borderColor: 'var(--color-primary)' }}>"{selectedVisit.acciones_correctivas}"</p>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {selectedVisit.area_tipo_flujo === 'tecnico' && selectedVisit.repuestos && (
-                <div className="visit-obs-section">
-                  <h4>⚙️ Materiales / Repuestos Utilizados</h4>
-                  <p className="obs-content" style={{ borderColor: 'var(--color-secondary)' }}>{selectedVisit.repuestos}</p>
-                </div>
-              )}
-
-              {/* Evidences (grouped by "Antes y Después") */}
-              {selectedVisit.evidencias && selectedVisit.evidencias.length > 0 && (
-                <div className="visit-evidence-section">
-                  <h4>📸 Evidencias Registradas</h4>
-                  
-                  {selectedVisit.evidencias.some(e => e.etiqueta === 'antes' || e.etiqueta === 'despues') && (
-                    <div className="antes-despues-grid">
-                      <div className="evidence-preview-card">
-                        <span className="evidence-badge red-badge">FOTO DEL ANTES</span>
-                        {selectedVisit.evidencias.filter(e => e.etiqueta === 'antes').map((e, idx) => (
-                          <div key={idx} className="img-container">
-                            <img src={e.ruta_archivo} alt="Antes" className="img-evidence" />
-                          </div>
-                        ))}
-                        {selectedVisit.evidencias.filter(e => e.etiqueta === 'antes').length === 0 && (
-                          <div className="no-img-placeholder">Sin foto registrada del antes.</div>
-                        )}
-                      </div>
-
-                      <div className="evidence-preview-card">
-                        <span className="evidence-badge green-badge">FOTO DEL DESPUÉS</span>
-                        {selectedVisit.evidencias.filter(e => e.etiqueta === 'despues').map((e, idx) => (
-                          <div key={idx} className="img-container">
-                            <img src={e.ruta_archivo} alt="Después" className="img-evidence" />
-                          </div>
-                        ))}
-                        {selectedVisit.evidencias.filter(e => e.etiqueta === 'despues').length === 0 && (
-                          <div className="no-img-placeholder">Sin foto registrada del después.</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedVisit.evidencias.some(e => e.etiqueta === 'soporte') && (
-                    <div className="soporte-docs-container">
-                      <h5>Otros Documentos Adjuntos:</h5>
-                      {selectedVisit.evidencias.filter(e => e.etiqueta === 'soporte').map((e) => (
-                        <div key={e.id} className="soporte-doc-item">
-                          <span>📄 {e.nombre_archivo}</span>
-                          <a href={e.ruta_archivo} target="_blank" rel="noreferrer" className="no-print">
-                            Descargar / Ver 📥
-                          </a>
+              {/* TAB 3: EVIDENCES */}
+              <div className={`tab-content-evidence ${modalTab === 'evidence' ? 'active-tab' : ''}`}>
+                {selectedVisit.evidencias && selectedVisit.evidencias.length > 0 ? (
+                  <div className="visit-evidence-section">
+                    <h4>📸 Evidencias Registradas</h4>
+                    
+                    {selectedVisit.evidencias.some(e => e.etiqueta === 'antes' || e.etiqueta === 'despues') && (
+                      <div className="antes-despues-grid">
+                        <div className="evidence-preview-card">
+                          <span className="evidence-badge red-badge">FOTO DEL ANTES</span>
+                          {selectedVisit.evidencias.filter(e => e.etiqueta === 'antes').map((e, idx) => (
+                            <div key={idx} className="img-container">
+                              <img src={e.ruta_archivo} alt="Antes" className="img-evidence" />
+                            </div>
+                          ))}
+                          {selectedVisit.evidencias.filter(e => e.etiqueta === 'antes').length === 0 && (
+                            <div className="no-img-placeholder">Sin foto registrada del antes.</div>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
 
-              {/* Display Signatures if flow is technical */}
-              {selectedVisit.area_tipo_flujo === 'tecnico' && (
-                <div className="signatures-view-grid">
-                  <div className="signature-view-card">
-                    <h5>Firma Auxiliar (Ejecutor)</h5>
-                    {selectedVisit.firma_auxiliar ? (
-                      <div className="sig-img-container">
-                        <img src={selectedVisit.firma_auxiliar} alt="Firma Auxiliar" />
+                        <div className="evidence-preview-card">
+                          <span className="evidence-badge green-badge">FOTO DEL DESPUÉS</span>
+                          {selectedVisit.evidencias.filter(e => e.etiqueta === 'despues').map((e, idx) => (
+                            <div key={idx} className="img-container">
+                              <img src={e.ruta_archivo} alt="Después" className="img-evidence" />
+                            </div>
+                          ))}
+                          {selectedVisit.evidencias.filter(e => e.etiqueta === 'despues').length === 0 && (
+                            <div className="no-img-placeholder">Sin foto registrada del después.</div>
+                          )}
+                        </div>
                       </div>
-                    ) : (
-                      <p className="text-muted italic">Pendiente de firma</p>
                     )}
-                  </div>
-                  <div className="signature-view-card">
-                    <h5>Firma Jefe de Área (Aprobador)</h5>
-                    {selectedVisit.firma_jefe ? (
-                      <div className="sig-img-container">
-                        <img src={selectedVisit.firma_jefe} alt="Firma Jefe" />
+
+                    {selectedVisit.evidencias.some(e => e.etiqueta === 'soporte') && (
+                      <div className="soporte-docs-container">
+                        <h5>Otros Documentos Adjuntos:</h5>
+                        {selectedVisit.evidencias.filter(e => e.etiqueta === 'soporte').map((e) => (
+                          <div key={e.id} className="soporte-doc-item">
+                            <span>📄 {e.nombre_archivo}</span>
+                            <a href={e.ruta_archivo} target="_blank" rel="noreferrer" className="no-print">
+                              Descargar / Ver 📥
+                            </a>
+                          </div>
+                        ))}
                       </div>
-                    ) : (
-                      <p className="text-muted italic">Pendiente de firma</p>
                     )}
                   </div>
-                </div>
-              )}
-
-              {/* Comments from Jefe if returned or closed */}
-              {selectedVisit.comentarios_jefe && (
-                <div className="visit-obs-section">
-                  <h4>💬 Comentarios del Jefe / Supervisor</h4>
-                  <p className="obs-content" style={{ borderLeftColor: '#DC2626', backgroundColor: '#FEF2F2' }}>
-                    "{selectedVisit.comentarios_jefe}"
-                  </p>
-                </div>
-              )}
-
-              {/* Jefe Review / Approval action panel (no-print) */}
-              {(selectedVisit.estado === 'finalizada' && (isUserJefe(userRole) || userRole === 1 || userRole === 2)) && (
-                <div className="jefe-approval-panel card shadow-sm no-print" style={{ marginTop: '20px', borderTop: '2px solid var(--color-warning)' }}>
-                  <div className="card-header">
-                    <h4>🛠️ Panel de Aprobación de Visita</h4>
+                ) : (
+                  <div className="visit-evidence-section">
+                    <h4>📸 Evidencias Registradas</h4>
+                    <p className="text-muted italic" style={{ padding: '15px 0', fontSize: '0.85rem' }}>No se registraron evidencias fotográficas ni documentos de soporte para esta visita.</p>
                   </div>
-                  <div className="card-body">
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="jefe-comments">Observaciones / Comentarios del Jefe</label>
-                      <textarea
-                        id="jefe-comments"
-                        className="form-textarea"
-                        placeholder="Escriba comentarios para aprobar o la razón de devolución si rechaza..."
-                        value={jefeComments}
-                        onChange={(e) => setJefeComments(e.target.value)}
-                      ></textarea>
-                    </div>
-
-                    {selectedVisit.area_tipo_flujo === 'tecnico' && (
-                      <SignaturePad
-                        label="Firma de Aprobación y Cierre (Jefe de Área) *"
-                        onSave={(base64) => setJefeSignature(base64)}
-                        onClear={() => setJefeSignature('')}
-                      />
-                    )}
-
-                    <div className="approval-actions" style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-                      <button
-                        type="button"
-                        className="btn btn-success"
-                        style={{ flex: 1 }}
-                        onClick={() => handleApproveVisit(selectedVisit.id)}
-                        disabled={isApproving}
-                      >
-                        ✔ Aprobar y Cerrar Visita
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        style={{ flex: 1 }}
-                        onClick={() => handleReturnVisit(selectedVisit.id)}
-                        disabled={isApproving}
-                      >
-                        ✖ Devolver para Corregir
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Signature block for PDF printing */}
-              <div className="print-signature-block">
-                <div className="sig-line">
-                  <div className="line"></div>
-                  <p>Firma Inspector / Auxiliar</p>
-                </div>
-                <div className="sig-line">
-                  <div className="line"></div>
-                  <p>Firma Jefe / Aprobador</p>
-                </div>
+                )}
               </div>
 
             </div>
@@ -2296,13 +2337,21 @@ export default function VisitasPage() {
         .modal-backdrop {
           position: fixed;
           inset: 0;
-          background-color: rgba(0,0,0,0.5);
-          backdrop-filter: blur(4px);
+          background-color: rgba(44, 24, 16, 0.45);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
           z-index: 100;
           display: flex;
           align-items: center;
           justify-content: center;
           padding: var(--spacing-md);
+          overflow-y: auto;
+        }
+
+        .tab-content-general:not(.active-tab),
+        .tab-content-checklist:not(.active-tab),
+        .tab-content-evidence:not(.active-tab) {
+          display: none !important;
         }
 
         .modal-content {
@@ -2692,9 +2741,14 @@ export default function VisitasPage() {
             -webkit-overflow-scrolling: touch;
           }
 
+          .modal-backdrop {
+            align-items: flex-start;
+            padding: var(--spacing-xs);
+          }
+
           .modal-content {
             max-width: 100% !important;
-            margin: 0 var(--spacing-xs);
+            margin: 10px 0;
             max-height: 95vh;
             display: flex;
             flex-direction: column;
@@ -2702,6 +2756,8 @@ export default function VisitasPage() {
 
           .modal-scrollable-body {
             flex: 1;
+            padding: var(--spacing-md);
+            gap: var(--spacing-md);
           }
 
           .visit-meta-grid {

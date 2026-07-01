@@ -178,7 +178,10 @@ h4 { font-size: 1rem; font-weight: 600; line-height: 1.4; }
   top: 0;
   bottom: 0;
   width: var(--sidebar-width);
-  background: linear-gradient(180deg, var(--color-bg-sidebar) 0%, #2D1509 100%);
+  background: rgba(61, 31, 20, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid rgba(139, 94, 60, 0.15);
   z-index: 50;
   transform: translateX(-100%);
   transition: transform var(--transition-normal);
@@ -579,14 +582,17 @@ h4 { font-size: 1rem; font-weight: 600; line-height: 1.4; }
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+  background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 50%, var(--color-primary-light) 100%);
   color: var(--color-text-on-primary);
-  box-shadow: 0 2px 8px rgba(107, 58, 42, 0.25);
+  box-shadow: 0 4px 10px rgba(74, 37, 24, 0.2);
+  background-size: 200% auto;
+  transition: all 0.3s ease;
 }
 
 .btn-primary:hover {
-  box-shadow: 0 4px 16px rgba(107, 58, 42, 0.35);
-  transform: translateY(-1px);
+  background-position: right center;
+  box-shadow: 0 6px 20px rgba(74, 37, 24, 0.3);
+  transform: translateY(-1.5px);
 }
 
 .btn-primary:active {
@@ -1496,5 +1502,68 @@ h4 { font-size: 1rem; font-weight: 600; line-height: 1.4; }
 
   .sidebar-brand h2 {
     font-size: 0.95rem;
+  }
+}
+
+/* ===== Bottom Navigation Mobile ===== */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--color-border-light);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 35;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  height: 100%;
+  color: var(--color-text-secondary);
+  font-size: 0.65rem;
+  font-weight: 500;
+  gap: 2px;
+  text-decoration: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.bottom-nav-item.active {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.bottom-nav-icon {
+  font-size: 1.25rem;
+}
+
+.button-reset {
+  outline: none;
+}
+
+@media (max-width: 767px) {
+  .page-container {
+    padding-bottom: 80px !important;
+  }
+  .bottom-nav {
+    display: flex;
+  }
+}
+
+@media (min-width: 768px) {
+  .bottom-nav {
+    display: none;
   }
 }

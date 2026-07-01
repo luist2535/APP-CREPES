@@ -20,6 +20,9 @@ export default function SolicitudesPage() {
   const [formDescripcion, setFormDescripcion] = useState('');
   const [formUrgencia, setFormUrgencia] = useState('revisar');
 
+  const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null });
+  const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '', type: 'success' });
+
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState('');
@@ -110,24 +113,31 @@ export default function SolicitudesPage() {
     );
   };
 
-  const handleRejectRequest = async (solicitudId) => {
-    if (!confirm('¿Está seguro de que desea rechazar esta solicitud?')) return;
-    
-    try {
-      // In a real application, you can set the state of request to 'rechazada'
-      // We will perform a PUT call to reject it
-      const res = await fetch('/api/solicitudes', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: solicitudId, action: 'rechazar' })
-      });
-      if (res.ok) {
-        alert('Solicitud rechazada.');
-        loadData();
+  const handleRejectRequest = (solicitudId) => {
+    setConfirmModal({
+      show: true,
+      title: 'Confirmar Rechazo',
+      message: '¿Está seguro de que desea rechazar esta solicitud?',
+      onConfirm: async () => {
+        setConfirmModal({ show: false, title: '', message: '', onConfirm: null });
+        try {
+          const res = await fetch('/api/solicitudes', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: solicitudId, action: 'rechazar' })
+          });
+          if (res.ok) {
+            setAlertModal({ show: true, title: 'Éxito', message: 'Solicitud rechazada correctamente.', type: 'success' });
+            loadData();
+          } else {
+            const data = await res.json();
+            setAlertModal({ show: true, title: 'Error', message: data.error || 'No se pudo rechazar la solicitud.', type: 'error' });
+          }
+        } catch (err) {
+          setAlertModal({ show: true, title: 'Error', message: err.message, type: 'error' });
+        }
       }
-    } catch (err) {
-      alert('Error: ' + err.message);
-    }
+    });
   };
 
   if (loading) {
@@ -314,8 +324,62 @@ export default function SolicitudesPage() {
                   {submitLoading ? 'Enviando requerimiento...' : 'Enviar Solicitud de Soporte'}
                 </button>
               </form>
-
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Confirmation Modal */}
+      {confirmModal.show && (
+        <div className="modal-backdrop">
+          <div className="modal-content" style={{ maxWidth: '380px', padding: 'var(--spacing-lg)', textAlign: 'center' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>❓</div>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'var(--color-primary-dark)', margin: '10px 0' }}>
+              {confirmModal.title}
+            </h3>
+            <p style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)', marginBottom: '20px', lineHeight: '1.4' }}>
+              {confirmModal.message}
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button 
+                className="btn btn-secondary btn-sm" 
+                onClick={() => setConfirmModal({ show: false, title: '', message: '', onConfirm: null })}
+                style={{ minWidth: '100px' }}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="btn btn-primary btn-sm" 
+                onClick={confirmModal.onConfirm}
+                style={{ minWidth: '100px', backgroundColor: 'var(--color-red)' }}
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Notification Alert Modal */}
+      {alertModal.show && (
+        <div className="modal-backdrop">
+          <div className="modal-content" style={{ maxWidth: '380px', padding: 'var(--spacing-lg)', textAlign: 'center' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>
+              {alertModal.type === 'success' ? '✅' : '❌'}
+            </div>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'var(--color-primary-dark)', margin: '10px 0' }}>
+              {alertModal.title}
+            </h3>
+            <p style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)', marginBottom: '20px', lineHeight: '1.4' }}>
+              {alertModal.message}
+            </p>
+            <button 
+              className="btn btn-primary btn-sm" 
+              onClick={() => setAlertModal({ show: false, title: '', message: '', type: 'success' })}
+              style={{ minWidth: '120px', alignSelf: 'center' }}
+            >
+              Aceptar
+            </button>
           </div>
         </div>
       )}
@@ -397,8 +461,9 @@ export default function SolicitudesPage() {
         .modal-backdrop {
           position: fixed;
           inset: 0;
-          background-color: rgba(0,0,0,0.5);
-          backdrop-filter: blur(4px);
+          background-color: rgba(44, 24, 16, 0.45);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
           z-index: 100;
           display: flex;
           align-items: center;

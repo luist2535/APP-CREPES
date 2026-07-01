@@ -1,9 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 
-export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState('usuarios');
+function AdminContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(tabParam || 'usuarios');
+
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
   
   // Lists
   const [users, setUsers] = useState([]);
@@ -1129,5 +1138,13 @@ export default function AdminPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 'var(--spacing-xl)', color: 'var(--color-primary-dark)', fontWeight: '600' }}>Cargando administrador...</div>}>
+      <AdminContent />
+    </Suspense>
   );
 }

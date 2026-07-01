@@ -53,6 +53,24 @@ export async function GET(request) {
       SELECT COUNT(*) as count FROM bloqueos_horario WHERE activo = 1 AND fecha >= date('now')
     `).get().count;
     
+    // Visitas pendientes
+    const visitasPendientes = db.prepare(`
+      SELECT COUNT(*) as count FROM visitas WHERE estado = 'pendiente'
+    `).get().count;
+
+    // Agenda de hoy
+    const localToday = new Date().toLocaleDateString('sv-SE');
+    const agendaHoy = db.prepare(`
+      SELECT e.*, p.nombre as pdv_nombre, c.nombre as ciudad_nombre,
+             a.nombre as area_nombre, a.color as area_color
+      FROM eventos_calendario e
+      JOIN pdv p ON e.pdv_id = p.id
+      JOIN ciudades c ON p.ciudad_id = c.id
+      LEFT JOIN areas a ON e.area_id = a.id
+      WHERE e.estado != 'cancelado' AND e.fecha = ?
+      ORDER BY e.hora_inicio ASC
+    `).all(localToday);
+    
     // Últimas actividades
     const ultimasActividades = db.prepare(`
       SELECT h.*, u.nombre as usuario, p.nombre as pdv_nombre, 
@@ -71,7 +89,9 @@ export async function GET(request) {
       visitasMes,
       visitasPorArea,
       bloqueosActivos,
-      ultimasActividades
+      ultimasActividades,
+      visitasPendientes,
+      agendaHoy
     });
   } catch (error) {
     console.error('Dashboard error:', error);
