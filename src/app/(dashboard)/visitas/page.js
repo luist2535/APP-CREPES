@@ -3,42 +3,107 @@
 import { useState, useEffect, useRef } from 'react';
 
 // Custom Interactive Signature Pad Component using HTML5 Canvas
-function SignaturePad({ onSave, onClear, label }) {
+function SignaturePad({ onSave, onClear, label, value }) {
   const canvasRef = useRef(null);
   const isDrawing = useRef(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [signatureData, setSignatureData] = useState(value || '');
 
+  // Synchronize internal state if value prop changes
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    ctx.strokeStyle = '#2C1810';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    setSignatureData(value || '');
+  }, [value]);
 
-    // Handle high DPI screens
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-    ctx.strokeStyle = '#2C1810';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-  }, []);
+  // Prevent background scrolling when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
+  // Handle canvas sizing and touch listeners when modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    // Tiny delay to ensure DOM is rendered before getting dimensions
+    const timer = setTimeout(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.strokeStyle = '#2C1810';
+      ctx.lineWidth = 3.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width || canvas.offsetWidth || 500;
+      canvas.height = rect.height || canvas.offsetHeight || 250;
+      ctx.strokeStyle = '#2C1810';
+      ctx.lineWidth = 3.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      // Programmatic touch event handlers to prevent default warning and page scrolling
+      const preventDefault = (e) => {
+        if (e.target === canvas) {
+          e.preventDefault();
+        }
+      };
+
+      const handleTouchStart = (e) => {
+        e.preventDefault();
+        const coords = getCoordinates(e);
+        ctx.beginPath();
+        ctx.moveTo(coords.x, coords.y);
+        isDrawing.current = true;
+      };
+
+      const handleTouchMove = (e) => {
+        if (!isDrawing.current) return;
+        e.preventDefault();
+        const coords = getCoordinates(e);
+        ctx.lineTo(coords.x, coords.y);
+        ctx.stroke();
+      };
+
+      const handleTouchEnd = (e) => {
+        if (isDrawing.current) {
+          isDrawing.current = false;
+        }
+      };
+
+      canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+      canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+      canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+      canvas.addEventListener('gesturestart', preventDefault, { passive: false });
+
+      return () => {
+        canvas.removeEventListener('touchstart', handleTouchStart);
+        canvas.removeEventListener('touchmove', handleTouchMove);
+        canvas.removeEventListener('touchend', handleTouchEnd);
+        canvas.removeEventListener('gesturestart', preventDefault);
+      };
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [isOpen]);
 
   const getCoordinates = (e) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
     
-    // Support Touch Events
     if (e.touches && e.touches.length > 0) {
       return {
         x: e.touches[0].clientX - rect.left,
         y: e.touches[0].clientY - rect.top
       };
     }
-    // Support Mouse Events
     return {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top
@@ -47,9 +112,10 @@ function SignaturePad({ onSave, onClear, label }) {
 
   const startDrawing = (e) => {
     e.preventDefault();
-    const coords = getCoordinates(e);
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    const coords = getCoordinates(e);
     ctx.beginPath();
     ctx.moveTo(coords.x, coords.y);
     isDrawing.current = true;
@@ -60,63 +126,245 @@ function SignaturePad({ onSave, onClear, label }) {
     e.preventDefault();
     const coords = getCoordinates(e);
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     ctx.lineTo(coords.x, coords.y);
     ctx.stroke();
   };
 
   const stopDrawing = () => {
-    if (!isDrawing.current) return;
-    isDrawing.current = false;
-    const dataUrl = canvasRef.current.toDataURL();
-    onSave(dataUrl);
+    if (isDrawing.current) {
+      isDrawing.current = false;
+    }
   };
 
   const clearCanvas = () => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  const saveSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const dataUrl = canvas.toDataURL();
+    setSignatureData(dataUrl);
+    onSave(dataUrl);
+    setIsOpen(false);
+  };
+
+  const handleClear = () => {
+    setSignatureData('');
     onClear();
   };
 
   return (
     <div className="signature-pad-wrapper">
       <span className="form-label">{label}</span>
-      <div className="canvas-container">
-        <canvas
-          ref={canvasRef}
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
-          onMouseUp={stopDrawing}
-          onMouseLeave={stopDrawing}
-          onTouchStart={startDrawing}
-          onTouchMove={draw}
-          onTouchEnd={stopDrawing}
-        />
-      </div>
-      <button type="button" className="btn btn-secondary btn-sm" onClick={clearCanvas}>
-        Limpiar Firma 🧹
-      </button>
+      
+      {signatureData ? (
+        <div className="signature-preview-box">
+          <div className="signature-preview-img-wrap">
+            <img src={signatureData} alt="Firma capturada" />
+          </div>
+          <div className="signature-preview-actions">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsOpen(true)}>
+              ✏️ Cambiar Firma
+            </button>
+            <button type="button" className="btn btn-danger btn-sm" onClick={handleClear}>
+              🗑️ Limpiar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" className="btn btn-primary btn-block btn-lg drawing-trigger-btn" onClick={() => setIsOpen(true)}>
+          ✍️ Pulsar para Dibujar Firma
+        </button>
+      )}
+
+      {/* Modal Overlay for drawing */}
+      {isOpen && (
+        <div className="sig-modal-overlay">
+          <div className="sig-modal-container">
+            <div className="sig-modal-header">
+              <h3>✍️ Dibujar Firma Digital</h3>
+              <button type="button" className="sig-modal-close" onClick={() => setIsOpen(false)}>×</button>
+            </div>
+            
+            <div className="sig-modal-body">
+              <p className="sig-instruction">Por favor dibuje su firma dentro del recuadro:</p>
+              
+              <div className="sig-canvas-frame">
+                <canvas
+                  ref={canvasRef}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                />
+              </div>
+            </div>
+
+            <div className="sig-modal-footer">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={clearCanvas}>
+                🧹 Limpiar
+              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsOpen(false)}>
+                  Cancelar
+                </button>
+                <button type="button" className="btn btn-success btn-sm" onClick={saveSignature}>
+                  Aceptar Firma
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
         .signature-pad-wrapper {
           display: flex;
           flex-direction: column;
           gap: var(--spacing-xs);
           margin-top: var(--spacing-sm);
+          width: 100%;
         }
-        .canvas-container {
-          border: 2px dashed var(--color-border);
+        .drawing-trigger-btn {
+          background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
+          color: white;
           border-radius: var(--radius-md);
-          background-color: white;
+          font-weight: 700;
+          font-size: 0.95rem;
+          padding: 14px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          box-shadow: var(--shadow-sm);
+        }
+        .signature-preview-box {
+          border: 1.5px solid var(--color-border);
+          border-radius: var(--radius-lg);
+          padding: var(--spacing-md);
+          background: white;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: var(--spacing-sm);
+        }
+        .signature-preview-img-wrap {
+          height: 100px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-bottom: 1px dashed var(--color-border-light);
+          width: 100%;
+          padding-bottom: 8px;
+        }
+        .signature-preview-img-wrap img {
+          max-height: 100%;
+          max-width: 100%;
+          object-fit: contain;
+        }
+        .signature-preview-actions {
+          display: flex;
+          gap: var(--spacing-sm);
+          width: 100%;
+          justify-content: center;
+        }
+        
+        /* Modal Styles */
+        .sig-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background-color: rgba(44, 24, 16, 0.6);
+          backdrop-filter: blur(8px);
+          WebkitBackdropFilter: blur(8px);
+          z-index: 99999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: var(--spacing-md);
+        }
+        
+        .sig-modal-container {
+          background: var(--color-bg-card);
+          border-radius: var(--radius-xl);
+          width: 100%;
+          max-width: 500px;
+          box-shadow: var(--shadow-xl);
+          display: flex;
+          flex-direction: column;
           overflow: hidden;
-          height: 150px;
-          position: relative;
+          animation: slideUpSig 0.25s ease-out;
+        }
+
+        @keyframes slideUpSig {
+          from { transform: translateY(30px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+
+        .sig-modal-header {
+          padding: var(--spacing-md) var(--spacing-lg);
+          border-bottom: 1px solid var(--color-border-light);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background-color: var(--color-bg-secondary);
+        }
+        .sig-modal-header h3 {
+          font-size: 1.05rem;
+          color: var(--color-primary-dark);
+          margin: 0;
+          font-weight: 700;
+        }
+        .sig-modal-close {
+          background: none;
+          border: none;
+          font-size: 1.8rem;
+          color: var(--color-text-muted);
+          cursor: pointer;
+          line-height: 1;
+        }
+        .sig-modal-body {
+          padding: var(--spacing-lg);
+          display: flex;
+          flex-direction: column;
+          gap: var(--spacing-sm);
+          background-color: var(--color-bg-primary);
+        }
+        .sig-instruction {
+          font-size: 0.825rem;
+          color: var(--color-text-secondary);
+          margin: 0;
+        }
+        .sig-canvas-frame {
+          border: 2.5px dashed var(--color-primary-light);
+          border-radius: var(--radius-lg);
+          background-color: white;
+          height: 250px;
+          width: 100%;
+          overflow: hidden;
+          box-shadow: inset 0 2px 6px rgba(0,0,0,0.05);
         }
         canvas {
           display: block;
           width: 100%;
           height: 100%;
           cursor: crosshair;
+          touch-action: none; /* Prevents default touch actions like scroll */
+        }
+        .sig-modal-footer {
+          padding: var(--spacing-md) var(--spacing-lg);
+          border-top: 1px solid var(--color-border-light);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background-color: var(--color-bg-secondary);
         }
       `}</style>
     </div>
@@ -318,6 +566,44 @@ export default function VisitasPage() {
   const [plantillas, setPlantillas] = useState([]);
   const [pdvs, setPdvs] = useState([]);
   const [users, setUsers] = useState([]);
+  const [searchTermVisita, setSearchTermVisita] = useState('');
+  const [selectedAreaFilter, setSelectedAreaFilter] = useState('all');
+  
+  // Custom Confirm & Alert Modal States
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+  });
+
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
+  const triggerConfirm = (title, message, callback) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        callback();
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
+  const triggerAlert = (title, message, type = 'info') => {
+    setAlertModal({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -343,10 +629,24 @@ export default function VisitasPage() {
   const [formAccionesCorrectivas, setFormAccionesCorrectivas] = useState('');
   const [auxiliarSignature, setAuxiliarSignature] = useState('');
   
+  // Applicant details and PDV signature states
+  const [solicitanteNombre, setSolicitanteNombre] = useState('');
+  const [solicitanteDocumento, setSolicitanteDocumento] = useState('');
+  const [solicitanteTelefono, setSolicitanteTelefono] = useState('');
+  const [firmaPdv, setFirmaPdv] = useState('');
+  
   // Jefe Approval states
   const [jefeComments, setJefeComments] = useState('');
   const [jefeSignature, setJefeSignature] = useState('');
   const [isApproving, setIsApproving] = useState(false);
+
+  // Checklist Template Editor states
+  const [editingTemplateId, setEditingTemplateId] = useState('');
+  const [templateFields, setTemplateFields] = useState([]);
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [newFieldType, setNewFieldType] = useState('checkbox');
+  const [newFieldLabel, setNewFieldLabel] = useState('');
+  const [newFieldRequired, setNewFieldRequired] = useState(true);
 
   // File Upload states
   const [antesFile, setAntesFile] = useState(null);
@@ -474,6 +774,120 @@ export default function VisitasPage() {
     }
   }, [selectedAreaId, tiposVisita]);
 
+  // Load template fields for editing in the checklist designer
+  useEffect(() => {
+    if (activeTab === 'templates') {
+      if (isUserJefe(userRole)) {
+        const userAreaId = getAreaIdFromRol(userRole);
+        if (userAreaId) {
+          const myTemplate = plantillas.find(p => p.area_id === parseInt(userAreaId));
+          if (myTemplate) {
+            setEditingTemplateId(String(myTemplate.id));
+            try {
+              setTemplateFields(JSON.parse(myTemplate.campos || '[]'));
+            } catch (e) {
+              setTemplateFields([]);
+            }
+          }
+        }
+      } else if (editingTemplateId) {
+        const selectedTemp = plantillas.find(p => String(p.id) === editingTemplateId);
+        if (selectedTemp) {
+          try {
+            setTemplateFields(JSON.parse(selectedTemp.campos || '[]'));
+          } catch (e) {
+            setTemplateFields([]);
+          }
+        }
+      }
+    }
+  }, [activeTab, editingTemplateId, plantillas, userRole]);
+
+  const handleAddField = () => {
+    if (!newFieldLabel.trim()) {
+      triggerAlert('Campo Requerido', 'Debe ingresar una etiqueta para el nuevo elemento.', 'warning');
+      return;
+    }
+    
+    const isComplex = templateFields.length > 0 && (templateFields[0].tipo === 'matrix' || templateFields[0].tipo === 'simple_checklist');
+    if (isComplex) {
+      triggerAlert('Acción no permitida', 'No se pueden añadir campos individuales a plantillas de tipo matriz.', 'warning');
+      return;
+    }
+
+    const newField = {
+      nombre: 'field_' + Math.random().toString(36).substring(2, 9),
+      tipo: newFieldType,
+      label: newFieldLabel,
+      requerido: newFieldRequired
+    };
+
+    setTemplateFields([...templateFields, newField]);
+    setNewFieldLabel('');
+    setNewFieldRequired(true);
+  };
+
+  const handleDeleteField = (index) => {
+    const isComplex = templateFields.length > 0 && (templateFields[0].tipo === 'matrix' || templateFields[0].tipo === 'simple_checklist');
+    if (isComplex) {
+      triggerAlert('Acción no permitida', 'No se pueden eliminar campos individuales en plantillas de tipo matriz.', 'warning');
+      return;
+    }
+    const updated = [...templateFields];
+    updated.splice(index, 1);
+    setTemplateFields(updated);
+  };
+
+  const handleFieldChange = (index, key, val) => {
+    const updated = [...templateFields];
+    updated[index][key] = val;
+    setTemplateFields(updated);
+  };
+
+  const handleMoveField = (index, direction) => {
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === templateFields.length - 1) return;
+    
+    const updated = [...templateFields];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const temp = updated[index];
+    updated[index] = updated[targetIndex];
+    updated[targetIndex] = temp;
+    setTemplateFields(updated);
+  };
+
+  const handleMatrixRowChange = (sectionIdx, rowIdx, val) => {
+    const updated = JSON.parse(JSON.stringify(templateFields));
+    updated[0].secciones[sectionIdx].filas[rowIdx] = val;
+    setTemplateFields(updated);
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!editingTemplateId) return;
+    setIsSavingTemplate(true);
+
+    try {
+      const res = await fetch('/api/plantillas', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: parseInt(editingTemplateId),
+          campos: templateFields
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al guardar la plantilla');
+
+      triggerAlert('Éxito', 'Plantilla de checklist guardada exitosamente.', 'success');
+      loadData();
+    } catch (err) {
+      triggerAlert('Error', 'Error: ' + err.message, 'error');
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
+
   // Update dynamic fields when Area / Type changes (Direct creation or Execution)
   const syncPlantillaFields = (areaId, tipoId) => {
     if (areaId && tipoId) {
@@ -563,7 +977,7 @@ export default function VisitasPage() {
       
       setUrlState(data.url);
     } catch (err) {
-      alert('Error en la subida: ' + err.message);
+      triggerAlert('Error de Carga', 'Error en la subida: ' + err.message, 'error');
       setFileState(null);
     } finally {
       setUploadingState(false);
@@ -582,10 +996,10 @@ export default function VisitasPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al iniciar trabajo');
 
-      alert('Trabajo iniciado. Se ha registrado la hora de inicio.');
+      triggerAlert('Éxito', 'Trabajo iniciado. Se ha registrado la hora de inicio.', 'success');
       loadData();
     } catch (err) {
-      alert(err.message);
+      triggerAlert('Error', err.message, 'error');
     }
   };
 
@@ -603,9 +1017,41 @@ export default function VisitasPage() {
     setSoporteUrl('');
     setSoporteFile(null);
 
+    setSolicitanteNombre(visit.solicitante_nombre || '');
+    setSolicitanteDocumento(visit.solicitante_documento || '');
+    setSolicitanteTelefono(visit.solicitante_telefono || '');
+    setFirmaPdv(visit.firma_pdv || '');
+
     // Load visit template fields
     let areaId = visit.area_id;
     let tipoId = visit.tipo_visita_id;
+
+    if (visit.campos_personalizados) {
+      try {
+        const fields = JSON.parse(visit.campos_personalizados);
+        const existingAnswers = JSON.parse(visit.datos_formulario || '{}');
+        const initialAnswers = {};
+        fields.forEach((f) => {
+          if (f.nombre in existingAnswers) {
+            initialAnswers[f.nombre] = existingAnswers[f.nombre];
+          } else {
+            if (f.tipo === 'checkbox') initialAnswers[f.nombre] = false;
+            else if (f.tipo === 'number') initialAnswers[f.nombre] = 0;
+            else initialAnswers[f.nombre] = '';
+          }
+        });
+        setFormAnswers(initialAnswers);
+        setActivePlantilla({
+          id: null,
+          nombre: 'Tareas Personalizadas',
+          campos: visit.campos_personalizados,
+          area_id: visit.area_id
+        });
+        return;
+      } catch (e) {
+        console.error("Error parsing campos_personalizados:", e);
+      }
+    }
     
     // If tipo_visita_id is null (created without template in calendar),
     // default to the first one available for the area
@@ -675,7 +1121,7 @@ export default function VisitasPage() {
 
     const isTech = activeExecutionVisit.area_tipo_flujo === 'tecnico';
 
-    // Validations for Technical Flow
+    // Validations for Technical / Systems Flow
     if (isTech) {
       if (!antesUrl) {
         setSubmitError('La fotografía del ANTES es obligatoria en trabajos técnicos.');
@@ -689,6 +1135,16 @@ export default function VisitasPage() {
       }
       if (!auxiliarSignature) {
         setSubmitError('La firma digital del Auxiliar es obligatoria para certificar la ejecución.');
+        setSubmitLoading(false);
+        return;
+      }
+      if (!solicitanteNombre.trim()) {
+        setSubmitError('El nombre del funcionario del Punto de Venta es obligatorio.');
+        setSubmitLoading(false);
+        return;
+      }
+      if (!firmaPdv) {
+        setSubmitError('La firma del funcionario del Punto de Venta es obligatoria.');
         setSubmitLoading(false);
         return;
       }
@@ -722,7 +1178,11 @@ export default function VisitasPage() {
         acciones_correctivas: !isTech ? formAccionesCorrectivas : null,
         tipo_visita_id: tipoId,
         plantilla_id: templateId,
-        evidencias: evidenciasArray
+        evidencias: evidenciasArray,
+        solicitante_nombre: solicitanteNombre.trim(),
+        solicitante_documento: solicitanteDocumento.trim(),
+        solicitante_telefono: solicitanteTelefono.trim(),
+        firma_pdv: firmaPdv
       };
 
       const res = await fetch('/api/visitas', {
@@ -755,9 +1215,8 @@ export default function VisitasPage() {
     setSubmitError('');
     setSubmitSuccess('');
 
-    const isTech = selectedVisit.area_tipo_flujo === 'tecnico';
-    if (isTech && !jefeSignature) {
-      alert('La firma digital del Jefe es obligatoria para aprobar y cerrar esta tarea técnica.');
+    if (!jefeSignature) {
+      triggerAlert('Firma Requerida', 'La firma digital del Jefe es obligatoria para aprobar y cerrar esta visita.', 'warning');
       setIsApproving(false);
       return;
     }
@@ -770,21 +1229,21 @@ export default function VisitasPage() {
           id: visitId,
           action: 'aprobar',
           comentarios_jefe: jefeComments,
-          firma_jefe: isTech ? jefeSignature : null
+          firma_jefe: jefeSignature
         })
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al aprobar visita');
 
-      alert('Visita aprobada y cerrada exitosamente.');
+      triggerAlert('Éxito', 'Visita aprobada y cerrada exitosamente.', 'success');
       setSelectedVisit(null);
       setJefeComments('');
       setJefeSignature('');
       setModalTab('general');
       loadData();
     } catch (err) {
-      alert('Error: ' + err.message);
+      triggerAlert('Error', 'Error: ' + err.message, 'error');
     } finally {
       setIsApproving(false);
     }
@@ -792,7 +1251,7 @@ export default function VisitasPage() {
 
   const handleReturnVisit = async (visitId) => {
     if (!jefeComments) {
-      alert('Debe escribir comentarios u observaciones explicando qué corregir al devolver la tarea.');
+      triggerAlert('Comentario Requerido', 'Debe escribir comentarios u observaciones explicando qué corregir al devolver la tarea.', 'warning');
       return;
     }
 
@@ -811,13 +1270,13 @@ export default function VisitasPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al devolver visita');
 
-      alert('Visita devuelta al Auxiliar para corregir.');
+      triggerAlert('Éxito', 'Visita devuelta al Auxiliar para corregir.', 'success');
       setSelectedVisit(null);
       setJefeComments('');
       setModalTab('general');
       loadData();
     } catch (err) {
-      alert('Error: ' + err.message);
+      triggerAlert('Error', 'Error: ' + err.message, 'error');
     } finally {
       setIsApproving(false);
     }
@@ -886,11 +1345,19 @@ export default function VisitasPage() {
     let parsedFields = [];
     let parsedData = {};
 
-    const template = plantillas.find((p) => p.id === visit.plantilla_id);
-    if (template) {
+    if (visit.campos_personalizados) {
       try {
-        parsedFields = JSON.parse(template.campos);
-      } catch (e) {}
+        parsedFields = JSON.parse(visit.campos_personalizados);
+      } catch (e) {
+        console.error("Error parsing campos_personalizados in details:", e);
+      }
+    } else {
+      const template = plantillas.find((p) => p.id === visit.plantilla_id);
+      if (template) {
+        try {
+          parsedFields = JSON.parse(template.campos);
+        } catch (e) {}
+      }
     }
 
     try {
@@ -951,42 +1418,132 @@ export default function VisitasPage() {
     v => ['cerrada', 'completada'].includes(v.estado)
   );
 
+  const filteredVisitas = visitas.filter((v) => {
+    const matchesSearch = 
+      (v.pdv_nombre || '').toLowerCase().includes(searchTermVisita.toLowerCase()) ||
+      (v.ciudad_nombre || '').toLowerCase().includes(searchTermVisita.toLowerCase()) ||
+      (v.usuario_nombre || '').toLowerCase().includes(searchTermVisita.toLowerCase()) ||
+      (v.responsable_nombre || '').toLowerCase().includes(searchTermVisita.toLowerCase()) ||
+      (v.tipo_visita_nombre || '').toLowerCase().includes(searchTermVisita.toLowerCase()) ||
+      (v.estado || '').toLowerCase().includes(searchTermVisita.toLowerCase());
+      
+    const matchesArea = selectedAreaFilter === 'all' || String(v.area_id) === selectedAreaFilter;
+    
+    return matchesSearch && matchesArea;
+  });
+
   return (
     <div className="visitas-page-container">
       
       {/* Navigation tabs */}
-      <div className="tabs-header no-print">
-        {isUserAuxiliar(userRole) && (
-          <button 
-            className={`tab-btn ${activeTab === 'pending_tasks' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('pending_tasks'); setActiveExecutionVisit(null); }}
-          >
-            📥 Mis Tareas Pendientes ({pendingVisits.length})
-          </button>
-        )}
-        
+      <div className="tabs-header no-print" style={{ display: 'flex', borderBottom: '2px solid #E8DDD4', marginBottom: '20px', gap: '20px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {isUserJefe(userRole) && (
           <button 
             className={`tab-btn ${activeTab === 'awaiting_approval' ? 'active' : ''}`}
             onClick={() => { setActiveTab('awaiting_approval'); setActiveExecutionVisit(null); }}
+            style={{
+              padding: '12px 16px',
+              fontSize: '0.9rem',
+              fontWeight: 'bold',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'awaiting_approval' ? '3px solid #6B3A2A' : '3px solid transparent',
+              color: activeTab === 'awaiting_approval' ? '#6B3A2A' : '#777',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              margin: 0,
+              whiteSpace: 'nowrap'
+            }}
           >
-            📋 Pendientes de Aprobación ({approvalRequiredVisits.length})
+            <span className="desktop-only-inline">📋 Pendientes de Aprobación</span>
+            <span className="mobile-only-inline">📋 Pendientes</span> ({approvalRequiredVisits.length})
           </button>
         )}
 
+        {isUserAuxiliar(userRole) && (
+          <button 
+            className={`tab-btn ${activeTab === 'pending_tasks' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('pending_tasks'); setActiveExecutionVisit(null); }}
+            style={{
+              padding: '12px 16px',
+              fontSize: '0.9rem',
+              fontWeight: 'bold',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'pending_tasks' ? '3px solid #6B3A2A' : '3px solid transparent',
+              color: activeTab === 'pending_tasks' ? '#6B3A2A' : '#777',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              margin: 0,
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Mis Tareas ({pendingVisits.length})
+          </button>
+        )}
+        
         <button 
           className={`tab-btn ${activeTab === 'list' ? 'active' : ''}`}
           onClick={() => { setActiveTab('list'); setActiveExecutionVisit(null); }}
+          style={{
+            padding: '12px 16px',
+            fontSize: '0.9rem',
+            fontWeight: 'bold',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'list' ? '3px solid #6B3A2A' : '3px solid transparent',
+            color: activeTab === 'list' ? '#6B3A2A' : '#777',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            margin: 0,
+            whiteSpace: 'nowrap'
+          }}
         >
-          📋 Historial de Visitas
+          <span className="desktop-only-inline">📋 Historial de Visitas</span>
+          <span className="mobile-only-inline">📋 Historial</span>
         </button>
 
         {(userRole === 1 || userRole === 2) && (
           <button 
             className={`tab-btn ${activeTab === 'new' ? 'active' : ''}`}
             onClick={() => { setActiveTab('new'); setActiveExecutionVisit(null); }}
+            style={{
+              padding: '12px 16px',
+              fontSize: '0.9rem',
+              fontWeight: 'bold',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'new' ? '3px solid #6B3A2A' : '3px solid transparent',
+              color: activeTab === 'new' ? '#6B3A2A' : '#777',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              margin: 0,
+              whiteSpace: 'nowrap'
+            }}
           >
-            ➕ Registrar Nueva Visita
+            ➕ Registrar Visita
+          </button>
+        )}
+
+        {(userRole === 1 || userRole === 2 || isUserJefe(userRole)) && (
+          <button 
+            className={`tab-btn ${activeTab === 'templates' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('templates'); setActiveExecutionVisit(null); }}
+            style={{
+              padding: '12px 16px',
+              fontSize: '0.9rem',
+              fontWeight: 'bold',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'templates' ? '3px solid #6B3A2A' : '3px solid transparent',
+              color: activeTab === 'templates' ? '#6B3A2A' : '#777',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              margin: 0,
+              whiteSpace: 'nowrap'
+            }}
+          >
+            ⚙️ Configurar
           </button>
         )}
       </div>
@@ -1011,14 +1568,16 @@ export default function VisitasPage() {
               <form onSubmit={handleFinishWork} className="visita-form">
                 
                 {/* Check list Renderer (conditional on template existance) */}
-                {activePlantilla && (
+                {(activePlantilla || (activeExecutionVisit && activeExecutionVisit.campos_personalizados)) && (
                   <div className="dynamic-template-section card shadow-sm">
                     <div className="card-header">
-                      <h4>📋 Checklist Formulario: {activePlantilla.nombre}</h4>
+                      <h4>📋 Checklist Formulario: {activeExecutionVisit.campos_personalizados ? 'Tareas Personalizadas de la Visita' : (activePlantilla ? activePlantilla.nombre : 'Checklist')}</h4>
                     </div>
                     <div className="card-body">
                       {(() => {
-                        const parsedCampos = JSON.parse(activePlantilla.campos);
+                        const parsedCampos = activeExecutionVisit.campos_personalizados 
+                          ? JSON.parse(activeExecutionVisit.campos_personalizados) 
+                          : (activePlantilla ? JSON.parse(activePlantilla.campos) : []);
                         const firstField = parsedCampos[0];
                         if (firstField && firstField.tipo === 'matrix') {
                           return (
@@ -1279,11 +1838,50 @@ export default function VisitasPage() {
                       </div>
                     </div>
 
+                    {/* Applicant Info and Signature for Technical/Systems Flow */}
+                    {activeExecutionVisit.area_tipo_flujo === 'tecnico' && (
+                      <div className="applicant-info-section card shadow-sm" style={{ marginTop: '20px', padding: '15px', backgroundColor: 'var(--color-bg-secondary)', border: '1px solid var(--color-border-light)' }}>
+                        <h4 style={{ color: 'var(--color-primary-dark)', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '15px', borderBottom: '1px solid var(--color-border-light)', paddingBottom: '6px' }}>
+                          👤 Información del Solicitante (Funcionario PDV)
+                        </h4>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          <div className="form-group">
+                            <label className="form-label" htmlFor="solic-name">Nombre Completo del Solicitante *</label>
+                            <input
+                              id="solic-name"
+                              type="text"
+                              className="form-input"
+                              placeholder="Ej. Kelly Marrugo"
+                              value={solicitanteNombre}
+                              onChange={(e) => setSolicitanteNombre(e.target.value)}
+                              required
+                            />
+                          </div>
+
+                          <div className="signature-section" style={{ marginTop: '10px' }}>
+                            <SignaturePad
+                              label="Firma del Funcionario de Punto de Venta *"
+                              value={firmaPdv}
+                              onSave={(base64) => setFirmaPdv(base64)}
+                              onClear={() => setFirmaPdv('')}
+                            />
+                            {firmaPdv && (
+                              <div className="upload-success-badge" style={{ marginTop: '8px' }}>
+                                ✓ Firma del funcionario capturada
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Auxiliar Digital Signature for Technical Flow */}
                     {activeExecutionVisit.area_tipo_flujo === 'tecnico' && (
                       <div className="signature-section" style={{ marginTop: '20px' }}>
                         <SignaturePad
-                          label="Firma de Conformidad de Ejecución (Auxiliar) *"
+                          label="Firma de Conformidad de Ejecución (Auxiliar / Funcionario Tecnología) *"
+                          value={auxiliarSignature}
                           onSave={(base64) => setAuxiliarSignature(base64)}
                           onClear={() => setAuxiliarSignature('')}
                         />
@@ -1313,83 +1911,206 @@ export default function VisitasPage() {
 
       {/* Tab 1: Auxiliar Tasks list */}
       {(!activeExecutionVisit && activeTab === 'pending_tasks') && (
-        <div className="visitas-list-tab animate-fade-in no-print">
+        <div className="visitas-list-tab animate-fade-in no-print" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div className="card shadow-md">
-            <div className="card-header">
-              <h3>📥 Mis Tareas y Visitas Asignadas</h3>
+            <div className="card-header" style={{ padding: '15px 20px', borderBottom: '1px solid var(--color-border-light)' }}>
+              <h3 style={{ margin: 0, fontWeight: 'bold' }}>📥 Mis Tareas y Visitas Asignadas</h3>
             </div>
             <div className="card-body px-0 py-0">
               {pendingVisits.length > 0 ? (
-                <div className="table-responsive">
-                  <table className="visitas-table">
-                    <thead>
-                      <tr>
-                        <th>Fecha</th>
-                        <th>PDV</th>
-                        <th>Área</th>
-                        <th>Observaciones Iniciales</th>
-                        <th>Estado</th>
-                        <th>Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pendingVisits.map((v) => (
-                        <tr key={v.id}>
-                          <td>{v.fecha}</td>
-                          <td className="font-semibold">{v.pdv_nombre} ({v.ciudad_nombre})</td>
-                          <td>
-                            <span className="area-color-tag" style={{ borderLeftColor: v.area_color || '#6B3A2A' }}>
-                              {v.area_nombre}
-                            </span>
-                          </td>
-                          <td>{v.observaciones || 'Sin detalles adicionales'}</td>
-                          <td>
-                            <span className={`status-pill ${v.estado}`}>
-                              {v.estado === 'pendiente' && '⏳ Pendiente'}
-                              {v.estado === 'en_progreso' && '⚙️ En Progreso'}
-                              {v.estado === 'devuelta' && '❌ Devuelta'}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="action-buttons-group">
-                              {v.estado === 'pendiente' && (
-                                <button 
-                                  className="btn btn-primary btn-sm"
-                                  onClick={() => handleStartWork(v.id)}
-                                >
-                                  Iniciar Trabajo 🚀
-                                </button>
-                              )}
-                              {v.estado === 'devuelta' && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                  <button 
-                                    className="btn btn-warning btn-sm"
-                                    onClick={() => handleOpenExecutionForm(v)}
-                                  >
+                <>
+                  {/* Desktop Table View */}
+                  <div className="table-responsive desktop-only-table">
+                    <table className="visitas-table">
+                      <thead>
+                        <tr>
+                          <th>Fecha</th>
+                          <th>PDV</th>
+                          <th>Área</th>
+                          <th>Observaciones</th>
+                          <th>Estado</th>
+                          <th>Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pendingVisits.map((v) => (
+                          <tr key={v.id}>
+                            <td>{v.fecha}</td>
+                            <td className="font-semibold">{v.pdv_nombre} ({v.ciudad_nombre})</td>
+                            <td>
+                              <span className="area-color-tag" style={{ borderLeftColor: v.area_color || '#6B3A2A' }}>
+                                {v.area_nombre}
+                              </span>
+                            </td>
+                            <td>{v.observaciones || 'Sin detalles adicionales'}</td>
+                            <td>
+                              <span className={`status-pill ${v.estado}`}>
+                                {v.estado === 'pendiente' && '⏳ Pendiente'}
+                                {v.estado === 'en_progreso' && '⚙️ En Progreso'}
+                                {v.estado === 'devuelta' && '❌ Devuelta'}
+                              </span>
+                            </td>
+                            <td>
+                              <div className="action-buttons-group">
+                                {v.estado === 'pendiente' && (
+                                  <button className="btn btn-primary btn-sm" onClick={() => handleStartWork(v.id)}>
+                                    Iniciar Trabajo 🚀
+                                  </button>
+                                )}
+                                {v.estado === 'devuelta' && (
+                                  <button className="btn btn-warning btn-sm" onClick={() => handleOpenExecutionForm(v)}>
                                     Corregir y Abrir ⚙️
                                   </button>
-                                  <span style={{ fontSize: '0.7rem', color: '#991B1B', fontWeight: 'bold' }}>
-                                    Nota: "{v.comentarios_jefe}"
-                                  </span>
-                                </div>
-                              )}
-                              {v.estado === 'en_progreso' && (
-                                <button 
-                                  className="btn btn-success btn-sm"
-                                  onClick={() => handleOpenExecutionForm(v)}
-                                >
-                                  Diligenciar Formulario 📋
-                                </button>
-                              )}
+                                )}
+                                {v.estado === 'en_progreso' && (
+                                  <button className="btn btn-success btn-sm" onClick={() => handleOpenExecutionForm(v)}>
+                                    Diligenciar Formulario 📋
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Card-based list for both Desktop & Mobile */}
+                  <div className="visitas-cards-grid" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {pendingVisits.map((v) => {
+                      const statusConfig = {
+                        pendiente: { label: '⏳ PENDIENTE', bg: '#FEF3C7', color: '#92400E' },
+                        en_progreso: { label: '⚙️ EN PROGRESO', bg: '#DBEAFE', color: '#1E40AF' },
+                        devuelta: { label: '❌ DEVUELTA', bg: '#FEE2E2', color: '#991B1B' }
+                      };
+                      const st = statusConfig[v.estado] || statusConfig.pendiente;
+
+                      return (
+                        <div 
+                          key={v.id} 
+                          className="visita-pending-card" 
+                          style={{
+                            backgroundColor: '#fff',
+                            border: '1.5px solid #e8ddd4',
+                            borderRadius: '12px',
+                            padding: '20px',
+                            boxShadow: '0 2px 8px rgba(44, 24, 16, 0.05)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                            position: 'relative'
+                          }}
+                        >
+                          {/* Card Top: PDV */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800', color: 'var(--color-primary-dark)', fontSize: '1rem' }}>
+                              <span>📍</span> {v.pdv_nombre} ({v.ciudad_nombre})
                             </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                            <span 
+                              style={{ 
+                                backgroundColor: st.bg, 
+                                color: st.color, 
+                                fontWeight: 'bold', 
+                                fontSize: '0.72rem', 
+                                padding: '4px 10px', 
+                                borderRadius: '20px',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {st.label}
+                            </span>
+                          </div>
+
+                          {/* Card Content */}
+                          <div className="pending-card-content-row" style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: '1', minWidth: '150px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#555' }}>
+                                <span>📋</span> {v.area_nombre}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#555' }}>
+                                <span>📋</span> {v.tipo_visita_nombre || 'Soporte General'}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: '#888', fontStyle: 'italic' }}>
+                                <span>📅</span> Programada: {v.fecha}
+                              </div>
+                            </div>
+
+                            {v.observaciones && (
+                              <div style={{ flex: '1', minWidth: '150px', backgroundColor: '#FAF6F0', borderRadius: '8px', padding: '10px', fontSize: '0.8rem', color: '#555', fontStyle: 'italic' }}>
+                                <strong style={{ color: '#4A2518', fontStyle: 'normal' }}>Observaciones:</strong><br/>
+                                "{v.observaciones}"
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Devuelta warning note */}
+                          {v.estado === 'devuelta' && v.comentarios_jefe && (
+                            <div style={{ backgroundColor: '#FEE2E2', borderRadius: '8px', padding: '10px', fontSize: '0.8rem', color: '#991B1B' }}>
+                              <strong>⚠️ Nota del Jefe:</strong> "{v.comentarios_jefe}"
+                            </div>
+                          )}
+
+                          {/* Card Footer Actions */}
+                          <div className="pending-card-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #f2ece6', paddingTop: '12px' }}>
+                            {v.estado === 'pendiente' && (
+                              <button
+                                className="btn btn-primary"
+                                onClick={() => handleStartWork(v.id)}
+                                style={{ 
+                                  backgroundColor: '#6B3A2A', 
+                                  color: '#fff', 
+                                  fontWeight: 'bold',
+                                  fontSize: '0.82rem',
+                                  padding: '10px 20px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Iniciar Trabajo 🚀
+                              </button>
+                            )}
+                            {v.estado === 'devuelta' && (
+                              <button
+                                className="btn btn-warning"
+                                onClick={() => handleOpenExecutionForm(v)}
+                                style={{ 
+                                  backgroundColor: '#F59E0B', 
+                                  color: '#fff', 
+                                  fontWeight: 'bold',
+                                  fontSize: '0.82rem',
+                                  padding: '10px 20px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Corregir y Reenviar ⚙️
+                              </button>
+                            )}
+                            {v.estado === 'en_progreso' && (
+                              <button
+                                className="btn btn-success"
+                                onClick={() => handleOpenExecutionForm(v)}
+                                style={{ 
+                                  backgroundColor: '#15803D', 
+                                  color: '#fff', 
+                                  fontWeight: 'bold',
+                                  fontSize: '0.82rem',
+                                  padding: '10px 20px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Diligenciar Formulario 📋
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
               ) : (
-                <div className="card text-center text-muted py-8 shadow-sm">
+                <div className="card text-center text-muted py-8 shadow-sm" style={{ border: 'none', margin: '20px' }}>
                   <p>No tienes tareas asignadas pendientes de ejecutar.</p>
                 </div>
               )}
@@ -1400,56 +2121,187 @@ export default function VisitasPage() {
 
       {/* Tab 2: Jefe Awaiting Approval list */}
       {(!activeExecutionVisit && activeTab === 'awaiting_approval') && (
-        <div className="visitas-list-tab animate-fade-in no-print">
+        <div className="visitas-list-tab animate-fade-in no-print" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div className="card shadow-md">
-            <div className="card-header">
-              <h3>📋 Visitas Pendientes de Aprobación</h3>
+            <div className="card-header" style={{ padding: '15px 20px', borderBottom: '1px solid var(--color-border-light)' }}>
+              <h3 style={{ margin: 0, fontWeight: 'bold' }}>📋 Visitas Pendientes de Aprobación</h3>
             </div>
             <div className="card-body px-0 py-0">
               {approvalRequiredVisits.length > 0 ? (
-                <div className="table-responsive">
-                  <table className="visitas-table">
-                    <thead>
-                      <tr>
-                        <th>Fecha</th>
-                        <th>PDV</th>
-                        <th>Área</th>
-                        <th>Tipo de Visita</th>
-                        <th>Ejecutado Por</th>
-                        <th>Estado</th>
-                        <th>Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {approvalRequiredVisits.map((v) => (
-                        <tr key={v.id}>
-                          <td>{v.fecha}</td>
-                          <td className="font-semibold">{v.pdv_nombre} ({v.ciudad_nombre})</td>
-                          <td>
-                            <span className="area-color-tag" style={{ borderLeftColor: v.area_color || '#6B3A2A' }}>
-                              {v.area_nombre}
-                            </span>
-                          </td>
-                          <td>{v.tipo_visita_nombre || 'Sin definir'}</td>
-                          <td>{v.responsable_nombre}</td>
-                          <td>
-                            <span className="status-pill finalizada">⏳ Finalizada</span>
-                          </td>
-                          <td>
-                            <button 
-                              className="btn btn-warning btn-sm"
-                              onClick={() => handleOpenVisitDetails(v)}
-                            >
-                              Revisar y Aprobar 🔎
-                            </button>
-                          </td>
+                <>
+                  {/* Desktop Table View */}
+                  <div className="table-responsive desktop-only-table">
+                    <table className="visitas-table">
+                      <thead>
+                        <tr>
+                          <th>Fecha</th>
+                          <th>PDV</th>
+                          <th>Área</th>
+                          <th>Tipo de Visita</th>
+                          <th>Ejecutado Por</th>
+                          <th>Estado</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {approvalRequiredVisits.map((v) => (
+                          <tr key={v.id}>
+                            <td>{v.fecha}</td>
+                            <td className="font-semibold">{v.pdv_nombre} ({v.ciudad_nombre})</td>
+                            <td>
+                              <span className="area-color-tag" style={{ borderLeftColor: v.area_color || '#6B3A2A' }}>
+                                {v.area_nombre}
+                              </span>
+                            </td>
+                            <td>{v.tipo_visita_nombre || 'Sin definir'}</td>
+                            <td>{v.responsable_nombre}</td>
+                            <td>
+                              <span className="status-pill finalizada" style={{ backgroundColor: '#F3E8FF', color: '#6B21A8', fontWeight: 'bold' }}>⏳ FINALIZADA</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Desktop & Mobile Card-based detailed list */}
+                  <div className="visitas-cards-grid" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {approvalRequiredVisits.map((v) => {
+                      // Custom role translation
+                      const getTechRoleName = (roleId, areaName) => {
+                        const rol = parseInt(roleId);
+                        if (rol === 16) return 'Auxiliar de Sistemas';
+                        if (rol === 12) return 'Auxiliar de Mantenimiento';
+                        if (rol === 10) return 'Auxiliar de Operaciones';
+                        if (rol === 11) return 'Auxiliar SST';
+                        if (rol === 13) return 'Auxiliar de Calidad';
+                        if (rol === 14) return 'Auxiliar de VRH';
+                        if (rol === 15) return 'Auxiliar de Formación';
+                        return `Auxiliar ${areaName || ''}`;
+                      };
+                      const techRole = getTechRoleName(v.responsable_rol_id, v.area_nombre);
+                      
+                      return (
+                        <div 
+                          key={v.id} 
+                          className="visita-pending-card" 
+                          style={{
+                            backgroundColor: '#fff',
+                            border: '1.5px solid #e8ddd4',
+                            borderRadius: '12px',
+                            padding: '20px',
+                            boxShadow: '0 2px 8px rgba(44, 24, 16, 0.05)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '15px',
+                            position: 'relative'
+                          }}
+                        >
+                          {/* Card Top: PDV and Options */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800', color: 'var(--color-primary-dark)', fontSize: '1rem' }}>
+                              <span>📍</span> {v.pdv_nombre} ({v.ciudad_nombre})
+                            </div>
+                            <span style={{ color: '#aaa', cursor: 'pointer', fontSize: '1.2rem' }}>•••</span>
+                          </div>
+
+                          {/* Card Content Row */}
+                          <div className="pending-card-content-row" style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '15px' }}>
+                            {/* Left block: details list */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '150px', flex: '1' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#555' }}>
+                                <span>📋</span> Visita {v.area_nombre}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#555' }}>
+                                <span>📋</span> {v.tipo_visita_nombre || 'Soporte General'}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: '#888', fontStyle: 'italic' }}>
+                                <span>📅</span> Realizada el: {v.fecha}
+                              </div>
+                            </div>
+
+                            {/* Right block: Technician & Status badge */}
+                            <div className="pending-card-tech-row" style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontSize: '0.72rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Técnico Ejecutor</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  {v.responsable_avatar ? (
+                                    <img 
+                                      src={v.responsable_avatar} 
+                                      alt={v.responsable_nombre} 
+                                      style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #ddd' }}
+                                    />
+                                  ) : (
+                                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#FAF6F0', color: '#6B3A2A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.85rem', border: '1px solid #e8ddd4' }}>
+                                      {v.responsable_nombre ? v.responsable_nombre.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'AX'}
+                                    </div>
+                                  )}
+                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: '0.82rem', fontWeight: 'bold', color: '#4A2518' }}>{techRole}</span>
+                                    <span style={{ fontSize: '0.78rem', color: '#555' }}>{v.responsable_nombre}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <span 
+                                className="status-pill finalizada" 
+                                style={{ 
+                                  backgroundColor: '#F3E8FF', 
+                                  color: '#6B21A8', 
+                                  fontWeight: 'bold', 
+                                  fontSize: '0.75rem', 
+                                  padding: '6px 12px', 
+                                  borderRadius: '20px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                🏆 FINALIZADA
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Card Footer Actions */}
+                          <div className="pending-card-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #f2ece6', paddingTop: '12px' }}>
+                            <button
+                              className="btn btn-secondary"
+                              onClick={() => handleOpenVisitDetails(v)}
+                              style={{ 
+                                backgroundColor: '#FAF6F0', 
+                                color: '#6B3A2A', 
+                                border: '1px solid #e8ddd4', 
+                                fontWeight: 'bold',
+                                fontSize: '0.82rem',
+                                padding: '8px 16px',
+                                borderRadius: '6px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Ver Detalles
+                            </button>
+                            <button
+                              className="btn btn-primary"
+                              onClick={() => handleOpenVisitDetails(v)}
+                              style={{ 
+                                backgroundColor: '#6B3A2A', 
+                                color: '#fff', 
+                                fontWeight: 'bold',
+                                fontSize: '0.82rem',
+                                padding: '8px 16px',
+                                borderRadius: '6px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Revisar y Aprobar ✍️
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
               ) : (
-                <div className="card text-center text-muted py-8 shadow-sm">
+                <div className="card text-center text-muted py-8 shadow-sm" style={{ border: 'none', margin: '20px' }}>
                   <p>No hay visitas en tu área pendientes de aprobación en este momento.</p>
                 </div>
               )}
@@ -1462,11 +2314,51 @@ export default function VisitasPage() {
       {(!activeExecutionVisit && activeTab === 'list') && (
         <div className="visitas-list-tab animate-fade-in no-print">
           <div className="visitas-table-card card shadow-md">
-            <div className="card-header">
+            <div className="card-header" style={{ borderBottom: 'none' }}>
               <h3>📋 Historial de Visitas Registradas</h3>
             </div>
-            <div className="card-body px-0 py-0">
-              {visitas.length > 0 ? (
+            
+            {visitas.length > 0 ? (
+              <div>
+                {/* Search & Filter Bar */}
+                <div style={{ display: 'flex', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', borderTop: '1px solid var(--color-border-light)', borderBottom: '1px solid var(--color-border-light)', flexWrap: 'wrap', alignItems: 'center', backgroundColor: 'var(--color-bg-primary)' }}>
+                  <div style={{ flex: '1', minWidth: '200px' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="🔍 Buscar por PDV, ciudad, inspector, tipo, estado..."
+                      value={searchTermVisita}
+                      onChange={(e) => setSearchTermVisita(e.target.value)}
+                      style={{ padding: '8px 12px', fontSize: '0.85rem' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 'bold', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginRight: '4px' }}>Filtrar Área:</span>
+                    <button
+                      type="button"
+                      className={`filter-chip ${selectedAreaFilter === 'all' ? 'active' : ''}`}
+                      onClick={() => setSelectedAreaFilter('all')}
+                      style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                    >
+                      Todas ({visitas.length})
+                    </button>
+                    {areas.map(a => {
+                      const count = visitas.filter(v => v.area_id === a.id).length;
+                      return (
+                        <button
+                          key={a.id}
+                          type="button"
+                          className={`filter-chip ${selectedAreaFilter === String(a.id) ? 'active' : ''}`}
+                          onClick={() => setSelectedAreaFilter(String(a.id))}
+                          style={{ padding: '6px 12px', fontSize: '0.75rem', borderLeft: `3px solid ${a.color || '#6B3A2A'}` }}
+                        >
+                          {a.nombre} <span className="filter-chip-count">{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="table-responsive">
                   <table className="visitas-table">
                     <thead>
@@ -1482,47 +2374,55 @@ export default function VisitasPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {visitas.map((v) => (
-                        <tr key={v.id}>
-                          <td>{v.fecha}</td>
-                          <td className="font-semibold">{v.pdv_nombre} ({v.ciudad_nombre})</td>
-                          <td>
-                            <span className="area-color-tag" style={{ borderLeftColor: v.area_color || '#6B3A2A' }}>
-                              {v.area_nombre}
-                            </span>
-                          </td>
-                          <td>{v.tipo_visita_nombre || 'Sin definir'}</td>
-                          <td>{v.usuario_nombre}</td>
-                          <td>{v.responsable_nombre || 'No asignado'}</td>
-                          <td>
-                            <span className={`status-pill ${v.estado}`}>
-                              {v.estado === 'pendiente' && '⏳ Pendiente'}
-                              {v.estado === 'en_progreso' && '⚙️ En Progreso'}
-                              {v.estado === 'finalizada' && '⏳ Por Aprobar'}
-                              {v.estado === 'devuelta' && '❌ Devuelta'}
-                              {v.estado === 'completada' && '✔ Completada'}
-                              {v.estado === 'cerrada' && '🔒 Cerrada'}
-                            </span>
-                          </td>
-                          <td>
-                            <button 
-                              className="btn btn-secondary btn-sm"
-                              onClick={() => handleOpenVisitDetails(v)}
-                            >
-                              Ver Respuestas 👁️
-                            </button>
+                      {filteredVisitas.length > 0 ? (
+                        filteredVisitas.map((v) => (
+                          <tr key={v.id}>
+                            <td>{v.fecha}</td>
+                            <td className="font-semibold">{v.pdv_nombre} ({v.ciudad_nombre})</td>
+                            <td>
+                              <span className="area-color-tag" style={{ borderLeftColor: v.area_color || '#6B3A2A' }}>
+                                {v.area_nombre}
+                              </span>
+                            </td>
+                            <td>{v.tipo_visita_nombre || 'Sin definir'}</td>
+                            <td>{v.usuario_nombre}</td>
+                            <td>{v.responsable_nombre || 'No asignado'}</td>
+                            <td>
+                              <span className={`status-pill ${v.estado}`}>
+                                {v.estado === 'pendiente' && '⏳ Pendiente'}
+                                {v.estado === 'en_progreso' && '⚙️ En Progreso'}
+                                {v.estado === 'finalizada' && '⏳ Por Aprobar'}
+                                {v.estado === 'devuelta' && '❌ Devuelta'}
+                                {v.estado === 'completada' && '✔ Completada'}
+                                {v.estado === 'cerrada' && '🔒 Cerrada'}
+                              </span>
+                            </td>
+                            <td>
+                              <button 
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => handleOpenVisitDetails(v)}
+                              >
+                                Ver Respuestas 👁️
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="8" style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-muted)' }}>
+                            No se encontraron visitas que coincidan con la búsqueda.
                           </td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
-              ) : (
-                <div className="card text-center text-muted py-8 shadow-sm">
-                  <p>No se registran visitas previas en el sistema.</p>
-                </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="card text-center text-muted py-8 shadow-sm">
+                <p>No se registran visitas previas en el sistema.</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1817,6 +2717,199 @@ export default function VisitasPage() {
         </div>
       )}
 
+      {/* Tab 5: Configure Checklist Template (Admins / Coordinadores / Jefes) */}
+      {(!activeExecutionVisit && activeTab === 'templates') && (
+        <div className="visitas-list-tab animate-fade-in no-print" style={{ width: '100%' }}>
+          <div className="card shadow-md">
+            <div className="card-header">
+              <h3>⚙️ Configuración del Checklist</h3>
+            </div>
+            <div className="card-body">
+              {/* Area selector for Admin/Coordinator. Read-only area for Jefes */}
+              <div className="form-group" style={{ marginBottom: '20px' }}>
+                <label className="form-label" style={{ fontWeight: 'bold' }}>Seleccionar Checklist</label>
+                {userRole === 1 || userRole === 2 ? (
+                  <select
+                    className="form-select"
+                    value={editingTemplateId}
+                    onChange={(e) => {
+                      setEditingTemplateId(e.target.value);
+                    }}
+                  >
+                    <option value="">-- Seleccionar Checklist de Área --</option>
+                    {plantillas.map(p => (
+                      <option key={p.id} value={p.id}>{p.nombre} ({areas.find(a => a.id === p.area_id)?.nombre || 'Área indefinida'})</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div style={{ padding: '12px 14px', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-light)', fontWeight: 'bold', color: 'var(--color-primary-dark)' }}>
+                    Checklist de Área: {plantillas.find(p => String(p.id) === editingTemplateId)?.nombre || 'Cargando...'}
+                  </div>
+                )}
+              </div>
+
+              {editingTemplateId ? (
+                <div className="template-editor-panel animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Warning for matrix or complex templates */}
+                  {templateFields.length > 0 && (templateFields[0].tipo === 'matrix' || templateFields[0].tipo === 'simple_checklist') ? (
+                    <div className="warning-alert" style={{ backgroundColor: '#FFFBEB', color: '#B45309', borderLeft: '4px solid #F59E0B', padding: '12px', borderRadius: 'var(--radius-md)', fontSize: '0.85rem' }}>
+                      <strong>💡 Diseño de Matriz Fija:</strong> Esta plantilla contiene una estructura de matriz fija. Puedes renombrar el texto de las preguntas de evaluación abajo para adaptarlas a tu área, pero la estructura de columnas y secciones se mantiene para mantener la compatibilidad con el reporte Excel y PDF.
+                    </div>
+                  ) : null}
+
+                  {/* List of Fields */}
+                  <div className="fields-editor-list" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    <h4 style={{ borderBottom: '1px solid var(--color-border-light)', paddingBottom: '8px', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>Elementos del Checklist</h4>
+                    
+                    {/* Matrix Row Editor */}
+                    {templateFields.length > 0 && (templateFields[0].tipo === 'matrix' || templateFields[0].tipo === 'simple_checklist') ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        {templateFields[0].secciones.map((sec, sIdx) => (
+                          <div key={sIdx} style={{ background: 'var(--color-bg-secondary)', padding: '15px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-light)' }}>
+                            <h5 style={{ fontWeight: 'bold', marginBottom: '10px', color: 'var(--color-primary-dark)', fontSize: '0.88rem' }}>📁 Sección: {sec.nombre}</h5>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              {sec.filas.map((fila, rIdx) => (
+                                <div key={rIdx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', minWidth: '25px' }}>{rIdx + 1}.</span>
+                                  <input
+                                    type="text"
+                                    className="form-input"
+                                    value={fila}
+                                    onChange={(e) => handleMatrixRowChange(sIdx, rIdx, e.target.value)}
+                                    placeholder="Nombre de la pregunta/tarea..."
+                                    style={{ flex: 1 }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      /* Simple checklist fields editor */
+                      templateFields.map((field, idx) => (
+                        <div key={field.nombre || idx} className="field-editor-row card shadow-sm" style={{ display: 'flex', flexDirection: 'column', padding: '15px', gap: '10px', backgroundColor: 'var(--color-bg-primary)', borderLeft: '4px solid var(--color-primary)' }}>
+                          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <span className="badge" style={{ backgroundColor: 'var(--color-bg-secondary)', color: 'var(--color-primary-dark)', fontSize: '0.7rem', fontWeight: 'bold', padding: '4px 8px', borderRadius: '4px' }}>
+                              {field.tipo === 'checkbox' && '☑️ Casilla de Verificación (Sí / No)'}
+                              {field.tipo === 'textarea' && '📝 Observaciones / Texto Largo'}
+                              {field.tipo === 'text' && '✍️ Respuesta / Texto Corto'}
+                              {field.tipo === 'number' && '🔢 Número'}
+                              {field.tipo === 'date' && '📅 Fecha'}
+                            </span>
+                            <div style={{ display: 'flex', gap: '5px', marginLeft: 'auto' }}>
+                              <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleMoveField(idx, 'up')} disabled={idx === 0} style={{ padding: '2px 8px' }}>▲</button>
+                              <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleMoveField(idx, 'down')} disabled={idx === templateFields.length - 1} style={{ padding: '2px 8px' }}>▼</button>
+                              <button type="button" className="btn btn-danger btn-sm" onClick={() => handleDeleteField(idx)} style={{ padding: '2px 8px' }}>🗑️ Eliminar</button>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <div style={{ flex: 1, minWidth: '200px' }}>
+                              <label className="form-label" style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)' }}>Etiqueta de la Pregunta / Ítem</label>
+                              <input
+                                type="text"
+                                className="form-input"
+                                value={field.label || ''}
+                                onChange={(e) => handleFieldChange(idx, 'label', e.target.value)}
+                                placeholder="Escriba la pregunta o tarea..."
+                              />
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '15px' }}>
+                              <input
+                                id={`field-req-${idx}`}
+                                type="checkbox"
+                                className="form-checkbox"
+                                checked={!!field.requerido}
+                                onChange={(e) => handleFieldChange(idx, 'requerido', e.target.checked)}
+                              />
+                              <label htmlFor={`field-req-${idx}`} style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>Obligatorio</label>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+
+                    {templateFields.length === 0 && (
+                      <p style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-muted)' }}>Esta plantilla no contiene campos.</p>
+                    )}
+                  </div>
+
+                  {/* Add New Field section (only for simple templates like Sistemas) */}
+                  {!(templateFields.length > 0 && (templateFields[0].tipo === 'matrix' || templateFields[0].tipo === 'simple_checklist')) && (
+                    <div className="card shadow-sm" style={{ padding: '20px', border: '1.5px dashed var(--color-border)', backgroundColor: 'var(--color-bg-secondary)' }}>
+                      <h4 style={{ fontWeight: 'bold', color: 'var(--color-primary-dark)', marginBottom: '15px' }}>➕ Agregar Nuevo Elemento al Checklist</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                          <div style={{ flex: 1, minWidth: '150px' }}>
+                            <label className="form-label">Tipo de Campo</label>
+                            <select
+                              className="form-select"
+                              value={newFieldType}
+                              onChange={(e) => setNewFieldType(e.target.value)}
+                            >
+                              <option value="checkbox">☑️ Checkbox / Sí o No</option>
+                              <option value="textarea">📝 Texto Largo / Observaciones</option>
+                              <option value="text">✍️ Texto Corto / Respuesta</option>
+                              <option value="number">🔢 Número</option>
+                            </select>
+                          </div>
+                          <div style={{ flex: 2, minWidth: '200px' }}>
+                            <label className="form-label">Etiqueta o Pregunta</label>
+                            <input
+                              type="text"
+                              className="form-input"
+                              value={newFieldLabel}
+                              onChange={(e) => setNewFieldLabel(e.target.value)}
+                              placeholder="Ej. ¿Limpiaste el CPU del equipo?, ¿Verificaste puertos?..."
+                            />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '5px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input
+                              id="new-field-req"
+                              type="checkbox"
+                              className="form-checkbox"
+                              checked={newFieldRequired}
+                              onChange={(e) => setNewFieldRequired(e.target.checked)}
+                            />
+                            <label htmlFor="new-field-req" style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>Es obligatorio completar</label>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={handleAddField}
+                          >
+                            ➕ Añadir al Checklist
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Save button */}
+                  <div style={{ marginTop: '20px', borderTop: '1px solid var(--color-border-light)', paddingTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      className="btn btn-success btn-lg"
+                      onClick={handleSaveTemplate}
+                      disabled={isSavingTemplate}
+                      style={{ padding: '12px 24px', fontWeight: 'bold' }}
+                    >
+                      {isSavingTemplate ? 'Guardando...' : '💾 Guardar Configuración de Checklist'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
+                  Por favor selecciona un checklist de área para comenzar a editarlo.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Details / Print modal & Jefe Approval actions */}
       {selectedVisit && (
         <div className="modal-backdrop">
@@ -1872,81 +2965,319 @@ export default function VisitasPage() {
             <div className="card-body modal-scrollable-body print-layout">
               
               {/* Logo / Header for print */}
-              <div className="print-only-header">
-                <h2>🥞 Crepes en Punto</h2>
-                <p>Reporte de Auditoría Operativa Interna ({selectedVisit.area_tipo_flujo === 'tecnico' ? 'Técnico' : 'Administrativo'})</p>
-                <hr className="print-divider" />
-              </div>
+              {selectedVisit.area_tipo_flujo !== 'tecnico' && (
+                <div className="print-only-header">
+                  <h2>🥞 Crepes en Punto</h2>
+                  <p>Reporte de Auditoría Operativa Interna ({selectedVisit.area_tipo_flujo === 'tecnico' ? 'Técnico' : 'Administrativo'})</p>
+                  <hr className="print-divider" />
+                </div>
+              )}
 
               {/* TAB 1: GENERAL INFO & APPROVAL */}
-              <div className={`tab-content-general ${modalTab === 'general' ? 'active-tab' : ''}`}>
-                <div className="visit-meta-grid">
-                  <p><strong>Punto de Venta (PDV):</strong> {selectedVisit.pdv_nombre} ({selectedVisit.ciudad_nombre})</p>
-                  <p><strong>Programado por:</strong> {selectedVisit.usuario_nombre}</p>
-                  <p><strong>Ejecutado por (Auxiliar):</strong> {selectedVisit.responsable_nombre || 'No asignado'}</p>
-                  <p><strong>Fecha:</strong> {selectedVisit.fecha}</p>
-                  <p><strong>Hora Inicio/Fin:</strong> {selectedVisit.hora_inicio || '--:--'} a {selectedVisit.hora_fin || '--:--'}</p>
-                  <p><strong>Área Inspectora:</strong> {selectedVisit.area_nombre}</p>
-                  <p><strong>Tipo de Visita:</strong> {selectedVisit.tipo_visita_nombre || 'Sin definir'}</p>
-                  <p><strong>Estado:</strong> <span className={`status-pill ${selectedVisit.estado}`}>{selectedVisit.estado.toUpperCase()}</span></p>
-                </div>
+              <div className={`tab-content-general ${modalTab === 'general' ? 'active-tab' : ''}`} style={{ width: '100%' }}>
+                {selectedVisit.area_tipo_flujo === 'tecnico' ? (
+                  /* Custom Visita Técnica Tecnología report sheet */
+                  (() => {
+                    const getVal = (keys, fallback = 'N/A') => {
+                      const dataKeys = Object.keys(selectedVisit.data || {});
+                      for (const key of keys) {
+                        const found = dataKeys.find(k => k.toLowerCase() === key || k.toLowerCase().includes(key));
+                        if (found && selectedVisit.data[found]) {
+                          return String(selectedVisit.data[found]);
+                        }
+                      }
+                      return fallback;
+                    };
+                    
+                    const eqTipo = getVal(['tipo', 'equipo', 'elemento', 'tipo_equipo'], selectedVisit.tipo_visita_nombre || 'N/A');
+                    const eqMarca = getVal(['marca', 'modelo', 'marca_equipo']);
+                    const eqSerial = getVal(['serial', 'serie', 'serie_equipo', 'n/s']);
+                    const eqSticker = getVal(['sticker', 'placa', 'nro_sticker']);
 
-                {selectedVisit.observaciones && (
-                  <div className="visit-obs-section">
-                    <h4>📝 Observaciones Generales</h4>
-                    <p className="obs-content">"{selectedVisit.observaciones}"</p>
-                  </div>
-                )}
+                    return (
+                      <div className="visita-tecnica-tech-sheet" style={{ fontFamily: 'Arial, sans-serif', color: '#000', padding: '0', fontSize: '0.82rem', border: '2px solid #2C1810', width: '100%', margin: '0 auto', backgroundColor: '#fff', borderRadius: '4px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                        {/* Header Table */}
+                        <table style={{ width: '100%', borderCollapse: 'collapse', borderBottom: '2px solid #2C1810' }}>
+                          <tbody>
+                            <tr>
+                              <td style={{ width: '22%', borderRight: '1.5px solid #2C1810', padding: '8px', textAlign: 'center', verticalAlign: 'middle', backgroundColor: '#faf6f2' }}>
+                                <img src="/logo.png" alt="Logo" style={{ maxHeight: '42px', objectFit: 'contain', display: 'block', margin: '0 auto 4px auto' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                                <div style={{ fontSize: '0.58rem', fontWeight: 'bold', color: '#4A2518' }}>CREPES CARIBE S.A</div>
+                              </td>
+                              <td style={{ width: '56%', borderRight: '1.5px solid #2C1810', padding: '8px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', fontSize: '1.05rem', color: '#4A2518', fontFamily: 'serif' }}>
+                                VISITA TÉCNICA TECNOLOGÍA.
+                              </td>
+                              <td style={{ width: '22%', padding: '8px', fontSize: '0.68rem', lineHeight: '1.4', backgroundColor: '#faf6f2' }}>
+                                <div><strong>Código:</strong> TEC-F-04</div>
+                                <hr style={{ margin: '4px 0', border: 'none', borderTop: '1.5px solid #2C1810' }} />
+                                <div><strong>Fecha:</strong> 22 de Agosto 2022</div>
+                                <div><strong>Versión:</strong> 01</div>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
 
-                {/* Specific fields depending on flow */}
-                {selectedVisit.area_tipo_flujo !== 'tecnico' && (
+                        {/* General Metadata */}
+                        <table style={{ width: '100%', borderCollapse: 'collapse', borderBottom: '1.5px solid #2C1810' }}>
+                          <tbody>
+                            <tr style={{ borderBottom: '1.5px solid #2C1810' }}>
+                              <td style={{ width: '50%', padding: '6px 10px', borderRight: '1.5px solid #2C1810' }}>
+                                <strong>FECHA DE SOPORTE:</strong> <span style={{ padding: '2px 8px', border: '1px solid #2C1810', borderRadius: '3px', marginLeft: '6px', fontFamily: 'monospace', fontWeight: 'bold', backgroundColor: '#fcfaf7' }}>{selectedVisit.fecha}</span>
+                              </td>
+                              <td style={{ width: '50%', padding: '6px 10px' }}>
+                                <strong>HORA REGISTRADA:</strong> <span style={{ marginLeft: '6px', fontWeight: 'bold' }}>{selectedVisit.hora_inicio || '--:--'} a {selectedVisit.hora_fin || '--:--'}</span>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style={{ width: '50%', padding: '6px 10px', borderRight: '1.5px solid #2C1810' }}>
+                                <strong>PUNTO DE VENTA:</strong> <span style={{ marginLeft: '6px', textTransform: 'uppercase', fontWeight: 'bold', color: '#4A2518' }}>{selectedVisit.pdv_nombre}</span>
+                              </td>
+                              <td style={{ width: '50%', padding: '6px 10px' }}>
+                                <strong>NRO. TICKET / CASO:</strong> <span style={{ marginLeft: '6px', fontWeight: 'bold' }}>{selectedVisit.evento_id ? `EV-${selectedVisit.evento_id}` : 'Soporte Directo'}</span>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+
+                        {/* Applicant Info */}
+                        <div style={{ backgroundColor: '#2C1810', color: '#fff', padding: '5px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', borderBottom: '1.5px solid #2C1810', textAlign: 'center' }}>
+                          INFORMACIÓN DEL SOLICITANTE (PUNTO DE VENTA)
+                        </div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', borderBottom: '1.5px solid #2C1810' }}>
+                          <tbody>
+                            <tr>
+                              <td style={{ width: '100%', padding: '8px 10px' }}>
+                                <strong>NOMBRE SOLICITANTE:</strong> <span style={{ marginLeft: '6px', fontWeight: 'bold' }}>{selectedVisit.solicitante_nombre || 'N/A'}</span>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+
+                        {/* Tech Staff Info */}
+                        <div style={{ backgroundColor: '#2C1810', color: '#fff', padding: '5px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', borderBottom: '1.5px solid #2C1810', textAlign: 'center' }}>
+                          INFORMACIÓN FUNCIONARIO DE TECNOLOGÍA (AUXILIAR)
+                        </div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', borderBottom: '1.5px solid #2C1810' }}>
+                          <tbody>
+                            <tr style={{ borderBottom: '1px solid #ddd' }}>
+                              <td style={{ width: '100%', padding: '6px 10px' }} colSpan="2">
+                                <strong>NOMBRE AUXILIAR:</strong> <span style={{ marginLeft: '6px', fontWeight: 'bold' }}>{selectedVisit.responsable_nombre || 'N/A'}</span>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style={{ width: '50%', padding: '6px 10px', borderRight: '1.5px solid #ddd' }}>
+                                <strong>CARGO:</strong> <span style={{ marginLeft: '6px' }}>Auxiliar de Sistemas de Tecnología</span>
+                              </td>
+                              <td style={{ width: '50%', padding: '6px 10px' }}>
+                                <strong>ESTADO DE REVISIÓN:</strong> <span style={{ marginLeft: '6px', textTransform: 'uppercase', fontWeight: 'bold', color: selectedVisit.estado === 'cerrada' ? 'green' : 'orange' }}>{selectedVisit.estado}</span>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+
+                        {/* Equipment Data */}
+                        <div style={{ backgroundColor: '#2C1810', color: '#fff', padding: '5px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', borderBottom: '1.5px solid #2C1810', textAlign: 'center' }}>
+                          DATOS DEL EQUIPO
+                        </div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', borderBottom: '1.5px solid #2C1810' }}>
+                          <tbody>
+                            <tr style={{ borderBottom: '1px solid #ddd' }}>
+                              <td style={{ width: '50%', padding: '6px 10px', borderRight: '1.5px solid #ddd' }}>
+                                <strong>TIPO ELEMENTO:</strong> <span style={{ marginLeft: '6px', fontWeight: 'bold' }}>{eqTipo}</span>
+                              </td>
+                              <td style={{ width: '50%', padding: '6px 10px' }}>
+                                <strong>MARCA / MODELO:</strong> <span style={{ marginLeft: '6px', fontWeight: 'bold' }}>{eqMarca}</span>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style={{ width: '50%', padding: '6px 10px', borderRight: '1.5px solid #ddd' }}>
+                                <strong>SERIAL:</strong> <span style={{ marginLeft: '6px', fontWeight: 'bold' }}>{eqSerial}</span>
+                              </td>
+                              <td style={{ width: '50%', padding: '6px 10px' }}>
+                                <strong>NRO. PLACA / STICKER:</strong> <span style={{ marginLeft: '6px', fontWeight: 'bold' }}>{eqSticker}</span>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+
+                        {/* Reason of Visit */}
+                        <div style={{ backgroundColor: '#2C1810', color: '#fff', padding: '5px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', borderBottom: '1.5px solid #2C1810', textAlign: 'center' }}>
+                          MOTIVO DE LA VISITA / TRABAJO SOLICITADO
+                        </div>
+                        <div style={{ padding: '12px 15px', minHeight: '65px', borderBottom: '1.5px solid #2C1810', backgroundColor: '#fff', fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                          {selectedVisit.observaciones || 'No se registraron observaciones iniciales.'}
+                        </div>
+
+                        {/* Checklist and Answers */}
+                        <div style={{ backgroundColor: '#2C1810', color: '#fff', padding: '5px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', borderBottom: '1.5px solid #2C1810', textAlign: 'center' }}>
+                          TAREAS EJECUTADAS / RESULTADOS DEL SOPORTE
+                        </div>
+                        <div style={{ padding: '8px 12px', backgroundColor: '#fff', borderBottom: '1.5px solid #2C1810' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1.5px solid #2C1810', fontWeight: 'bold', color: '#2C1810' }}>
+                                <th style={{ textAlign: 'left', padding: '6px 4px' }}>Descripción de la Tarea / Ítem</th>
+                                <th style={{ width: '100px', textAlign: 'center', padding: '6px 4px' }}>Estado</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedVisit.fields && selectedVisit.fields.map((field, idx) => {
+                                const val = selectedVisit.data[field.nombre];
+                                return (
+                                  <tr key={idx} style={{ borderBottom: '1px solid #f4f4f4' }}>
+                                    <td style={{ padding: '6px 4px', color: '#333' }}>{field.label}</td>
+                                    <td style={{ textAlign: 'center', padding: '6px 4px', fontWeight: 'bold', color: val === true || val === 'SI' ? 'green' : 'red' }}>
+                                      {val === true || val === 'SI' ? '✓ CUMPLIDO' : (val === false || val === 'NO' ? '✗ NO CUMPLIDO' : 'N/A')}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                              {(!selectedVisit.fields || selectedVisit.fields.length === 0) && (
+                                <tr>
+                                  <td colSpan="2" style={{ padding: '10px', textAlign: 'center', color: '#aaa', fontStyle: 'italic' }}>No hay tareas registradas en esta visita.</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Solutions and Materials */}
+                        {selectedVisit.repuestos && (
+                          <>
+                            <div style={{ backgroundColor: '#2C1810', color: '#fff', padding: '5px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', borderBottom: '1.5px solid #2C1810', textAlign: 'center' }}>
+                              SOLUCIÓN APLICADA Y REPUESTOS / MATERIALES UTILIZADOS
+                            </div>
+                            <div style={{ padding: '12px 15px', minHeight: '55px', borderBottom: '1.5px solid #2C1810', backgroundColor: '#fff', fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                              {selectedVisit.repuestos}
+                            </div>
+                          </>
+                        )}
+
+                        {/* 3 Signatures block */}
+                        <div style={{ backgroundColor: '#2C1810', color: '#fff', padding: '5px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', borderBottom: '1.5px solid #2C1810', textAlign: 'center' }}>
+                          FIRMAS Y APROBACIONES DEL SERVICIO
+                        </div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                          <tbody>
+                            <tr>
+                              {/* Signature 1: Funcionario Tecnologia */}
+                              <td style={{ width: '33.3%', borderRight: '1.5px solid #2C1810', padding: '12px 8px', textAlign: 'center', verticalAlign: 'bottom', height: '150px', backgroundColor: '#fff' }}>
+                                {selectedVisit.firma_auxiliar ? (
+                                  <div style={{ maxHeight: '75px', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '8px' }}>
+                                    <img src={selectedVisit.firma_auxiliar} alt="Firma Auxiliar" style={{ maxHeight: '75px', maxWidth: '90%', objectFit: 'contain' }} />
+                                  </div>
+                                ) : (
+                                  <div style={{ height: '75px', color: '#aaa', fontStyle: 'italic', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', marginBottom: '8px' }}>Firma pendiente</div>
+                                )}
+                                <hr style={{ width: '85%', border: 'none', borderTop: '1px solid #2C1810', margin: '4px auto' }} />
+                                <div style={{ fontSize: '0.68rem', fontWeight: 'bold', color: '#4A2518' }}>FUNCIONARIO TECNOLOGÍA</div>
+                                <div style={{ fontSize: '0.62rem', color: '#666', marginTop: '2px' }}>{selectedVisit.responsable_nombre}</div>
+                              </td>
+
+                              {/* Signature 2: Funcionario Punto de Venta */}
+                              <td style={{ width: '33.3%', borderRight: '1.5px solid #2C1810', padding: '12px 8px', textAlign: 'center', verticalAlign: 'bottom', height: '150px', backgroundColor: '#fff' }}>
+                                {selectedVisit.firma_pdv ? (
+                                  <div style={{ maxHeight: '75px', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '8px' }}>
+                                    <img src={selectedVisit.firma_pdv} alt="Firma PDV" style={{ maxHeight: '75px', maxWidth: '90%', objectFit: 'contain' }} />
+                                  </div>
+                                ) : (
+                                  <div style={{ height: '75px', color: '#aaa', fontStyle: 'italic', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', marginBottom: '8px' }}>Firma pendiente</div>
+                                )}
+                                <hr style={{ width: '85%', border: 'none', borderTop: '1px solid #2C1810', margin: '4px auto' }} />
+                                <div style={{ fontSize: '0.68rem', fontWeight: 'bold', color: '#4A2518' }}>FUNCIONARIO PUNTO DE VENTA</div>
+                                <div style={{ fontSize: '0.62rem', color: '#666', marginTop: '2px' }}>{selectedVisit.solicitante_nombre || 'N/A'}</div>
+                              </td>
+
+                              {/* Signature 3: Jefe Autorizador */}
+                              <td style={{ width: '33.3%', padding: '12px 8px', textAlign: 'center', verticalAlign: 'bottom', height: '150px', backgroundColor: '#fff' }}>
+                                {selectedVisit.firma_jefe ? (
+                                  <div style={{ maxHeight: '75px', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '8px' }}>
+                                    <img src={selectedVisit.firma_jefe} alt="Firma Jefe" style={{ maxHeight: '75px', maxWidth: '90%', objectFit: 'contain' }} />
+                                  </div>
+                                ) : (
+                                  <div style={{ height: '75px', color: '#aaa', fontStyle: 'italic', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', marginBottom: '8px' }}>Pendiente de aprobación</div>
+                                )}
+                                <hr style={{ width: '85%', border: 'none', borderTop: '1px solid #2C1810', margin: '4px auto' }} />
+                                <div style={{ fontSize: '0.68rem', fontWeight: 'bold', color: '#4A2518' }}>JEFE / SUPERVISOR AUTORIZADOR</div>
+                                <div style={{ fontSize: '0.62rem', color: '#666', marginTop: '2px' }}>{selectedVisit.firma_jefe ? 'AUTORIZADO ✓' : 'Esperando Autorización'}</div>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()
+                ) : (
                   <>
-                    {selectedVisit.hallazgos && (
+                    <div className="visit-meta-grid">
+                      <p><strong>Punto de Venta (PDV):</strong> {selectedVisit.pdv_nombre} ({selectedVisit.ciudad_nombre})</p>
+                      <p><strong>Programado por:</strong> {selectedVisit.usuario_nombre}</p>
+                      <p><strong>Ejecutado por (Auxiliar):</strong> {selectedVisit.responsable_nombre || 'No asignado'}</p>
+                      <p><strong>Fecha:</strong> {selectedVisit.fecha}</p>
+                      <p><strong>Hora Inicio/Fin:</strong> {selectedVisit.hora_inicio || '--:--'} a {selectedVisit.hora_fin || '--:--'}</p>
+                      <p><strong>Área Inspectora:</strong> {selectedVisit.area_nombre}</p>
+                      <p><strong>Tipo de Visita:</strong> {selectedVisit.tipo_visita_nombre || 'Sin definir'}</p>
+                      <p><strong>Estado:</strong> <span className={`status-pill ${selectedVisit.estado}`}>{selectedVisit.estado.toUpperCase()}</span></p>
+                    </div>
+
+                    {selectedVisit.observaciones && (
                       <div className="visit-obs-section">
-                        <h4>🔎 Hallazgos Registrados</h4>
-                        <p className="obs-content" style={{ borderColor: 'var(--color-warning)' }}>"{selectedVisit.hallazgos}"</p>
+                        <h4>📝 Observaciones Generales</h4>
+                        <p className="obs-content">"{selectedVisit.observaciones}"</p>
                       </div>
                     )}
-                    {selectedVisit.acciones_correctivas && (
+
+                    {/* Specific fields depending on flow */}
+                    {selectedVisit.area_tipo_flujo !== 'tecnico' && (
+                      <>
+                        {selectedVisit.hallazgos && (
+                          <div className="visit-obs-section">
+                            <h4>🔎 Hallazgos Registrados</h4>
+                            <p className="obs-content" style={{ borderColor: 'var(--color-warning)' }}>"{selectedVisit.hallazgos}"</p>
+                          </div>
+                        )}
+                        {selectedVisit.acciones_correctivas && (
+                          <div className="visit-obs-section">
+                            <h4>🛠️ Acciones Correctivas Recomendadas</h4>
+                            <p className="obs-content" style={{ borderColor: 'var(--color-primary)' }}>"{selectedVisit.acciones_correctivas}"</p>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {selectedVisit.area_tipo_flujo === 'tecnico' && selectedVisit.repuestos && (
                       <div className="visit-obs-section">
-                        <h4>🛠️ Acciones Correctivas Recomendadas</h4>
-                        <p className="obs-content" style={{ borderColor: 'var(--color-primary)' }}>"{selectedVisit.acciones_correctivas}"</p>
+                        <h4>⚙️ Materiales / Repuestos Utilizados</h4>
+                        <p className="obs-content" style={{ borderColor: 'var(--color-secondary)' }}>{selectedVisit.repuestos}</p>
+                      </div>
+                    )}
+
+                    {/* Display Signatures */}
+                    {(selectedVisit.firma_auxiliar || selectedVisit.firma_jefe || selectedVisit.area_tipo_flujo === 'tecnico') && (
+                      <div className="signatures-view-grid">
+                        <div className="signature-view-card">
+                          <h5>Firma Auxiliar (Ejecutor)</h5>
+                          {selectedVisit.firma_auxiliar ? (
+                            <div className="sig-img-container">
+                              <img src={selectedVisit.firma_auxiliar} alt="Firma Auxiliar" />
+                            </div>
+                          ) : (
+                            <p className="text-muted italic">Pendiente de firma</p>
+                          )}
+                        </div>
+                        <div className="signature-view-card">
+                          <h5>Firma Jefe de Área (Aprobador)</h5>
+                          {selectedVisit.firma_jefe ? (
+                            <div className="sig-img-container">
+                              <img src={selectedVisit.firma_jefe} alt="Firma Jefe" />
+                            </div>
+                          ) : (
+                            <p className="text-muted italic">Pendiente de firma</p>
+                          )}
+                        </div>
                       </div>
                     )}
                   </>
-                )}
-
-                {selectedVisit.area_tipo_flujo === 'tecnico' && selectedVisit.repuestos && (
-                  <div className="visit-obs-section">
-                    <h4>⚙️ Materiales / Repuestos Utilizados</h4>
-                    <p className="obs-content" style={{ borderColor: 'var(--color-secondary)' }}>{selectedVisit.repuestos}</p>
-                  </div>
-                )}
-
-                {/* Display Signatures if flow is technical */}
-                {selectedVisit.area_tipo_flujo === 'tecnico' && (
-                  <div className="signatures-view-grid">
-                    <div className="signature-view-card">
-                      <h5>Firma Auxiliar (Ejecutor)</h5>
-                      {selectedVisit.firma_auxiliar ? (
-                        <div className="sig-img-container">
-                          <img src={selectedVisit.firma_auxiliar} alt="Firma Auxiliar" />
-                        </div>
-                      ) : (
-                        <p className="text-muted italic">Pendiente de firma</p>
-                      )}
-                    </div>
-                    <div className="signature-view-card">
-                      <h5>Firma Jefe de Área (Aprobador)</h5>
-                      {selectedVisit.firma_jefe ? (
-                        <div className="sig-img-container">
-                          <img src={selectedVisit.firma_jefe} alt="Firma Jefe" />
-                        </div>
-                      ) : (
-                        <p className="text-muted italic">Pendiente de firma</p>
-                      )}
-                    </div>
-                  </div>
                 )}
 
                 {/* Comments from Jefe if returned or closed */}
@@ -1977,13 +3308,12 @@ export default function VisitasPage() {
                         ></textarea>
                       </div>
 
-                      {selectedVisit.area_tipo_flujo === 'tecnico' && (
-                        <SignaturePad
-                          label="Firma de Aprobación y Cierre (Jefe de Área) *"
-                          onSave={(base64) => setJefeSignature(base64)}
-                          onClear={() => setJefeSignature('')}
-                        />
-                      )}
+                      <SignaturePad
+                        label="Firma de Aprobación y Cierre (Jefe de Área) *"
+                        value={jefeSignature}
+                        onSave={(base64) => setJefeSignature(base64)}
+                        onClear={() => setJefeSignature('')}
+                      />
 
                       <div className="approval-actions" style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                         <button
@@ -2012,11 +3342,23 @@ export default function VisitasPage() {
                 {/* Signature block for PDF printing */}
                 <div className="print-signature-block">
                   <div className="sig-line">
-                    <div className="line"></div>
+                    {selectedVisit.firma_auxiliar ? (
+                      <div className="print-sig-img" style={{ height: '50px', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '5px' }}>
+                        <img src={selectedVisit.firma_auxiliar} alt="Firma Auxiliar" style={{ maxHeight: '100%', maxWidth: '150px', objectFit: 'contain' }} />
+                      </div>
+                    ) : (
+                      <div className="line"></div>
+                    )}
                     <p>Firma Inspector / Auxiliar</p>
                   </div>
                   <div className="sig-line">
-                    <div className="line"></div>
+                    {selectedVisit.firma_jefe ? (
+                      <div className="print-sig-img" style={{ height: '50px', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '5px' }}>
+                        <img src={selectedVisit.firma_jefe} alt="Firma Jefe" style={{ maxHeight: '100%', maxWidth: '150px', objectFit: 'contain' }} />
+                      </div>
+                    ) : (
+                      <div className="line"></div>
+                    )}
                     <p>Firma Jefe / Aprobador</p>
                   </div>
                 </div>
@@ -2790,8 +4132,166 @@ export default function VisitasPage() {
             font-size: 0.62rem;
             padding: 1px 6px;
           }
+
+          .desktop-only-table {
+            display: none !important;
+          }
+          
+          .desktop-only-inline {
+            display: none !important;
+          }
+
+          .mobile-only-inline {
+            display: inline !important;
+          }
+
+          .visitas-cards-grid {
+            padding: 10px !important;
+          }
+
+          .visita-pending-card {
+            padding: 12px !important;
+          }
+
+          .pending-card-content-row {
+            flex-direction: column !important;
+          }
+
+          .pending-card-tech-row {
+            flex-direction: row !important;
+            gap: 10px !important;
+          }
+
+          .pending-card-actions {
+            flex-direction: row !important;
+            justify-content: stretch !important;
+          }
+
+          .pending-card-actions button {
+            flex: 1 !important;
+            text-align: center !important;
+            padding: 10px 8px !important;
+            font-size: 0.78rem !important;
+          }
+        }
+
+        .desktop-only-inline {
+          display: inline;
+        }
+
+        .mobile-only-inline {
+          display: none;
+        }
+
+        .desktop-only-table {
+          display: block;
         }
       `}</style>
+
+      {/* Custom Confirm Modal */}
+      {confirmModal.isOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(44, 24, 16, 0.45)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--spacing-md)'
+        }}>
+          <div className="card animate-fade-in" style={{
+            width: '100%',
+            maxWidth: '400px',
+            backgroundColor: 'var(--color-bg-card)',
+            borderRadius: 'var(--radius-xl)',
+            boxShadow: 'var(--shadow-xl)',
+            overflow: 'hidden'
+          }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--spacing-md) var(--spacing-lg)' }}>
+              <h3 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--color-primary-dark)' }}>{confirmModal.title || '¿Estás seguro?'}</h3>
+              <button 
+                type="button"
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: 'var(--color-text-muted)', cursor: 'pointer' }}
+              >×</button>
+            </div>
+            <div className="card-body" style={{ padding: 'var(--spacing-lg)' }}>
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', margin: '0 0 var(--spacing-lg) 0', lineHeight: '1.5' }}>
+                {confirmModal.message}
+              </p>
+              <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-danger btn-sm"
+                  onClick={confirmModal.onConfirm}
+                >
+                  Aceptar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Alert Modal */}
+      {alertModal.isOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(44, 24, 16, 0.45)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--spacing-md)'
+        }}>
+          <div className="card animate-fade-in" style={{
+            width: '100%',
+            maxWidth: '400px',
+            backgroundColor: 'var(--color-bg-card)',
+            borderRadius: 'var(--radius-xl)',
+            boxShadow: 'var(--shadow-xl)',
+            overflow: 'hidden'
+          }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--spacing-md) var(--spacing-lg)' }}>
+              <h3 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--color-primary-dark)' }}>{alertModal.title || 'Aviso'}</h3>
+              <button 
+                type="button"
+                onClick={() => setAlertModal(prev => ({ ...prev, isOpen: false }))}
+                style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: 'var(--color-text-muted)', cursor: 'pointer' }}
+              >×</button>
+            </div>
+            <div className="card-body" style={{ padding: 'var(--spacing-lg)' }}>
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', margin: '0 0 var(--spacing-lg) 0', lineHeight: '1.5' }}>
+                {alertModal.type === 'error' && '❌ '}
+                {alertModal.type === 'success' && '✅ '}
+                {alertModal.message}
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setAlertModal(prev => ({ ...prev, isOpen: false }))}
+                >
+                  Aceptar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

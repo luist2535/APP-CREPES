@@ -35,7 +35,8 @@ export async function GET(request) {
       SELECT v.*, p.nombre as pdv_nombre, c.nombre as ciudad_nombre,
              a.nombre as area_nombre, a.color as area_color, a.tipo_flujo as area_tipo_flujo,
              tv.nombre as tipo_visita_nombre,
-             u.nombre as usuario_nombre, r.nombre as responsable_nombre
+             u.nombre as usuario_nombre, r.nombre as responsable_nombre,
+             r.avatar as responsable_avatar, r.rol_id as responsable_rol_id
       FROM visitas v
       JOIN pdv p ON v.pdv_id = p.id
       JOIN ciudades c ON p.ciudad_id = c.id
@@ -133,6 +134,7 @@ export async function POST(request) {
     // Mark calendar event as completed if linked
     if (evento_id) {
       db.prepare("UPDATE eventos_calendario SET estado = 'completado' WHERE id = ?").run(parseInt(evento_id));
+      db.prepare("UPDATE solicitudes_visita SET estado = 'cerrada' WHERE evento_id = ?").run(parseInt(evento_id));
     }
 
     db.prepare(`
@@ -181,7 +183,8 @@ export async function PUT(request) {
     if (action === 'finalizar') {
       const { 
         datos_formulario, observaciones, evidencias, repuestos, 
-        firma_auxiliar, hallazgos, acciones_correctivas, tipo_visita_id, plantilla_id 
+        firma_auxiliar, hallazgos, acciones_correctivas, tipo_visita_id, plantilla_id,
+        firma_pdv, solicitante_nombre, solicitante_documento, solicitante_telefono
       } = data;
       
       const nowTime = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -191,6 +194,7 @@ export async function PUT(request) {
         SET hora_fin = ?, datos_formulario = ?, observaciones = ?, repuestos = ?, 
             firma_auxiliar = ?, hallazgos = ?, acciones_correctivas = ?, 
             tipo_visita_id = COALESCE(?, tipo_visita_id), plantilla_id = COALESCE(?, plantilla_id),
+            firma_pdv = ?, solicitante_nombre = ?, solicitante_documento = ?, solicitante_telefono = ?,
             estado = 'finalizada' 
         WHERE id = ?
       `).run(
@@ -203,6 +207,10 @@ export async function PUT(request) {
         acciones_correctivas || null,
         tipo_visita_id || null,
         plantilla_id || null,
+        firma_pdv || null,
+        solicitante_nombre || null,
+        solicitante_documento || null,
+        solicitante_telefono || null,
         id
       );
 
@@ -239,6 +247,7 @@ export async function PUT(request) {
 
       if (visit.evento_id) {
         db.prepare("UPDATE eventos_calendario SET estado = 'completado' WHERE id = ?").run(visit.evento_id);
+        db.prepare("UPDATE solicitudes_visita SET estado = 'cerrada' WHERE evento_id = ?").run(visit.evento_id);
       }
 
       db.prepare(`

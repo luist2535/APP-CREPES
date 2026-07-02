@@ -28,16 +28,22 @@ export async function GET(request) {
 
     // Case 2: Fetch detailed info of a scanned QR
     if (!id) {
-      return NextResponse.json({ error: 'ID de equipo o QR requerido' }, { status: 400 });
+      return NextResponse.json({ error: 'ID de equipo, Sticker o QR requerido' }, { status: 400 });
     }
+
+    const cleanedId = id.trim();
 
     const equipo = db.prepare(`
       SELECT e.*, p.nombre as pdv_nombre, c.nombre as ciudad_nombre
       FROM equipos e
       JOIN pdv p ON e.pdv_id = p.id
       JOIN ciudades c ON p.ciudad_id = c.id
-      WHERE e.id = ? AND e.activo = 1
-    `).get(id);
+      WHERE (
+        LOWER(e.id) = LOWER(?)
+        OR LOWER(json_extract(e.datos_tecnicos, '$.sticker')) = LOWER(?)
+        OR LOWER(e.serie) = LOWER(?)
+      ) AND e.activo = 1
+    `).get(cleanedId, cleanedId, cleanedId);
 
     if (!equipo) {
       return NextResponse.json({ error: 'Equipo no registrado o inactivo en el sistema' }, { status: 404 });

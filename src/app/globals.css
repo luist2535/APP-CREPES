@@ -105,6 +105,43 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* ===== Custom Scrollbar (visualización elegante sin flechas de subir/bajar) ===== */
+/* Para navegadores basados en WebKit (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(107, 58, 42, 0.25); /* Color de marca semitransparente */
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 58, 42, 0.45);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Ocultar las flechas de subir y bajar del scrollbar */
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+/* Para Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(107, 58, 42, 0.25) transparent;
 }
 
 a { color: inherit; text-decoration: none; }
@@ -126,7 +163,7 @@ h4 { font-size: 1rem; font-weight: 600; line-height: 1.4; }
 
 /* ===== Layout Principal ===== */
 .app-layout {
-  display: flex;
+  display: block;
   min-height: 100vh;
 }
 
@@ -1567,3 +1604,268 @@ h4 { font-size: 1rem; font-weight: 600; line-height: 1.4; }
     display: none;
   }
 }
+
+/* =============================================
+   MOCKUP REDESIGN STYLES (PC & MOBILE)
+   ============================================= */
+
+/* Salir Button Redesign */
+.btn-salir {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-salir:hover {
+  background-color: var(--color-border);
+  color: var(--color-primary-dark);
+}
+
+.salir-icon-rect {
+  width: 6px;
+  height: 14px;
+  background-color: var(--color-primary);
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+/* Actions Menu Dropdown */
+.action-menu-container {
+  position: relative;
+  display: inline-block;
+}
+
+.action-menu-trigger {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.action-menu-trigger:hover {
+  background: var(--color-border);
+}
+
+.action-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 50;
+  min-width: 130px;
+  overflow: hidden;
+  animation: scaleIn 0.15s ease;
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.action-menu-item {
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.action-menu-item:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-primary-dark);
+}
+
+.action-menu-item.danger {
+  color: var(--color-error);
+}
+
+.action-menu-item.danger:hover {
+  background: var(--color-red-bg);
+  color: var(--color-error);
+}
+
+.action-menu-item svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 2px;
+  fill: none;
+}
+
+/* Mobile Role Filter Accordion */
+.mobile-role-filter-container {
+  width: 100%;
+  margin-bottom: var(--spacing-md);
+  position: relative;
+}
+
+.mobile-role-filter-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.mobile-role-filter-trigger {
+  width: 100%;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+
+.mobile-role-filter-trigger:hover {
+  background: var(--color-primary-hover);
+}
+
+.mobile-role-filter-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 60;
+  max-height: 250px;
+  overflow-y: auto;
+  padding: var(--spacing-xs) 0;
+}
+
+.mobile-role-filter-option {
+  width: 100%;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.mobile-role-filter-option:hover {
+  background: var(--color-bg-secondary);
+}
+
+.mobile-role-filter-option.active {
+  background: var(--color-bg-secondary);
+  color: var(--color-primary-dark);
+  font-weight: bold;
+}
+
+.mobile-role-filter-count {
+  font-size: 0.7rem;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+}
+
+.mobile-role-filter-option.active .mobile-role-filter-count {
+  background: var(--color-primary);
+  color: white;
+}
+
+/* Mobile User Card */
+.user-mobile-card {
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-light);
+  padding: var(--spacing-md);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  position: relative;
+  transition: all var(--transition-fast);
+}
+
+.user-mobile-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.user-mobile-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.user-mobile-card-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--color-text-primary);
+}
+
+.user-mobile-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.user-mobile-card-info {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.user-mobile-card-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 0.78rem;
+}
+

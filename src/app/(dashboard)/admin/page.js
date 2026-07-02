@@ -13,6 +13,23 @@ function AdminContent() {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
+
+  // Mockup redesign states
+  const [activeActionMenuUserId, setActiveActionMenuUserId] = useState(null);
+  const [roleFilterDropdownOpen, setRoleFilterDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    const handleDocumentClick = (e) => {
+      if (!e.target.closest('.action-menu-container')) {
+        setActiveActionMenuUserId(null);
+      }
+      if (!e.target.closest('.mobile-role-filter-container')) {
+        setRoleFilterDropdownOpen(false);
+      }
+    };
+    document.addEventListener('click', handleDocumentClick);
+    return () => document.removeEventListener('click', handleDocumentClick);
+  }, []);
   
   // Lists
   const [users, setUsers] = useState([]);
@@ -20,6 +37,44 @@ function AdminContent() {
   const [pdvs, setPdvs] = useState([]);
   const [ciudades, setCiudades] = useState([]);
   const [areas, setAreas] = useState([]);
+  const [searchTermUser, setSearchTermUser] = useState('');
+  const [selectedRoleFilter, setSelectedRoleFilter] = useState('all');
+  
+  // Custom Confirm & Alert Modal States
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+  });
+
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
+  const triggerConfirm = (title, message, callback) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        callback();
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
+  const triggerAlert = (title, message, type = 'info') => {
+    setAlertModal({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -175,7 +230,7 @@ function AdminContent() {
 
       loadAllData();
     } catch (err) {
-      alert(err.message);
+      triggerAlert('Error', err.message, 'error');
     }
   };
 
@@ -218,11 +273,7 @@ function AdminContent() {
     setShowAddForm(true);
   };
 
-  const handleDeletePdv = async (id, name) => {
-    if (!window.confirm(`¿Estás seguro de que deseas eliminar permanentemente el Punto de Venta "${name}"?\nEsta acción no se puede deshacer.`)) {
-      return;
-    }
-    
+  const proceedDeletePdv = async (id) => {
     try {
       setLoading(true);
       const res = await fetch(`/api/admin?entity=pdv&id=${id}`, {
@@ -232,20 +283,24 @@ function AdminContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al eliminar Punto de Venta');
       
-      alert(data.message || 'Punto de Venta eliminado con éxito');
+      triggerAlert('Éxito', data.message || 'Punto de Venta eliminado con éxito', 'success');
       loadAllData();
     } catch (err) {
-      alert(err.message);
+      triggerAlert('Error', err.message, 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteUser = async (id, name) => {
-    if (!window.confirm(`¿Estás seguro de que deseas eliminar permanentemente al usuario "${name}"?\nEsta acción no se puede deshacer.`)) {
-      return;
-    }
-    
+  const handleDeletePdv = (id, name) => {
+    triggerConfirm(
+      'Eliminar Punto de Venta',
+      `¿Estás seguro de que deseas eliminar permanentemente el Punto de Venta "${name}"? Esta acción no se puede deshacer.`,
+      () => proceedDeletePdv(id)
+    );
+  };
+
+  const proceedDeleteUser = async (id) => {
     try {
       setLoading(true);
       const res = await fetch(`/api/admin?entity=user&id=${id}`, {
@@ -255,13 +310,21 @@ function AdminContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al eliminar usuario');
       
-      alert(data.message || 'Usuario eliminado con éxito');
+      triggerAlert('Éxito', data.message || 'Usuario eliminado con éxito', 'success');
       loadAllData();
     } catch (err) {
-      alert(err.message);
+      triggerAlert('Error', err.message, 'error');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteUser = (id, name) => {
+    triggerConfirm(
+      'Eliminar Usuario',
+      `¿Estás seguro de que deseas eliminar permanentemente al usuario "${name}"? Esta acción no se puede deshacer.`,
+      () => proceedDeleteUser(id)
+    );
   };
 
   const handleCreateEntity = async (e) => {
@@ -357,6 +420,21 @@ function AdminContent() {
     );
   }
 
+  const filteredUsers = users.filter((u) => {
+    const matchesSearch = 
+      (u.nombre || '').toLowerCase().includes(searchTermUser.toLowerCase()) ||
+      (u.email || '').toLowerCase().includes(searchTermUser.toLowerCase());
+    const matchesRole = selectedRoleFilter === 'all' || String(u.rol_id) === selectedRoleFilter;
+    return matchesSearch && matchesRole;
+  });
+
+  const getSelectedRoleName = () => {
+    if (selectedRoleFilter === 'all') return `Todos (${users.length})`;
+    const activeRole = roles.find(r => String(r.id) === selectedRoleFilter);
+    const count = users.filter(u => String(u.rol_id) === selectedRoleFilter).length;
+    return activeRole ? `${activeRole.nombre} (${count})` : 'Filtrar por Rol';
+  };
+
   return (
     <div className="admin-page-container">
       {error && <div className="card error-card"><div className="card-body">❌ {error}</div></div>}
@@ -402,67 +480,338 @@ function AdminContent() {
           <div className="admin-list-col">
             <div className="card shadow-md">
               <div className="card-body px-0 py-0">
-                
-                {/* Users Table */}
-                {activeTab === 'usuarios' && (
-                  <div className="table-responsive">
-                    <table className="admin-table">
-                      <thead>
-                        <tr>
-                          <th>Nombre</th>
-                          <th>Email</th>
-                          <th>Rol</th>
-                          <th>Ciudad Asignada</th>
-                          <th>Estado</th>
-                          <th>Acción</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {users.map((u) => (
-                          <tr key={u.id} className={!u.activo ? 'row-inactive' : ''}>
-                            <td className="font-semibold">{u.nombre}</td>
-                            <td>{u.email}</td>
-                            <td><span className="admin-role-badge">{u.rol_nombre}</span></td>
-                            <td>{u.ciudad_nombre || 'Nivel Nacional'}</td>
-                            <td>
+                               {activeTab === 'usuarios' && (
+                  <div>
+                    {/* Search & Filter Bar */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border-light)', backgroundColor: 'var(--color-bg-primary)' }}>
+                      <div className="search-input-wrapper">
+                        <span className="search-icon-left">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                          </svg>
+                        </span>
+                        <input
+                          type="text"
+                          className="form-input search-input-styled"
+                          placeholder="Buscar usuario por nombre o correo..."
+                          value={searchTermUser}
+                          onChange={(e) => setSearchTermUser(e.target.value)}
+                        />
+                        <span className="search-chevron-right">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                        </span>
+                      </div>
+
+                      {/* Desktop chips filter */}
+                      <div className="desktop-role-filter" style={{ gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginTop: '4px' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 'bold', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginRight: '4px' }}>Filtrar por Rol:</span>
+                        <button
+                          type="button"
+                          className={`filter-chip ${selectedRoleFilter === 'all' ? 'active' : ''}`}
+                          onClick={() => setSelectedRoleFilter('all')}
+                          style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                        >
+                          Todos ({users.length})
+                        </button>
+                        {roles.map(r => {
+                          const count = users.filter(u => u.rol_id === r.id).length;
+                          return (
+                            <button
+                              key={r.id}
+                              type="button"
+                              className={`filter-chip ${selectedRoleFilter === String(r.id) ? 'active' : ''}`}
+                              onClick={() => setSelectedRoleFilter(String(r.id))}
+                              style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                            >
+                              {r.nombre} <span className="filter-chip-count">{count}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Mobile custom role filter accordion */}
+                      <div className="mobile-role-filter">
+                        <div className="mobile-role-filter-container">
+                          <span className="mobile-role-filter-label">Filtrar por Rol:</span>
+                          <button 
+                            type="button" 
+                            className="mobile-role-filter-trigger"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRoleFilterDropdownOpen(!roleFilterDropdownOpen);
+                            }}
+                          >
+                            <span>{getSelectedRoleName()}</span>
+                            <span className="chevron-icon">
+                              {roleFilterDropdownOpen ? (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="18 15 12 9 6 15" />
+                                </svg>
+                              ) : (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="6 9 12 15 18 9" />
+                                </svg>
+                              )}
+                            </span>
+                          </button>
+                          {roleFilterDropdownOpen && (
+                            <div className="mobile-role-filter-dropdown">
+                              <button
+                                type="button"
+                                className={`mobile-role-filter-option ${selectedRoleFilter === 'all' ? 'active' : ''}`}
+                                onClick={() => {
+                                  setSelectedRoleFilter('all');
+                                  setRoleFilterDropdownOpen(false);
+                                }}
+                              >
+                                <span>Todos</span>
+                                <span className="mobile-role-filter-count">{users.length}</span>
+                              </button>
+                              {roles.map(r => {
+                                const count = users.filter(u => u.rol_id === r.id).length;
+                                return (
+                                  <button
+                                    key={r.id}
+                                    type="button"
+                                    className={`mobile-role-filter-option ${selectedRoleFilter === String(r.id) ? 'active' : ''}`}
+                                    onClick={() => {
+                                      setSelectedRoleFilter(String(r.id));
+                                      setRoleFilterDropdownOpen(false);
+                                    }}
+                                  >
+                                    <span>{r.nombre}</span>
+                                    <span className="mobile-role-filter-count">{count}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Desktop View: Table */}
+                    <div className="desktop-only-table table-responsive">
+                      <table className="admin-table">
+                        <thead>
+                          <tr>
+                            <th>Nombre</th>
+                            <th>Email</th>
+                            <th>Rol</th>
+                            <th>Ciudad Asignada</th>
+                            <th>Estado</th>
+                            <th>Acción</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredUsers.length > 0 ? (
+                            filteredUsers.map((u) => (
+                              <tr key={u.id} className={!u.activo ? 'row-inactive' : ''}>
+                                <td className="font-semibold">{u.nombre}</td>
+                                <td>{u.email}</td>
+                                <td><span className="admin-role-badge">{u.rol_nombre}</span></td>
+                                <td>{u.ciudad_nombre || 'Nivel Nacional'}</td>
+                                <td>
+                                  <span className={`status-dot-pill ${u.activo ? 'active' : 'inactive'}`}>
+                                    <span className="dot"></span>
+                                    {u.activo ? 'Activo' : 'Inactivo'}
+                                  </span>
+                                </td>
+                                <td>
+                                  <div className="action-menu-container">
+                                    <button 
+                                      type="button" 
+                                      className="action-menu-trigger" 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveActionMenuUserId(activeActionMenuUserId === u.id ? null : u.id);
+                                      }}
+                                    >
+                                      •••
+                                    </button>
+                                    {activeActionMenuUserId === u.id && (
+                                      <div className="action-menu-dropdown">
+                                        <button 
+                                          type="button" 
+                                          className="action-menu-item"
+                                          onClick={() => {
+                                            handleEditUserClick(u);
+                                            setActiveActionMenuUserId(null);
+                                          }}
+                                        >
+                                          <svg viewBox="0 0 24 24">
+                                            <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                                          </svg>
+                                          Editar
+                                        </button>
+                                        <button 
+                                          type="button" 
+                                          className="action-menu-item"
+                                          onClick={() => {
+                                            handleToggleActive('user', u.id, u.activo);
+                                            setActiveActionMenuUserId(null);
+                                          }}
+                                          disabled={u.id === 1}
+                                        >
+                                          <svg viewBox="0 0 24 24">
+                                            {u.activo ? (
+                                              <>
+                                                <circle cx="12" cy="12" r="10" />
+                                                <line x1="15" y1="9" x2="9" y2="15" />
+                                                <line x1="9" y1="9" x2="15" y2="15" />
+                                              </>
+                                            ) : (
+                                              <>
+                                                <circle cx="12" cy="12" r="10" />
+                                                <polyline points="12 6 12 12 16 14" />
+                                              </>
+                                            )}
+                                          </svg>
+                                          {u.activo ? 'Desactivar' : 'Activar'}
+                                        </button>
+                                        <button 
+                                          type="button" 
+                                          className="action-menu-item danger"
+                                          onClick={() => {
+                                            handleDeleteUser(u.id, u.nombre);
+                                            setActiveActionMenuUserId(null);
+                                          }}
+                                          disabled={u.id === 1}
+                                        >
+                                          <svg viewBox="0 0 24 24">
+                                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
+                                          </svg>
+                                          Eliminar
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan="6" style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-muted)' }}>
+                                No se encontraron usuarios que coincidan con la búsqueda.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile View: Cards */}
+                    <div className="mobile-only-cards" style={{ padding: 'var(--spacing-md)' }}>
+                      {filteredUsers.length > 0 ? (
+                        filteredUsers.map((u) => (
+                          <div key={u.id} className={`user-mobile-card ${!u.activo ? 'row-inactive' : ''}`}>
+                            <div className="user-mobile-card-header">
+                              <div>
+                                <div className="user-mobile-card-title">{u.nombre}</div>
+                                <div className="user-mobile-card-badges">
+                                  <span className="admin-role-badge">{u.rol_nombre}</span>
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                                    {u.ciudad_nombre || 'Nivel Nacional'}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              {/* Actions Dropdown for Mobile Card */}
+                              <div className="action-menu-container">
+                                <button 
+                                  type="button" 
+                                  className="action-menu-trigger" 
+                                  style={{ border: 'none', background: 'transparent', width: '24px', height: '24px', fontSize: '1.2rem' }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveActionMenuUserId(activeActionMenuUserId === u.id ? null : u.id);
+                                  }}
+                                >
+                                  ⋮
+                                </button>
+                                {activeActionMenuUserId === u.id && (
+                                  <div className="action-menu-dropdown" style={{ right: 0, top: '24px' }}>
+                                    <button 
+                                      type="button" 
+                                      className="action-menu-item"
+                                      onClick={() => {
+                                        handleEditUserClick(u);
+                                        setActiveActionMenuUserId(null);
+                                      }}
+                                    >
+                                      <svg viewBox="0 0 24 24">
+                                        <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                                      </svg>
+                                      Editar
+                                    </button>
+                                    <button 
+                                      type="button" 
+                                      className="action-menu-item"
+                                      onClick={() => {
+                                        handleToggleActive('user', u.id, u.activo);
+                                        setActiveActionMenuUserId(null);
+                                      }}
+                                      disabled={u.id === 1}
+                                    >
+                                      <svg viewBox="0 0 24 24">
+                                        {u.activo ? (
+                                          <>
+                                            <circle cx="12" cy="12" r="10" />
+                                            <line x1="15" y1="9" x2="9" y2="15" />
+                                            <line x1="9" y1="9" x2="15" y2="15" />
+                                          </>
+                                        ) : (
+                                          <>
+                                            <circle cx="12" cy="12" r="10" />
+                                            <polyline points="12 6 12 12 16 14" />
+                                          </>
+                                        )}
+                                      </svg>
+                                      {u.activo ? 'Desactivar' : 'Activar'}
+                                    </button>
+                                    <button 
+                                      type="button" 
+                                      className="action-menu-item danger"
+                                      onClick={() => {
+                                        handleDeleteUser(u.id, u.nombre);
+                                        setActiveActionMenuUserId(null);
+                                      }}
+                                      disabled={u.id === 1}
+                                    >
+                                      <svg viewBox="0 0 24 24">
+                                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
+                                      </svg>
+                                      Eliminar
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="user-mobile-card-info">
+                              <div><strong>Email:</strong> {u.email}</div>
+                            </div>
+                            
+                            <div className="user-mobile-card-status-row">
+                              <div>Estado:</div>
                               <span className={`status-dot-pill ${u.activo ? 'active' : 'inactive'}`}>
                                 <span className="dot"></span>
                                 {u.activo ? 'Activo' : 'Inactivo'}
                               </span>
-                            </td>
-                            <td style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                              <button 
-                                className={`btn btn-sm ${u.activo ? 'btn-danger' : 'btn-success'}`}
-                                onClick={() => handleToggleActive('user', u.id, u.activo)}
-                                disabled={u.id === 1} // Prevent deactivating admin
-                                title={u.activo ? 'Desactivar usuario' : 'Activar usuario'}
-                              >
-                                {u.activo ? 'Desactivar 🔒' : 'Activar 🔓'}
-                              </button>
-                              <button 
-                                className="btn btn-sm btn-primary"
-                                onClick={() => handleEditUserClick(u)}
-                                title="Editar datos del usuario"
-                              >
-                                Editar ✏️
-                              </button>
-                              <button 
-                                className="btn btn-sm btn-danger"
-                                onClick={() => handleDeleteUser(u.id, u.nombre)}
-                                disabled={u.id === 1} // Prevent deleting admin
-                                title="Eliminar permanentemente"
-                              >
-                                Eliminar 🗑️
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-muted)' }}>
+                          No se encontraron usuarios que coincidan con la búsqueda.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
-
-                {/* PDVs Table */}
                 {activeTab === 'pdvs' && (
                   <div className="table-responsive">
                     <table className="admin-table">
@@ -932,27 +1281,127 @@ function AdminContent() {
 
         .tabs-header {
           display: flex;
-          gap: var(--spacing-sm);
-          border-bottom: 2px solid var(--color-border-light);
-          padding-bottom: 2px;
+          background: var(--color-bg-secondary);
+          border-radius: var(--radius-xl);
+          padding: 6px;
+          gap: 4px;
           overflow-x: auto;
+          scrollbar-width: none;
+        }
+
+        .tabs-header::-webkit-scrollbar {
+          display: none;
         }
 
         .tab-btn {
-          background: none;
+          flex: 1;
+          background: transparent;
           border: none;
-          padding: 10px 20px;
-          font-size: 0.9rem;
+          padding: 10px 18px;
+          font-size: 0.85rem;
           font-weight: 600;
           color: var(--color-text-secondary);
-          border-bottom: 3px solid transparent;
+          border-radius: var(--radius-lg);
           cursor: pointer;
-          transition: all var(--transition-fast);
+          transition: all 0.2s ease;
           white-space: nowrap;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
         }
 
-        .tab-btn:hover { color: var(--color-primary); }
-        .tab-btn.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+        .tab-btn:hover {
+          color: var(--color-primary-dark);
+        }
+
+        .tab-btn.active {
+          background: var(--color-primary);
+          color: white;
+          box-shadow: 0 4px 10px rgba(107, 58, 42, 0.2);
+        }
+
+        /* Search input wrapper and custom styles */
+        .search-input-wrapper {
+          position: relative;
+          display: flex;
+          align-items: center;
+          width: 100%;
+        }
+
+        .search-input-styled {
+          padding-left: 38px !important;
+          padding-right: 38px !important;
+          height: 40px;
+          font-size: 0.85rem !important;
+          border-radius: var(--radius-md);
+          border: 1.5px solid var(--color-border);
+          background-color: var(--color-bg-card);
+          width: 100%;
+          outline: none;
+          transition: border-color var(--transition-fast);
+        }
+
+        .search-input-styled:focus {
+          border-color: var(--color-primary);
+        }
+
+        .search-icon-left {
+          position: absolute;
+          left: 12px;
+          display: flex;
+          align-items: center;
+          pointer-events: none;
+        }
+
+        .search-chevron-right {
+          position: absolute;
+          right: 12px;
+          display: flex;
+          align-items: center;
+          pointer-events: none;
+        }
+
+        /* View toggles */
+        .desktop-only-table {
+          display: block;
+        }
+
+        .mobile-only-cards {
+          display: none;
+        }
+
+        .desktop-role-filter {
+          display: flex;
+        }
+
+        .mobile-role-filter {
+          display: none;
+        }
+
+        @media (max-width: 767px) {
+          .desktop-only-table {
+            display: none !important;
+          }
+          .mobile-only-cards {
+            display: grid;
+            gap: var(--spacing-sm);
+          }
+          .desktop-role-filter {
+            display: none !important;
+          }
+          .mobile-role-filter {
+            display: block;
+          }
+          .tabs-header {
+            padding: 4px;
+            border-radius: var(--radius-lg);
+          }
+          .tab-btn {
+            padding: 8px 12px;
+            font-size: 0.75rem;
+          }
+        }
 
         .admin-actions-row {
           display: flex;
@@ -1137,6 +1586,111 @@ function AdminContent() {
           }
         }
       `}</style>
+
+      {/* Custom Confirm Modal */}
+      {confirmModal.isOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(44, 24, 16, 0.45)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--spacing-md)'
+        }}>
+          <div className="card animate-fade-in" style={{
+            width: '100%',
+            maxWidth: '400px',
+            backgroundColor: 'var(--color-bg-card)',
+            borderRadius: 'var(--radius-xl)',
+            boxShadow: 'var(--shadow-xl)',
+            overflow: 'hidden'
+          }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--spacing-md) var(--spacing-lg)' }}>
+              <h3 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--color-primary-dark)' }}>{confirmModal.title || '¿Estás seguro?'}</h3>
+              <button 
+                type="button"
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: 'var(--color-text-muted)', cursor: 'pointer' }}
+              >×</button>
+            </div>
+            <div className="card-body" style={{ padding: 'var(--spacing-lg)' }}>
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', margin: '0 0 var(--spacing-lg) 0', lineHeight: '1.5' }}>
+                {confirmModal.message}
+              </p>
+              <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-danger btn-sm"
+                  onClick={confirmModal.onConfirm}
+                >
+                  Aceptar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Alert Modal */}
+      {alertModal.isOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(44, 24, 16, 0.45)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--spacing-md)'
+        }}>
+          <div className="card animate-fade-in" style={{
+            width: '100%',
+            maxWidth: '400px',
+            backgroundColor: 'var(--color-bg-card)',
+            borderRadius: 'var(--radius-xl)',
+            boxShadow: 'var(--shadow-xl)',
+            overflow: 'hidden'
+          }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--spacing-md) var(--spacing-lg)' }}>
+              <h3 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--color-primary-dark)' }}>{alertModal.title || 'Aviso'}</h3>
+              <button 
+                type="button"
+                onClick={() => setAlertModal(prev => ({ ...prev, isOpen: false }))}
+                style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: 'var(--color-text-muted)', cursor: 'pointer' }}
+              >×</button>
+            </div>
+            <div className="card-body" style={{ padding: 'var(--spacing-lg)' }}>
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', margin: '0 0 var(--spacing-lg) 0', lineHeight: '1.5' }}>
+                {alertModal.type === 'error' && '❌ '}
+                {alertModal.type === 'success' && '✅ '}
+                {alertModal.message}
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setAlertModal(prev => ({ ...prev, isOpen: false }))}
+                >
+                  Aceptar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

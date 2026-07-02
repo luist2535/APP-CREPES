@@ -32,6 +32,11 @@ export default function CalendarioPage() {
   const [formHoraFin, setFormHoraFin] = useState('09:00');
   const [formTipo, setFormTipo] = useState('visita');
   const [formSyncOutlook, setFormSyncOutlook] = useState(true);
+
+  // Custom checklist items states
+  const [customizeChecklist, setCustomizeChecklist] = useState(false);
+  const [customChecklistTasks, setCustomChecklistTasks] = useState([]);
+  const [newCustomTaskText, setNewCustomTaskText] = useState('');
   
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -145,6 +150,55 @@ export default function CalendarioPage() {
     }
   }, [areas, formAreaId]);
 
+  // Synchronize custom checklist tasks with the selected template as a baseline
+  useEffect(() => {
+    if (formAreaId && formTipoVisitaId && plantillas.length > 0) {
+      const template = plantillas.find(
+        (p) => p.area_id === parseInt(formAreaId) && p.tipo_visita_id === parseInt(formTipoVisitaId)
+      );
+      if (template) {
+        try {
+          const parsed = JSON.parse(template.campos);
+          if (parsed[0] && parsed[0].tipo === 'matrix') {
+            const rows = parsed[0].secciones.flatMap(s => s.filas);
+            setCustomChecklistTasks(rows);
+          } else if (parsed[0] && parsed[0].tipo === 'simple_checklist') {
+            const rows = parsed[0].secciones.flatMap(s => s.filas);
+            setCustomChecklistTasks(rows);
+          } else {
+            const labels = parsed.filter(f => f.tipo === 'checkbox').map(f => f.label);
+            setCustomChecklistTasks(labels);
+          }
+        } catch (e) {
+          setCustomChecklistTasks([]);
+        }
+      } else {
+        setCustomChecklistTasks([]);
+      }
+    } else {
+      setCustomChecklistTasks([]);
+    }
+  }, [formAreaId, formTipoVisitaId, plantillas]);
+
+  const handleAddCustomTask = () => {
+    if (newCustomTaskText.trim()) {
+      setCustomChecklistTasks([...customChecklistTasks, newCustomTaskText.trim()]);
+      setNewCustomTaskText('');
+    }
+  };
+
+  const handleDeleteCustomTask = (idx) => {
+    const updated = [...customChecklistTasks];
+    updated.splice(idx, 1);
+    setCustomChecklistTasks(updated);
+  };
+
+  const handleEditCustomTask = (idx, text) => {
+    const updated = [...customChecklistTasks];
+    updated[idx] = text;
+    setCustomChecklistTasks(updated);
+  };
+
   const handlePrevMonth = () => {
     setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   };
@@ -177,6 +231,18 @@ export default function CalendarioPage() {
       if (template) selectedPlantillaId = template.id;
     }
 
+    let camposPersonalizados = null;
+    if (customizeChecklist && customChecklistTasks.length > 0) {
+      camposPersonalizados = JSON.stringify(
+        customChecklistTasks.map((task, idx) => ({
+          nombre: `custom_field_${idx}`,
+          tipo: 'checkbox',
+          label: task,
+          requerido: true
+        }))
+      );
+    }
+
     try {
       const res = await fetch('/api/calendario', {
         method: 'POST',
@@ -192,6 +258,7 @@ export default function CalendarioPage() {
           tipo_evento: formTipo,
           tipo_visita_id: formTipoVisitaId ? parseInt(formTipoVisitaId) : null,
           plantilla_id: selectedPlantillaId,
+          campos_personalizados: camposPersonalizados
         }),
       });
 
@@ -201,6 +268,8 @@ export default function CalendarioPage() {
       setSubmitSuccess(data.message || 'Visita programada exitosamente');
       setFormTitle('');
       setFormDesc('');
+      setCustomizeChecklist(false);
+      setCustomChecklistTasks([]);
       setShowForm(false);
 
       // Reload calendar events
@@ -533,6 +602,74 @@ export default function CalendarioPage() {
                         onChange={(e) => setFormDesc(e.target.value)}
                       ></textarea>
                     </div>
+
+                    {/* Custom Checklist Section */}
+                    {formTipo === 'visita' && formAreaId && formTipoVisitaId && (
+                      <div className="custom-checklist-schedule-section" style={{ marginTop: '10px', padding: '12px', border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-bg-secondary)', marginBottom: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                          <input
+                            id="form-customize-checklist"
+                            type="checkbox"
+                            className="form-checkbox"
+                            checked={customizeChecklist}
+                            onChange={(e) => setCustomizeChecklist(e.target.checked)}
+                          />
+                          <label htmlFor="form-customize-checklist" style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--color-primary-dark)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                            📋 Personalizar checklist específico para esta visita
+                          </label>
+                        </div>
+
+                        {customizeChecklist && (
+                          <div className="custom-tasks-list-editor animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontWeight: 'bold' }}>Lista de tareas a realizar (el Auxiliar las marcará):</span>
+                            
+                            <div className="tasks-chips-container" style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: '150px', overflowY: 'auto', padding: '6px', background: 'white', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-light)' }}>
+                              {customChecklistTasks.map((task, idx) => (
+                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--color-bg-secondary)', padding: '4px 8px', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', border: '1px solid var(--color-border-light)' }}>
+                                  <span style={{ flex: 1 }}>{task}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteCustomTask(idx)}
+                                    style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', padding: '0 4px', fontWeight: 'bold', fontSize: '0.9rem' }}
+                                    title="Eliminar tarea"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                              {customChecklistTasks.length === 0 && (
+                                <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', textAlign: 'center', padding: '10px' }}>No hay tareas en el checklist. Agrega una abajo.</span>
+                              )}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '5px', marginTop: '4px' }}>
+                              <input
+                                type="text"
+                                className="form-input"
+                                placeholder="Ej. Limpiar CPU, Soplar fuentes..."
+                                value={newCustomTaskText}
+                                onChange={(e) => setNewCustomTaskText(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleAddCustomTask();
+                                  }
+                                }}
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', height: '30px' }}
+                              />
+                              <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={handleAddCustomTask}
+                                style={{ padding: '4px 10px', fontSize: '0.75rem', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              >
+                                Añadir
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div className="form-checkbox-group">
                       <input

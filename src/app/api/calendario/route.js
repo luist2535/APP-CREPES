@@ -76,7 +76,7 @@ export async function POST(request) {
     const user = getUserFromRequest(request);
     if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     
-    const { pdv_id, titulo, descripcion, fecha, hora_inicio, hora_fin, tipo_evento, area_id, tipo_visita_id, plantilla_id, solicitud_id } = await request.json();
+    const { pdv_id, titulo, descripcion, fecha, hora_inicio, hora_fin, tipo_evento, area_id, tipo_visita_id, plantilla_id, solicitud_id, campos_personalizados } = await request.json();
     
     if (!pdv_id || !titulo || !fecha || !hora_inicio || !hora_fin || !area_id) {
       return NextResponse.json(
@@ -157,8 +157,8 @@ export async function POST(request) {
 
     // Automatically create a row in the visitas table in 'pendiente' state
     db.prepare(`
-      INSERT INTO visitas (pdv_id, user_id, area_id, tipo_visita_id, plantilla_id, fecha, hora_inicio, hora_fin, responsable_id, estado, observaciones, evento_id)
-      VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, 'pendiente', ?, ?)
+      INSERT INTO visitas (pdv_id, user_id, area_id, tipo_visita_id, plantilla_id, fecha, hora_inicio, hora_fin, responsable_id, estado, observaciones, evento_id, campos_personalizados)
+      VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, 'pendiente', ?, ?, ?)
     `).run(
       parseInt(pdv_id),
       user.id,
@@ -168,7 +168,8 @@ export async function POST(request) {
       fecha,
       responsableId,
       descripcion || '',
-      createdEventId
+      createdEventId,
+      campos_personalizados || null
     );
 
     // If this calendar event was scheduled from a PDV ticket request, mark the request as programmed

@@ -135,7 +135,8 @@ export async function POST(request) {
       }
     }
 
-    return NextResponse.json({ success: true, message: 'Solicitud registrada correctamente.', id: solicitudId });
+    const ticketCode = 'TK-' + String(solicitudId).padStart(5, '0');
+    return NextResponse.json({ success: true, message: `Solicitud registrada correctamente. Tu número de ticket es: ${ticketCode}`, id: solicitudId, ticket_code: ticketCode });
   } catch (error) {
     console.error('Error en POST api/solicitudes:', error);
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 });
@@ -164,5 +165,38 @@ export async function PUT(request) {
   } catch (error) {
     console.error('Error en PUT api/solicitudes:', error);
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request) {
+  try {
+    const user = getUserFromRequest(request);
+    if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    
+    // Only Admin (1) and Coordinator (2) can delete requests
+    const rolId = parseInt(user.rol_id);
+    if (rolId !== 1 && rolId !== 2) {
+      return NextResponse.json({ error: 'No autorizado para eliminar solicitudes' }, { status: 403 });
+    }
+
+    const db = getDb();
+    const { searchParams } = new URL(request.url);
+    const idsStr = searchParams.get('ids');
+    if (!idsStr) return NextResponse.json({ error: 'Faltan IDs' }, { status: 400 });
+    
+    const ids = idsStr.split(',').map(id => parseInt(id));
+    
+    const stmt = db.prepare("DELETE FROM solicitudes_visita WHERE id = ?");
+    const deleteTx = db.transaction((idsToDelete) => {
+      for (const id of idsToDelete) {
+        stmt.run(id);
+      }
+    });
+    deleteTx(ids);
+    
+    return NextResponse.json({ success: true, message: 'Solicitudes eliminadas correctamente.' });
+  } catch (error) {
+    console.error('Error en DELETE api/solicitudes:', error);
+    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
   }
 }

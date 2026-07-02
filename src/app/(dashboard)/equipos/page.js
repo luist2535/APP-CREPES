@@ -82,7 +82,7 @@ export default function EquiposPage() {
 
   const startCameraScan = () => {
     if (!scannerLoaded) {
-      alert('La cámara no está lista aún. Por favor espera un momento.');
+      setSearchError('La cámara no está lista aún. Por favor espera un momento.');
       return;
     }
     
@@ -125,6 +125,39 @@ export default function EquiposPage() {
       setScannerInstance(null);
     }
     setIsScanning(false);
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setSearchLoading(true);
+    setSearchError('');
+    setEquipo(null);
+    setMantenimientos([]);
+    
+    if (!window.Html5Qrcode) {
+      setSearchError('El decodificador de imagen no está listo aún. Por favor intenta de nuevo.');
+      setSearchLoading(false);
+      return;
+    }
+
+    try {
+      const html5QrCode = new window.Html5Qrcode("reader-hidden");
+      html5QrCode.scanFile(file, true)
+        .then(decodedText => {
+          handleSearchEquipment(decodedText);
+        })
+        .catch(err => {
+          console.error("Error scanning file:", err);
+          setSearchError("No se pudo detectar un código QR en la imagen. Intenta tomar una foto más nítida de cerca o ingresa el Sticker manualmente.");
+          setSearchLoading(false);
+        });
+    } catch (err) {
+      console.error("Failed to initialize scanner for file:", err);
+      setSearchError("Error al iniciar el decodificador de archivo.");
+      setSearchLoading(false);
+    }
   };
 
   const handleCreateMaintenance = () => {
@@ -196,16 +229,69 @@ export default function EquiposPage() {
                   </button>
                 </div>
               ) : (
-                <div className="scan-placeholder-view">
+                <div className="scan-placeholder-view" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                   <div className="qr-icon-large">📱</div>
-                  <p>Escanea el código QR pegado en la licuadora, nevera, o equipo para ver su ficha técnica e historial.</p>
-                  <button 
-                    className="btn btn-primary btn-lg" 
-                    onClick={startCameraScan}
-                    disabled={!scannerLoaded}
-                  >
-                    {scannerLoaded ? '📷 Escanear con Cámara' : 'Cargando Cámara...'}
-                  </button>
+                  <p>Escanea el código QR o el código de barras (con el sticker de inventario) pegado en el equipo para ver su ficha técnica e historial.</p>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', alignItems: 'center' }}>
+                    <button 
+                      className="btn btn-primary btn-lg" 
+                      onClick={startCameraScan}
+                      disabled={!scannerLoaded}
+                      style={{ width: '100%', maxWidth: '280px' }}
+                    >
+                      {scannerLoaded ? '📷 Escanear con Cámara' : 'Cargando Cámara...'}
+                    </button>
+
+                    <label 
+                      className="btn btn-secondary btn-lg" 
+                      style={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        gap: '8px', 
+                        cursor: 'pointer',
+                        padding: '10px 20px',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: '0.95rem',
+                        fontWeight: 'bold',
+                        backgroundColor: '#FAF6F0',
+                        color: 'var(--color-primary-dark)',
+                        border: '1.5px dashed var(--color-primary)',
+                        width: '100%',
+                        maxWidth: '280px',
+                        margin: 0
+                      }}
+                    >
+                      <span>📁</span> Subir Foto del QR
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        capture="environment" 
+                        onChange={handleFileChange} 
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Hidden reader element for file decoding */}
+              <div id="reader-hidden" style={{ display: 'none' }}></div>
+
+              {/* HTTP Insecure Connection Warning Tip */}
+              {typeof window !== 'undefined' && window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && (
+                <div style={{ marginTop: '20px', padding: '12px', borderRadius: '8px', backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', fontSize: '0.82rem', color: '#991B1B', textAlign: 'left' }}>
+                  <strong style={{ display: 'block', marginBottom: '4px' }}>⚠️ Aviso de Acceso a Cámara:</strong>
+                  <p style={{ margin: '0 0 8px 0', lineHeight: '1.3' }}>Estás accediendo mediante una dirección IP no segura (HTTP). Por políticas de seguridad del navegador, la cámara directa requiere <strong>HTTPS</strong> o localhost.</p>
+                  <p style={{ margin: '0 0 4px 0', fontWeight: 'bold' }}>¿Cómo solucionarlo?</p>
+                  <ul style={{ margin: 0, paddingLeft: '18px', lineHeight: '1.4' }}>
+                    <li>Usa la opción <strong>"Subir Foto del QR"</strong> para usar la cámara nativa del celular.</li>
+                    <li>Digita manualmente el <strong>Sticker</strong> o <strong>Serial</strong> en el buscador de abajo.</li>
+                    <li>
+                      Configura Chrome ingresando a: <code style={{ wordBreak: 'break-all', fontSize: '0.75rem' }}>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>, habilita la opción y agrega <code>http://172.25.13.26:3000</code>.
+                    </li>
+                  </ul>
                 </div>
               )}
 
@@ -216,13 +302,13 @@ export default function EquiposPage() {
               {/* Manual search input */}
               <div className="manual-search-form">
                 <div className="form-group mb-0">
-                  <label className="form-label" htmlFor="manual-qr-input">Código de Equipo</label>
+                  <label className="form-label" htmlFor="manual-qr-input">Código de Equipo, Serial o Sticker</label>
                   <div className="input-with-button">
                     <input
                       id="manual-qr-input"
                       type="text"
                       className="form-input"
-                      placeholder="Ej: EQ-1001"
+                      placeholder="Ej: EQ-1001 o ADM 000002539"
                       value={qrInput}
                       onChange={(e) => setQrInput(e.target.value)}
                     />
@@ -239,11 +325,11 @@ export default function EquiposPage() {
 
               {/* Quick test links */}
               <div className="quick-test-section">
-                <span>Códigos de Prueba Rápidos:</span>
+                <span>Ejemplos de Códigos y Stickers de Prueba:</span>
                 <div className="quick-test-buttons">
                   <button className="btn btn-secondary btn-sm" onClick={() => handleSearchEquipment('EQ-1001')}>🔌 EQ-1001 (Licuadora)</button>
-                  <button className="btn btn-secondary btn-sm" onClick={() => handleSearchEquipment('EQ-1002')}>❄️ EQ-1002 (Nevera)</button>
-                  <button className="btn btn-secondary btn-sm" onClick={() => handleSearchEquipment('EQ-1003')}>🥞 EQ-1003 (Crepera)</button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => handleSearchEquipment('R05 000001613')}>🖥️ R05 000001613 (Servidor)</button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => handleSearchEquipment('ADM 000002539')}>💻 ADM 000002539 (Desktop)</button>
                 </div>
               </div>
 
@@ -257,9 +343,11 @@ export default function EquiposPage() {
             <div className="card error-card animate-fade-in">
               <div className="card-body text-center">
                 <span className="error-icon">❌</span>
-                <h4>No se encontró el equipo</h4>
+                <h4>{searchError.includes('cámara') ? 'Cámara no disponible' : 'No se encontró el equipo'}</h4>
                 <p className="text-muted">{searchError}</p>
-                <p className="suggest-hint">Prueba con los códigos de prueba `EQ-1001`, `EQ-1002` o `EQ-1003` para validar la ficha técnica.</p>
+                {!searchError.includes('cámara') && (
+                  <p className="suggest-hint">Prueba con códigos como `EQ-1001` o con números de sticker de inventario como `R05 000001613` o `ADM 000002539` para validar la ficha técnica.</p>
+                )}
               </div>
             </div>
           )}

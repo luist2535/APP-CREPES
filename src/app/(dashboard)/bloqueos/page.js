@@ -25,6 +25,42 @@ export default function BloqueosPage() {
   const [submitSuccess, setSubmitSuccess] = useState('');
   const [userRole, setUserRole] = useState(null);
 
+  // Custom Confirm & Alert Modal States
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+  });
+
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
+  const triggerConfirm = (title, message, callback) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        callback();
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
+  const triggerAlert = (title, message, type = 'info') => {
+    setAlertModal({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -107,11 +143,7 @@ export default function BloqueosPage() {
     }
   };
 
-  const handleLiftBloqueo = async (bloqueoId) => {
-    if (!confirm('¿Está seguro de levantar este bloqueo? El PDV regresará a estado operativo normal.')) {
-      return;
-    }
-
+  const proceedLiftBloqueo = async (bloqueoId) => {
     try {
       const res = await fetch(`/api/bloqueos?id=${bloqueoId}`, {
         method: 'DELETE',
@@ -120,11 +152,19 @@ export default function BloqueosPage() {
       
       if (!res.ok) throw new Error(data.error || 'Error al levantar bloqueo');
       
-      alert(data.message || 'Bloqueo levantado correctamente');
+      triggerAlert('Éxito', data.message || 'Bloqueo levantado correctamente', 'success');
       loadData();
     } catch (err) {
-      alert(err.message);
+      triggerAlert('Error', err.message, 'error');
     }
+  };
+
+  const handleLiftBloqueo = (bloqueoId) => {
+    triggerConfirm(
+      'Levantar Bloqueo',
+      '¿Está seguro de levantar este bloqueo? El PDV regresará a estado operativo normal.',
+      () => proceedLiftBloqueo(bloqueoId)
+    );
   };
 
   const isCoordinatorOrAdmin = userRole === 1 || userRole === 2;
@@ -502,6 +542,111 @@ export default function BloqueosPage() {
           }
         }
       `}</style>
+
+      {/* Custom Confirm Modal */}
+      {confirmModal.isOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(44, 24, 16, 0.45)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--spacing-md)'
+        }}>
+          <div className="card animate-fade-in" style={{
+            width: '100%',
+            maxWidth: '400px',
+            backgroundColor: 'var(--color-bg-card)',
+            borderRadius: 'var(--radius-xl)',
+            boxShadow: 'var(--shadow-xl)',
+            overflow: 'hidden'
+          }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--spacing-md) var(--spacing-lg)' }}>
+              <h3 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--color-primary-dark)' }}>{confirmModal.title || '¿Estás seguro?'}</h3>
+              <button 
+                type="button"
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: 'var(--color-text-muted)', cursor: 'pointer' }}
+              >×</button>
+            </div>
+            <div className="card-body" style={{ padding: 'var(--spacing-lg)' }}>
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', margin: '0 0 var(--spacing-lg) 0', lineHeight: '1.5' }}>
+                {confirmModal.message}
+              </p>
+              <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-danger btn-sm"
+                  onClick={confirmModal.onConfirm}
+                >
+                  Aceptar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Alert Modal */}
+      {alertModal.isOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(44, 24, 16, 0.45)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--spacing-md)'
+        }}>
+          <div className="card animate-fade-in" style={{
+            width: '100%',
+            maxWidth: '400px',
+            backgroundColor: 'var(--color-bg-card)',
+            borderRadius: 'var(--radius-xl)',
+            boxShadow: 'var(--shadow-xl)',
+            overflow: 'hidden'
+          }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--spacing-md) var(--spacing-lg)' }}>
+              <h3 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--color-primary-dark)' }}>{alertModal.title || 'Aviso'}</h3>
+              <button 
+                type="button"
+                onClick={() => setAlertModal(prev => ({ ...prev, isOpen: false }))}
+                style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: 'var(--color-text-muted)', cursor: 'pointer' }}
+              >×</button>
+            </div>
+            <div className="card-body" style={{ padding: 'var(--spacing-lg)' }}>
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', margin: '0 0 var(--spacing-lg) 0', lineHeight: '1.5' }}>
+                {alertModal.type === 'error' && '❌ '}
+                {alertModal.type === 'success' && '✅ '}
+                {alertModal.message}
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setAlertModal(prev => ({ ...prev, isOpen: false }))}
+                >
+                  Aceptar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
