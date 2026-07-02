@@ -1437,7 +1437,7 @@ export default function VisitasPage() {
       
       {/* Navigation tabs */}
       <div className="tabs-header no-print" style={{ display: 'flex', borderBottom: '2px solid #E8DDD4', marginBottom: '20px', gap: '20px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        {isUserJefe(userRole) && (
+        {(isUserJefe(userRole) || userRole === 1 || userRole === 2) && (
           <button 
             className={`tab-btn ${activeTab === 'awaiting_approval' ? 'active' : ''}`}
             onClick={() => { setActiveTab('awaiting_approval'); setActiveExecutionVisit(null); }}
@@ -2359,7 +2359,7 @@ export default function VisitasPage() {
                   </div>
                 </div>
 
-                <div className="table-responsive">
+                <div className="table-responsive desktop-only-table">
                   <table className="visitas-table">
                     <thead>
                       <tr>
@@ -2416,6 +2416,68 @@ export default function VisitasPage() {
                       )}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Mobile cards for history list */}
+                <div className="visitas-cards-grid" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {filteredVisitas.length > 0 ? filteredVisitas.map((v) => {
+                    const stateMap = {
+                      pendiente:   { label: '⏳ PENDIENTE',   bg: '#FEF3C7', color: '#92400E' },
+                      en_progreso: { label: '⚙️ EN PROGRESO', bg: '#DBEAFE', color: '#1E40AF' },
+                      finalizada:  { label: '📋 POR APROBAR', bg: '#F3E8FF', color: '#6B21A8' },
+                      devuelta:    { label: '❌ DEVUELTA',     bg: '#FEE2E2', color: '#991B1B' },
+                      completada:  { label: '✔ COMPLETADA',  bg: '#DCFCE7', color: '#15803D' },
+                      cerrada:     { label: '🔒 CERRADA',     bg: '#F1F5F9', color: '#475569' },
+                    };
+                    const st = stateMap[v.estado] || stateMap.pendiente;
+                    return (
+                      <div key={v.id} className="visita-pending-card" style={{ backgroundColor: '#fff', border: '1.5px solid #e8ddd4', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(44,24,16,0.05)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {/* Top: PDV + Badge */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ fontWeight: '800', color: 'var(--color-primary-dark)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>📍</span> {v.pdv_nombre} ({v.ciudad_nombre})
+                          </div>
+                          <span style={{ backgroundColor: st.bg, color: st.color, fontWeight: 'bold', fontSize: '0.72rem', padding: '4px 10px', borderRadius: '20px', whiteSpace: 'nowrap' }}>
+                            {st.label}
+                          </span>
+                        </div>
+
+                        {/* Content */}
+                        <div className="pending-card-content-row" style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1', minWidth: '140px' }}>
+                            <div style={{ fontSize: '0.82rem', color: '#555', display: 'flex', gap: '6px', alignItems: 'center' }}><span>📋</span> {v.area_nombre}</div>
+                            <div style={{ fontSize: '0.82rem', color: '#555', display: 'flex', gap: '6px', alignItems: 'center' }}><span>📋</span> {v.tipo_visita_nombre || 'Soporte General'}</div>
+                            <div style={{ fontSize: '0.78rem', color: '#888', fontStyle: 'italic', display: 'flex', gap: '6px', alignItems: 'center' }}><span>📅</span> {v.fecha}</div>
+                          </div>
+                          {v.responsable_nombre && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: '#FAF6F0', color: '#6B3A2A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.8rem', border: '1px solid #e8ddd4', flexShrink: 0 }}>
+                                {v.responsable_nombre.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '0.7rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Técnico</span>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#4A2518' }}>{v.responsable_nombre}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="pending-card-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #f2ece6', paddingTop: '10px' }}>
+                          <button
+                            onClick={() => handleOpenVisitDetails(v)}
+                            style={{ backgroundColor: '#6B3A2A', color: '#fff', fontWeight: 'bold', fontSize: '0.82rem', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', border: 'none' }}
+                          >
+                            Ver Detalles 👁️
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }) : (
+                    <div className="card text-center text-muted" style={{ border: 'none', padding: '20px' }}>
+                      <p>No se encontraron visitas que coincidan con la búsqueda.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
