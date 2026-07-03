@@ -48,3 +48,6 @@ next-env.d.ts
 # user uploads folder
 /public/uploads/*
 !/public/uploads/.gitkeep
+
+# executables
+cloudflared.exe

@@ -1,7 +1,248 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+
+function SearchableCategorySelect({ categories, selectedId, onChange, areaId }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeParentId, setActiveParentId] = useState(null);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  // Reset drill-down level when area changes
+  useEffect(() => {
+    setActiveParentId(null);
+  }, [areaId]);
+
+  // Filter categories by area inspectora
+  const filtered = categories.filter(c => c.area_id === parseInt(areaId));
+
+  // Helper to build full hierarchical path
+  const getCategoryFullPath = (catId) => {
+    const path = [];
+    let current = filtered.find(c => c.id === catId);
+    while (current) {
+      path.unshift(current.nombre);
+      current = filtered.find(c => c.id === current.padre_id);
+    }
+    return path.join(' › ');
+  };
+
+  // Find currently selected option
+  const selectedCat = filtered.find(c => String(c.id) === String(selectedId));
+  const selectedFullPath = selectedCat ? getCategoryFullPath(selectedCat.id) : '';
+
+  // Breadcrumbs for drill-down navigation
+  const crumbs = [];
+  let curr = filtered.find(c => c.id === activeParentId);
+  while (curr) {
+    crumbs.unshift(curr);
+    curr = filtered.find(c => c.id === curr.padre_id);
+  }
+
+  // Determine which options to show
+  let visibleOptions = [];
+  if (searchTerm) {
+    // Search mode: Flat list of matching categories
+    visibleOptions = filtered
+      .filter(c => c.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
+      .map(c => ({
+        ...c,
+        fullPath: getCategoryFullPath(c.id),
+        hasChildren: filtered.some(child => child.padre_id === c.id)
+      }));
+  } else {
+    // Drill-down mode: direct children of activeParentId
+    visibleOptions = filtered
+      .filter(c => activeParentId ? c.padre_id === activeParentId : !c.padre_id)
+      .map(c => ({
+        ...c,
+        fullPath: c.nombre,
+        hasChildren: filtered.some(child => child.padre_id === c.id)
+      }));
+  }
+
+  return (
+    <div className="searchable-select-container" ref={containerRef} style={{ position: 'relative' }}>
+      <div 
+        className="searchable-select-trigger" 
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!isOpen) {
+            // When opening, show either parent of selected or root
+            if (selectedCat && selectedCat.padre_id) {
+              setActiveParentId(selectedCat.padre_id);
+            } else {
+              setActiveParentId(null);
+            }
+          }
+        }}
+        style={{
+          padding: '10px 14px',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: '#fff',
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: '0.85rem',
+          minHeight: '38px',
+          boxSizing: 'border-box'
+        }}
+      >
+        <span style={{ color: selectedCat ? '#333' : '#777' }}>
+          {selectedCat ? selectedFullPath : '-- Seleccionar Categoría --'}
+        </span>
+        <span style={{ fontSize: '0.75rem', color: '#999' }}>{isOpen ? '▲' : '▼'}</span>
+      </div>
+
+      {isOpen && (
+        <div 
+          className="searchable-select-dropdown"
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            backgroundColor: '#fff',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-md)',
+            marginTop: '4px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+            maxHeight: '300px',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}
+        >
+          <input
+            type="text"
+            className="searchable-select-input"
+            placeholder="Escribe para buscar..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            autoFocus
+            onClick={e => e.stopPropagation()}
+            style={{
+              padding: '10px 12px',
+              border: 'none',
+              borderBottom: '1px solid var(--color-border-light)',
+              outline: 'none',
+              fontSize: '0.85rem',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}
+          />
+
+          {/* Breadcrumbs for easy drill-down navigation */}
+          {!searchTerm && (
+            <div 
+              className="maint-breadcrumbs"
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#fafafa',
+                borderBottom: '1px solid #eee',
+                fontSize: '0.72rem',
+                color: '#666',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                flexWrap: 'wrap',
+                textAlign: 'left'
+              }}
+            >
+              <span 
+                style={{ cursor: 'pointer', color: 'var(--color-primary)', fontWeight: !activeParentId ? 'bold' : 'normal' }}
+                onClick={() => setActiveParentId(null)}
+              >
+                Categorías
+              </span>
+              {crumbs.map((c, idx) => (
+                <span key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span>›</span>
+                  <span 
+                    style={{ 
+                      cursor: 'pointer', 
+                      color: idx === crumbs.length - 1 ? '#333' : 'var(--color-primary)',
+                      fontWeight: idx === crumbs.length - 1 ? 'bold' : 'normal'
+                    }}
+                    onClick={() => setActiveParentId(c.id)}
+                  >
+                    {c.nombre}
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="searchable-select-options" style={{ overflowY: 'auto', flex: 1, maxHeight: '200px' }}>
+            {visibleOptions.length === 0 ? (
+              <div style={{ padding: '12px', fontSize: '0.8rem', color: '#999', textAlign: 'center' }}>
+                No se encontraron categorías
+              </div>
+            ) : (
+              visibleOptions.map(cat => (
+                <div
+                  key={cat.id}
+                  onClick={() => {
+                    if (searchTerm) {
+                      // Select directly in search mode
+                      onChange(String(cat.id));
+                      setIsOpen(false);
+                      setSearchTerm('');
+                    } else if (cat.hasChildren) {
+                      // Drill down if it has children
+                      setActiveParentId(cat.id);
+                    } else {
+                      // Select leaf node
+                      onChange(String(cat.id));
+                      setIsOpen(false);
+                    }
+                  }}
+                  style={{
+                    padding: '10px 12px',
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    backgroundColor: String(selectedId) === String(cat.id) ? '#fdf8f3' : 'transparent',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    borderBottom: '1px solid #f0f0f0',
+                    textAlign: 'left'
+                  }}
+                  className="searchable-option"
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#fdf8f3'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = String(selectedId) === String(cat.id) ? '#fdf8f3' : 'transparent'}
+                >
+                  <span style={{ fontWeight: String(selectedId) === String(cat.id) ? 'bold' : 'normal', color: '#333' }}>
+                    {cat.fullPath}
+                  </span>
+                  {!searchTerm && cat.hasChildren && (
+                    <span style={{ fontSize: '0.72rem', color: '#999', backgroundColor: '#f0f0f0', padding: '2px 6px', borderRadius: '10px' }}>
+                      ver subcategorías »
+                    </span>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function CalendarioPage() {
   const router = useRouter();
@@ -32,6 +273,8 @@ export default function CalendarioPage() {
   const [formHoraFin, setFormHoraFin] = useState('09:00');
   const [formTipo, setFormTipo] = useState('visita');
   const [formSyncOutlook, setFormSyncOutlook] = useState(true);
+  const [categorias, setCategorias] = useState([]);
+  const [formCategoriaId, setFormCategoriaId] = useState('');
 
   // Custom checklist items states
   const [customizeChecklist, setCustomizeChecklist] = useState(false);
@@ -44,6 +287,11 @@ export default function CalendarioPage() {
   
   // User info
   const [userRole, setUserRole] = useState(null);
+
+  // Conflict override modal states (for area chiefs)
+  const [conflictModal, setConflictModal] = useState(null); // { titulo, usuario_nombre, hora_inicio, hora_fin }
+  const [overrideJustificacion, setOverrideJustificacion] = useState('');
+  const [overridePending, setOverridePending] = useState(null); // Saved payload for retry
 
   const getAreaIdFromRol = (rolId) => {
     const rol = parseInt(rolId);
@@ -85,6 +333,7 @@ export default function CalendarioPage() {
         setAreas(dataVisitas.areas || []);
         setTiposVisita(dataVisitas.tiposVisita || []);
         setPlantillas(dataVisitas.plantillas || []);
+        setCategorias(dataVisitas.categorias || []);
       }
     } catch (err) {
       setError(err.message);
@@ -216,8 +465,10 @@ export default function CalendarioPage() {
     setSubmitError('');
   };
 
-  const handleScheduleVisit = async (e) => {
-    e.preventDefault();
+  const OVERRIDE_ROLES = [1, 2, 3, 4, 5, 6, 7, 9]; // Admin + all chiefs
+
+  const handleScheduleVisit = async (e, overrideJustif = null) => {
+    if (e && e.preventDefault) e.preventDefault();
     setSubmitError('');
     setSubmitSuccess('');
     setSubmitLoading(true);
@@ -243,34 +494,61 @@ export default function CalendarioPage() {
       );
     }
 
+    // Validation: Category is mandatory for systems/maintenance roles when area is Sistemas/Mantenimiento
+    const isSistemasOrMantenimiento = parseInt(formAreaId) === 3 || parseInt(formAreaId) === 7;
+    if (isSistemasOrMantenimiento && [1, 4, 9, 12, 16].includes(userRole)) {
+      if (!formCategoriaId) {
+        setSubmitError('Debe clasificar la visita en una categoría.');
+        setSubmitLoading(false);
+        return;
+      }
+    }
+
+    const payload = {
+      pdv_id: parseInt(formPdvId),
+      area_id: parseInt(formAreaId),
+      titulo: formTitle,
+      descripcion: formDesc,
+      fecha: selectedDateStr,
+      hora_inicio: formHoraInicio,
+      hora_fin: formHoraFin,
+      tipo_evento: formTipo,
+      tipo_visita_id: formTipoVisitaId ? parseInt(formTipoVisitaId) : null,
+      plantilla_id: selectedPlantillaId,
+      campos_personalizados: camposPersonalizados,
+      categoria_id: formCategoriaId ? parseInt(formCategoriaId) : null,
+      ...(overrideJustif ? { override_justificacion: overrideJustif } : {})
+    };
+
     try {
       const res = await fetch('/api/calendario', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pdv_id: parseInt(formPdvId),
-          area_id: parseInt(formAreaId),
-          titulo: formTitle,
-          descripcion: formDesc,
-          fecha: selectedDateStr,
-          hora_inicio: formHoraInicio,
-          hora_fin: formHoraFin,
-          tipo_evento: formTipo,
-          tipo_visita_id: formTipoVisitaId ? parseInt(formTipoVisitaId) : null,
-          plantilla_id: selectedPlantillaId,
-          campos_personalizados: camposPersonalizados
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
+
+      if (res.status === 409 && data.conflicto && OVERRIDE_ROLES.includes(userRole)) {
+        // Chief detected a conflict - show override modal
+        setConflictModal(data.evento_conflicto);
+        setOverridePending(payload);
+        setOverrideJustificacion('');
+        setSubmitLoading(false);
+        return;
+      }
+
       if (!res.ok) throw new Error(data.error || 'Error al programar visita');
 
       setSubmitSuccess(data.message || 'Visita programada exitosamente');
       setFormTitle('');
       setFormDesc('');
+      setFormCategoriaId('');
       setCustomizeChecklist(false);
       setCustomChecklistTasks([]);
       setShowForm(false);
+      setConflictModal(null);
+      setOverridePending(null);
 
       // Reload calendar events
       const resEventos = await fetch('/api/calendario');
@@ -284,6 +562,16 @@ export default function CalendarioPage() {
       setSubmitLoading(false);
     }
   };
+
+  const handleConfirmOverride = async () => {
+    if (!overrideJustificacion.trim()) {
+      alert('Debes ingresar una justificación para autorizar esta excepción.');
+      return;
+    }
+    setConflictModal(null);
+    await handleScheduleVisit(null, overrideJustificacion.trim());
+  };
+
 
   const handleCompleteAudit = (event) => {
     // Redirect to checklists module prefilled
@@ -355,6 +643,49 @@ export default function CalendarioPage() {
   return (
     <div className="calendario-page-container">
       {error && <div className="card error-card"><div className="card-body">❌ {error}</div></div>}
+
+      {/* ===== Conflict Override Modal for Area Chiefs ===== */}
+      {conflictModal && (
+        <div className="cal-modal-overlay" onClick={() => setConflictModal(null)}>
+          <div className="cal-modal conflict-modal" onClick={e => e.stopPropagation()}>
+            <div className="conflict-modal-icon">⚠️</div>
+            <h3 className="conflict-modal-title">Conflicto de Horario Detectado</h3>
+            <p className="conflict-modal-desc">
+              Ya existe la visita <strong>"{conflictModal?.titulo}"</strong> programada por{' '}
+              <strong>{conflictModal?.usuario_nombre}</strong> de{' '}
+              <strong>{conflictModal?.hora_inicio}</strong> a{' '}
+              <strong>{conflictModal?.hora_fin}</strong> en este PDV y fecha.
+            </p>
+            <p className="conflict-modal-auth">
+              Como Jefe de Área, puedes autorizar esta excepción ingresando una justificación:
+            </p>
+            <textarea
+              className="conflict-justif-input"
+              placeholder="Ej: Visita urgente solicitada por gerencia. Se coordinó con el área de Mantenimiento."
+              value={overrideJustificacion}
+              onChange={e => setOverrideJustificacion(e.target.value)}
+              rows={3}
+              id="input-override-justificacion"
+            />
+            <div className="conflict-modal-actions">
+              <button
+                className="btn-conflict-cancel"
+                onClick={() => { setConflictModal(null); setOverridePending(null); }}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn-conflict-confirm"
+                onClick={handleConfirmOverride}
+                disabled={!overrideJustificacion.trim()}
+                id="btn-confirmar-excepcion"
+              >
+                ✅ Autorizar Excepción
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="calendar-layout-grid">
         
@@ -564,6 +895,18 @@ export default function CalendarioPage() {
                               <option key={t.id} value={t.id}>{t.nombre}</option>
                             ))}
                         </select>
+                      </div>
+                    )}
+
+                    {formAreaId && (parseInt(formAreaId) === 3 || parseInt(formAreaId) === 7) && [1, 4, 9, 12, 16].includes(userRole) && (
+                      <div className="form-group animate-fade-in">
+                        <label className="form-label" htmlFor="form-categoria">Categoría del Soporte</label>
+                        <SearchableCategorySelect
+                          categories={categorias}
+                          selectedId={formCategoriaId}
+                          onChange={(val) => setFormCategoriaId(val)}
+                          areaId={formAreaId}
+                        />
                       </div>
                     )}
 
@@ -1075,6 +1418,125 @@ export default function CalendarioPage() {
           .day-number {
             font-size: 0.7rem;
           }
+        }
+
+        /* ===== Conflict Override Modal ===== */
+        .cal-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.55);
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+        }
+
+        .conflict-modal {
+          background: #fff;
+          border-radius: 16px;
+          padding: 32px;
+          max-width: 500px;
+          width: 100%;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+          animation: slideUp 0.25s ease;
+        }
+
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        .conflict-modal-icon {
+          font-size: 2.5rem;
+          text-align: center;
+          margin-bottom: 12px;
+        }
+
+        .conflict-modal-title {
+          font-size: 1.2rem;
+          font-weight: 800;
+          color: #92400e;
+          text-align: center;
+          margin: 0 0 12px;
+        }
+
+        .conflict-modal-desc {
+          font-size: 0.88rem;
+          color: var(--color-text-secondary);
+          background: #fef3c7;
+          border-radius: 8px;
+          padding: 12px 14px;
+          margin-bottom: 12px;
+          line-height: 1.5;
+        }
+
+        .conflict-modal-auth {
+          font-size: 0.85rem;
+          color: var(--color-text-muted);
+          margin-bottom: 10px;
+        }
+
+        .conflict-justif-input {
+          width: 100%;
+          border: 2px solid var(--color-border);
+          border-radius: 8px;
+          padding: 10px 12px;
+          font-size: 0.85rem;
+          color: var(--color-text-primary);
+          resize: vertical;
+          margin-bottom: 16px;
+          box-sizing: border-box;
+        }
+
+        .conflict-justif-input:focus {
+          outline: none;
+          border-color: var(--color-primary);
+        }
+
+        .conflict-modal-actions {
+          display: flex;
+          gap: 12px;
+          justify-content: flex-end;
+        }
+
+        .btn-conflict-cancel {
+          background: transparent;
+          border: 1px solid var(--color-border);
+          border-radius: 8px;
+          padding: 10px 20px;
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: var(--color-text-muted);
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-conflict-cancel:hover {
+          border-color: var(--color-primary);
+          color: var(--color-primary);
+        }
+
+        .btn-conflict-confirm {
+          background: linear-gradient(135deg, #f59e0b, #d97706);
+          border: none;
+          border-radius: 8px;
+          padding: 10px 20px;
+          font-size: 0.85rem;
+          font-weight: 700;
+          color: #fff;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-conflict-confirm:hover:not(:disabled) {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(245,158,11,0.4);
+        }
+
+        .btn-conflict-confirm:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
         }
       `}</style>
     </div>

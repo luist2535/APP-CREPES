@@ -13,6 +13,9 @@ const getAreaIdFromRol = (rolId) => {
   return null;
 };
 
+// Roles that can override schedule conflicts (Admin + all area chiefs)
+const OVERRIDE_ROLES = [1, 2, 3, 4, 5, 6, 7, 9]; // Admin + Coordinador + Jefes de área + Jefe Sistemas
+
 export async function GET(request) {
   try {
     const { getUserFromRequest } = require('@/lib/auth');
@@ -72,11 +75,24 @@ export async function POST(request) {
   try {
     const { getUserFromRequest } = require('@/lib/auth');
     const { getDb } = require('@/lib/db');
+    const { sendNotificationEmail } = require('@/lib/email');
     
     const user = getUserFromRequest(request);
     if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     
-    const { pdv_id, titulo, descripcion, fecha, hora_inicio, hora_fin, tipo_evento, area_id, tipo_visita_id, plantilla_id, solicitud_id, campos_personalizados } = await request.json();
+    const rolInt = parseInt(user.rol_id);
+    if (rolInt === 17 || rolInt === 8) {
+      return NextResponse.json({ error: 'No autorizado para programar visitas' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { 
+      pdv_id, titulo, descripcion, fecha, hora_inicio, hora_fin, 
+      tipo_evento, area_id, tipo_visita_id, plantilla_id, 
+      solicitud_id, campos_personalizados,
+      override_justificacion, // provided when a chief confirms a conflict override
+      categoria_id
+    } = body;
     
     if (!pdv_id || !titulo || !fecha || !hora_inicio || !hora_fin || !area_id) {
       return NextResponse.json(
@@ -101,24 +117,40 @@ export async function POST(request) {
     }
     
     const db = getDb();
+    const canOverride = OVERRIDE_ROLES.includes(rolInt);
 
-    // Check for conflicts: events on the same PDV, same date, overlapping time range (unless user is Administrator)
-    const isAdmin = parseInt(user.rol_id) === 1;
-    if (!isAdmin) {
-      const conflict = db.prepare(`
-        SELECT e.*, u.nombre as usuario_nombre
-        FROM eventos_calendario e
-        JOIN users u ON e.user_id = u.id
-        WHERE e.pdv_id = ? 
-          AND e.fecha = ? 
-          AND e.estado = 'programado'
-          AND e.hora_inicio < ? 
-          AND e.hora_fin > ?
-      `).get(pdv_id, fecha, hora_fin, hora_inicio);
+    // Check for schedule conflicts
+    const conflict = db.prepare(`
+      SELECT e.*, u.nombre as usuario_nombre
+      FROM eventos_calendario e
+      JOIN users u ON e.user_id = u.id
+      WHERE e.pdv_id = ? 
+        AND e.fecha = ? 
+        AND e.estado = 'programado'
+        AND e.hora_inicio < ? 
+        AND e.hora_fin > ?
+    `).get(pdv_id, fecha, hora_fin, hora_inicio);
 
-      if (conflict) {
+    if (conflict) {
+      // If the user can override conflicts (chief / admin) and provided a justification, allow it
+      if (canOverride && override_justificacion) {
+        // Allow with justification - will be saved below
+      } else if (canOverride && !override_justificacion) {
+        // Chief detected conflict but hasn't confirmed yet - send conflict info back to frontend
         return NextResponse.json({
-          error: `Conflicto de horario: El PDV ya tiene programado el evento "${conflict.titulo}" por ${conflict.usuario_nombre} de ${conflict.hora_inicio} a ${conflict.hora_fin}. Solo la Administración puede autorizar visitas simultáneas en este horario.`
+          conflicto: true,
+          evento_conflicto: {
+            titulo: conflict.titulo,
+            usuario_nombre: conflict.usuario_nombre,
+            hora_inicio: conflict.hora_inicio,
+            hora_fin: conflict.hora_fin
+          },
+          message: `Conflicto de horario detectado: El PDV ya tiene programado "${conflict.titulo}" de ${conflict.hora_inicio} a ${conflict.hora_fin}. Como Jefe de Área, puedes autorizar esta excepción proporcionando una justificación.`
+        }, { status: 409 });
+      } else {
+        // Regular user - block completely
+        return NextResponse.json({
+          error: `Conflicto de horario: El PDV ya tiene programado el evento "${conflict.titulo}" por ${conflict.usuario_nombre} de ${conflict.hora_inicio} a ${conflict.hora_fin}. Solo un Jefe de Área o el Administrador puede autorizar visitas en este horario.`
         }, { status: 409 });
       }
     }
@@ -141,24 +173,29 @@ export async function POST(request) {
 
     const auxRolId = getAuxiliarRolIdForArea(area_id);
     let responsableId = null;
+    let responsableUser = null;
     if (auxRolId) {
-      const auxUser = db.prepare('SELECT id FROM users WHERE rol_id = ? AND activo = 1 LIMIT 1').get(auxRolId);
-      if (auxUser) {
-        responsableId = auxUser.id;
+      responsableUser = db.prepare('SELECT id, nombre, email FROM users WHERE rol_id = ? AND activo = 1 LIMIT 1').get(auxRolId);
+      if (responsableUser) {
+        responsableId = responsableUser.id;
       }
     }
 
+    // Get PDV and area info for email
+    const pdvInfo = db.prepare('SELECT p.nombre as pdv_nombre, c.nombre as ciudad_nombre FROM pdv p JOIN ciudades c ON p.ciudad_id = c.id WHERE p.id = ?').get(pdv_id);
+    const areaInfo = db.prepare('SELECT nombre FROM areas WHERE id = ?').get(parseInt(area_id));
+
     const info = db.prepare(`
-      INSERT INTO eventos_calendario (pdv_id, user_id, area_id, titulo, descripcion, fecha, hora_inicio, hora_fin, tipo_evento, outlook_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(pdv_id, user.id, parseInt(area_id), titulo, descripcion || '', fecha, hora_inicio, hora_fin, tipo_evento || 'visita', outlook_id);
+      INSERT INTO eventos_calendario (pdv_id, user_id, area_id, titulo, descripcion, fecha, hora_inicio, hora_fin, tipo_evento, outlook_id, override_justificacion)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(pdv_id, user.id, parseInt(area_id), titulo, descripcion || '', fecha, hora_inicio, hora_fin, tipo_evento || 'visita', outlook_id, override_justificacion || null);
 
     const createdEventId = info.lastInsertRowid;
 
     // Automatically create a row in the visitas table in 'pendiente' state
     db.prepare(`
-      INSERT INTO visitas (pdv_id, user_id, area_id, tipo_visita_id, plantilla_id, fecha, hora_inicio, hora_fin, responsable_id, estado, observaciones, evento_id, campos_personalizados)
-      VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, 'pendiente', ?, ?, ?)
+      INSERT INTO visitas (pdv_id, user_id, area_id, tipo_visita_id, plantilla_id, fecha, hora_inicio, hora_fin, responsable_id, estado, observaciones, evento_id, campos_personalizados, categoria_id)
+      VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, 'pendiente', ?, ?, ?, ?)
     `).run(
       parseInt(pdv_id),
       user.id,
@@ -169,7 +206,8 @@ export async function POST(request) {
       responsableId,
       descripcion || '',
       createdEventId,
-      campos_personalizados || null
+      campos_personalizados || null,
+      categoria_id ? parseInt(categoria_id) : null
     );
 
     // If this calendar event was scheduled from a PDV ticket request, mark the request as programmed
@@ -191,6 +229,77 @@ export async function POST(request) {
       LEFT JOIN areas a ON e.area_id = a.id
       WHERE e.id = ?
     `).get(createdEventId);
+
+    // ==========================================
+    // F1: Send email notification asynchronously
+    // ==========================================
+    const emailTargets = [];
+
+    // Notify the assigned auxiliary (responsable)
+    if (responsableUser && responsableUser.email) {
+      emailTargets.push({
+        to: responsableUser.email,
+        subject: `📋 Nueva visita programada — ${pdvInfo?.pdv_nombre || 'PDV'} el ${fecha}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fdf8f3; border-radius: 12px; overflow: hidden;">
+            <div style="background: linear-gradient(135deg, #6B3A2A, #8B6914); padding: 24px; text-align: center;">
+              <h1 style="color: #fff; margin: 0; font-size: 22px;">🍫 Crepes en Punto</h1>
+              <p style="color: #fde68a; margin: 4px 0 0; font-size: 14px;">Sistema de Gestión Operativa</p>
+            </div>
+            <div style="padding: 28px;">
+              <h2 style="color: #6B3A2A; margin-top: 0;">Nueva visita programada para ti</h2>
+              <p style="color: #555;">Hola <strong>${responsableUser.nombre}</strong>, se ha programado una visita que requiere tu atención:</p>
+              <table style="width: 100%; border-collapse: collapse; margin: 16px 0; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+                <tr style="background: #f9f3ed;"><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A; width: 40%;">📍 PDV</td><td style="padding: 10px 14px; color: #333;">${pdvInfo?.pdv_nombre || 'N/A'} — ${pdvInfo?.ciudad_nombre || ''}</td></tr>
+                <tr><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A;">🗂️ Área</td><td style="padding: 10px 14px; color: #333;">${areaInfo?.nombre || 'N/A'}</td></tr>
+                <tr style="background: #f9f3ed;"><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A;">📅 Fecha</td><td style="padding: 10px 14px; color: #333;">${fecha}</td></tr>
+                <tr><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A;">⏰ Horario</td><td style="padding: 10px 14px; color: #333;">${hora_inicio} – ${hora_fin}</td></tr>
+                <tr style="background: #f9f3ed;"><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A;">📝 Título</td><td style="padding: 10px 14px; color: #333;">${titulo}</td></tr>
+                ${descripcion ? `<tr><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A;">💬 Descripción</td><td style="padding: 10px 14px; color: #333;">${descripcion}</td></tr>` : ''}
+                ${override_justificacion ? `<tr style="background: #fef9c3;"><td style="padding: 10px 14px; font-weight: bold; color: #854d0e;">⚠️ Nota</td><td style="padding: 10px 14px; color: #854d0e;">Visita programada con excepción de horario: ${override_justificacion}</td></tr>` : ''}
+              </table>
+              <p style="color: #555;">Programada por: <strong>${user.nombre}</strong></p>
+              <p style="font-size: 12px; color: #999; margin-top: 24px;">Este es un mensaje automático del sistema Crepes en Punto. Por favor no responder.</p>
+            </div>
+          </div>
+        `
+      });
+    }
+
+    // Also notify PDV users linked to this PDV
+    const pdvUsers = db.prepare('SELECT email, nombre FROM users WHERE pdv_id = ? AND rol_id = 17 AND activo = 1').all(parseInt(pdv_id));
+    for (const pdvUser of pdvUsers) {
+      if (pdvUser.email) {
+        emailTargets.push({
+          to: pdvUser.email,
+          subject: `📋 Visita programada en tu punto de venta — ${fecha}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fdf8f3; border-radius: 12px; overflow: hidden;">
+              <div style="background: linear-gradient(135deg, #6B3A2A, #8B6914); padding: 24px; text-align: center;">
+                <h1 style="color: #fff; margin: 0; font-size: 22px;">🍫 Crepes en Punto</h1>
+                <p style="color: #fde68a; margin: 4px 0 0; font-size: 14px;">Sistema de Gestión Operativa</p>
+              </div>
+              <div style="padding: 28px;">
+                <h2 style="color: #6B3A2A; margin-top: 0;">Visita programada en tu punto de venta</h2>
+                <p style="color: #555;">Hola <strong>${pdvUser.nombre}</strong>, se ha programado la siguiente visita en tu PDV:</p>
+                <table style="width: 100%; border-collapse: collapse; margin: 16px 0; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+                  <tr style="background: #f9f3ed;"><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A; width: 40%;">🗂️ Área</td><td style="padding: 10px 14px; color: #333;">${areaInfo?.nombre || 'N/A'}</td></tr>
+                  <tr><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A;">📅 Fecha</td><td style="padding: 10px 14px; color: #333;">${fecha}</td></tr>
+                  <tr style="background: #f9f3ed;"><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A;">⏰ Horario</td><td style="padding: 10px 14px; color: #333;">${hora_inicio} – ${hora_fin}</td></tr>
+                  <tr><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A;">📝 Descripción</td><td style="padding: 10px 14px; color: #333;">${titulo}${descripcion ? ': ' + descripcion : ''}</td></tr>
+                </table>
+                <p style="font-size: 12px; color: #999; margin-top: 24px;">Este es un mensaje automático del sistema Crepes en Punto. Por favor no responder.</p>
+              </div>
+            </div>
+          `
+        });
+      }
+    }
+
+    // Fire & forget: send all emails without blocking the response
+    Promise.all(emailTargets.map(e => sendNotificationEmail(e))).catch(err => {
+      console.error('Error sending visit notification emails:', err);
+    });
 
     return NextResponse.json({ 
       evento: createdEvent, 

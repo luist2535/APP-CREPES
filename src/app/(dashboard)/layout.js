@@ -107,6 +107,8 @@ export default function DashboardLayout({ children }) {
         return [2, 4, 9, 12, 16].includes(rol); // Coordinator, Maintenance, and Systems roles can scan
       case '/solicitudes':
         return [1, 2, 4, 9, 12, 16, 17].includes(rol); // Admin, Coordinator, Mantenimiento, Sistemas, and PDVs
+      case '/reportes':
+        return [1, 2, 3, 4, 5, 6, 7, 8, 9].includes(rol); // Only Admin, Coordinator, Visualizador, and Area Chiefs can view reports
       case '/admin':
         return rol === 1; // Admin only
       default:
@@ -288,9 +290,9 @@ export default function DashboardLayout({ children }) {
       title: 'REPORTES',
       items: [
         {
-          name: 'Reportes',
-          path: '/territorial',
-          accessPath: '/territorial',
+          name: 'Reportes por Área',
+          path: '/reportes',
+          accessPath: '/reportes',
           icon: (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="20" x2="18" y2="10" />

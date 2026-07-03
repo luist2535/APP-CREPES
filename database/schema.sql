@@ -148,13 +148,15 @@ CREATE TABLE IF NOT EXISTS visitas (
   hallazgos TEXT,
   acciones_correctivas TEXT,
   evento_id INTEGER,
+  equipo_id TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (pdv_id) REFERENCES pdv(id),
   FOREIGN KEY (user_id) REFERENCES users(id),
   FOREIGN KEY (area_id) REFERENCES areas(id),
   FOREIGN KEY (tipo_visita_id) REFERENCES tipos_visita(id),
   FOREIGN KEY (plantilla_id) REFERENCES plantillas(id),
-  FOREIGN KEY (responsable_id) REFERENCES users(id)
+  FOREIGN KEY (responsable_id) REFERENCES users(id),
+  FOREIGN KEY (equipo_id) REFERENCES equipos(id)
 );
 
 -- Evidencias de Visitas

@@ -559,6 +559,247 @@ const SimpleChecklistForm = ({ template, answers, onChange }) => {
   );
 };
 
+function SearchableCategorySelect({ categories, selectedId, onChange, areaId }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeParentId, setActiveParentId] = useState(null);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  // Reset drill-down level when area changes
+  useEffect(() => {
+    setActiveParentId(null);
+  }, [areaId]);
+
+  // Filter categories by area inspectora
+  const filtered = categories.filter(c => c.area_id === parseInt(areaId));
+
+  // Helper to build full hierarchical path
+  const getCategoryFullPath = (catId) => {
+    const path = [];
+    let current = filtered.find(c => c.id === catId);
+    while (current) {
+      path.unshift(current.nombre);
+      current = filtered.find(c => c.id === current.padre_id);
+    }
+    return path.join(' › ');
+  };
+
+  // Find currently selected option
+  const selectedCat = filtered.find(c => String(c.id) === String(selectedId));
+  const selectedFullPath = selectedCat ? getCategoryFullPath(selectedCat.id) : '';
+
+  // Breadcrumbs for drill-down navigation
+  const crumbs = [];
+  let curr = filtered.find(c => c.id === activeParentId);
+  while (curr) {
+    crumbs.unshift(curr);
+    curr = filtered.find(c => c.id === curr.padre_id);
+  }
+
+  // Determine which options to show
+  let visibleOptions = [];
+  if (searchTerm) {
+    // Search mode: Flat list of matching categories
+    visibleOptions = filtered
+      .filter(c => c.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
+      .map(c => ({
+        ...c,
+        fullPath: getCategoryFullPath(c.id),
+        hasChildren: filtered.some(child => child.padre_id === c.id)
+      }));
+  } else {
+    // Drill-down mode: direct children of activeParentId
+    visibleOptions = filtered
+      .filter(c => activeParentId ? c.padre_id === activeParentId : !c.padre_id)
+      .map(c => ({
+        ...c,
+        fullPath: c.nombre,
+        hasChildren: filtered.some(child => child.padre_id === c.id)
+      }));
+  }
+
+  return (
+    <div className="searchable-select-container" ref={containerRef} style={{ position: 'relative' }}>
+      <div 
+        className="searchable-select-trigger" 
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!isOpen) {
+            // When opening, show either parent of selected or root
+            if (selectedCat && selectedCat.padre_id) {
+              setActiveParentId(selectedCat.padre_id);
+            } else {
+              setActiveParentId(null);
+            }
+          }
+        }}
+        style={{
+          padding: '10px 14px',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: '#fff',
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: '0.85rem',
+          minHeight: '38px',
+          boxSizing: 'border-box'
+        }}
+      >
+        <span style={{ color: selectedCat ? '#333' : '#777' }}>
+          {selectedCat ? selectedFullPath : '-- Seleccionar Categoría --'}
+        </span>
+        <span style={{ fontSize: '0.75rem', color: '#999' }}>{isOpen ? '▲' : '▼'}</span>
+      </div>
+
+      {isOpen && (
+        <div 
+          className="searchable-select-dropdown"
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            backgroundColor: '#fff',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-md)',
+            marginTop: '4px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+            maxHeight: '300px',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}
+        >
+          <input
+            type="text"
+            className="searchable-select-input"
+            placeholder="Escribe para buscar..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            autoFocus
+            onClick={e => e.stopPropagation()}
+            style={{
+              padding: '10px 12px',
+              border: 'none',
+              borderBottom: '1px solid var(--color-border-light)',
+              outline: 'none',
+              fontSize: '0.85rem',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}
+          />
+
+          {/* Breadcrumbs for easy drill-down navigation */}
+          {!searchTerm && (
+            <div 
+              className="maint-breadcrumbs"
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#fafafa',
+                borderBottom: '1px solid #eee',
+                fontSize: '0.72rem',
+                color: '#666',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                flexWrap: 'wrap',
+                textAlign: 'left'
+              }}
+            >
+              <span 
+                style={{ cursor: 'pointer', color: 'var(--color-primary)', fontWeight: !activeParentId ? 'bold' : 'normal' }}
+                onClick={() => setActiveParentId(null)}
+              >
+                Categorías
+              </span>
+              {crumbs.map((c, idx) => (
+                <span key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span>›</span>
+                  <span 
+                    style={{ 
+                      cursor: 'pointer', 
+                      color: idx === crumbs.length - 1 ? '#333' : 'var(--color-primary)',
+                      fontWeight: idx === crumbs.length - 1 ? 'bold' : 'normal'
+                    }}
+                    onClick={() => setActiveParentId(c.id)}
+                  >
+                    {c.nombre}
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="searchable-select-options" style={{ overflowY: 'auto', flex: 1, maxHeight: '200px' }}>
+            {visibleOptions.length === 0 ? (
+              <div style={{ padding: '12px', fontSize: '0.8rem', color: '#999', textAlign: 'center' }}>
+                No se encontraron categorías
+              </div>
+            ) : (
+              visibleOptions.map(cat => (
+                <div
+                  key={cat.id}
+                  onClick={() => {
+                    if (searchTerm) {
+                      // Select directly in search mode
+                      onChange(String(cat.id));
+                      setIsOpen(false);
+                      setSearchTerm('');
+                    } else if (cat.hasChildren) {
+                      // Drill down if it has children
+                      setActiveParentId(cat.id);
+                    } else {
+                      // Select leaf node
+                      onChange(String(cat.id));
+                      setIsOpen(false);
+                    }
+                  }}
+                  style={{
+                    padding: '10px 12px',
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    backgroundColor: String(selectedId) === String(cat.id) ? '#fdf8f3' : 'transparent',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    borderBottom: '1px solid #f0f0f0',
+                    textAlign: 'left'
+                  }}
+                  className="searchable-option"
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#fdf8f3'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = String(selectedId) === String(cat.id) ? '#fdf8f3' : 'transparent'}
+                >
+                  <span style={{ fontWeight: String(selectedId) === String(cat.id) ? 'bold' : 'normal', color: '#333' }}>
+                    {cat.fullPath}
+                  </span>
+                  {!searchTerm && cat.hasChildren && (
+                    <span style={{ fontSize: '0.72rem', color: '#999', backgroundColor: '#f0f0f0', padding: '2px 6px', borderRadius: '10px' }}>
+                      ver subcategorías »
+                    </span>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function VisitasPage() {
   const [visitas, setVisitas] = useState([]);
   const [areas, setAreas] = useState([]);
@@ -566,6 +807,8 @@ export default function VisitasPage() {
   const [plantillas, setPlantillas] = useState([]);
   const [pdvs, setPdvs] = useState([]);
   const [users, setUsers] = useState([]);
+  const [categorias, setCategorias] = useState([]);
+  const [selectedCategoriaId, setSelectedCategoriaId] = useState('');
   const [searchTermVisita, setSearchTermVisita] = useState('');
   const [selectedAreaFilter, setSelectedAreaFilter] = useState('all');
   
@@ -661,6 +904,15 @@ export default function VisitasPage() {
   const [soporteUrl, setSoporteUrl] = useState('');
   const [soporteUploading, setSoporteUploading] = useState(false);
 
+  // Equipment selection and scanning states
+  const [equipoId, setEquipoId] = useState('');
+  const [equipoData, setEquipoData] = useState(null);
+  const [equipoSearchLoading, setEquipoSearchLoading] = useState(false);
+  const [equipoSearchError, setEquipoSearchError] = useState('');
+  const [isScanningEquipo, setIsScanningEquipo] = useState(false);
+  const [scannerInstance, setScannerInstance] = useState(null);
+  const [scannerLoaded, setScannerLoaded] = useState(false);
+
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState('');
@@ -692,7 +944,7 @@ export default function VisitasPage() {
   };
 
   const isUserJefe = (rolId) => {
-    return [3, 4, 5, 6, 7, 9, 17].includes(parseInt(rolId));
+    return [3, 4, 5, 6, 7, 9].includes(parseInt(rolId));
   };
 
   const loadData = async () => {
@@ -708,6 +960,7 @@ export default function VisitasPage() {
       setAreas(dataVisitas.areas);
       setTiposVisita(dataVisitas.tiposVisita);
       setPlantillas(dataVisitas.plantillas);
+      setCategorias(dataVisitas.categorias || []);
 
       // Load PDVs
       const resPdvs = await fetch('/api/pdv');
@@ -758,6 +1011,41 @@ export default function VisitasPage() {
       } catch (e) {}
     }
   }, []);
+
+  // Dynamically load the CDN html5-qrcode scanner library
+  useEffect(() => {
+    if (window.Html5QrcodeScanner) {
+      setScannerLoaded(true);
+      return;
+    }
+    
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/html5-qrcode';
+    script.async = true;
+    script.onload = () => {
+      setScannerLoaded(true);
+      console.log('📷 Html5Qrcode library loaded successfully on Visitas.');
+    };
+    script.onerror = () => {
+      console.error('Failed to load Html5Qrcode on Visitas.');
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      if (script.parentNode) {
+        document.body.removeChild(script);
+      }
+    };
+  }, []);
+
+  // Clean up scanner on unmount
+  useEffect(() => {
+    return () => {
+      if (scannerInstance) {
+        scannerInstance.clear().catch(e => console.error('Error clearing scanner:', e));
+      }
+    };
+  }, [scannerInstance]);
 
   // Pre-select first type of visit when area changes
   useEffect(() => {
@@ -984,6 +1272,105 @@ export default function VisitasPage() {
     }
   };
 
+  // Equipment integration helper functions
+  const loadEquipmentDetails = async (code) => {
+    if (!code || !code.trim()) return;
+    setEquipoSearchLoading(true);
+    setEquipoSearchError('');
+    try {
+      const res = await fetch(`/api/equipos?id=${code.trim().toUpperCase()}`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Equipo no registrado o inactivo');
+      }
+      setEquipoData(data.equipo);
+      setEquipoId(data.equipo.id);
+    } catch (err) {
+      setEquipoSearchError(err.message);
+      setEquipoData(null);
+    } finally {
+      setEquipoSearchLoading(false);
+    }
+  };
+
+  const startCameraScanEquipo = () => {
+    if (!scannerLoaded) {
+      setEquipoSearchError('La cámara no está lista aún. Por favor espera un momento.');
+      return;
+    }
+    
+    setIsScanningEquipo(true);
+    setEquipoSearchError('');
+
+    // Wait a tick for the container #reader-equipo to render in the DOM
+    setTimeout(() => {
+      try {
+        const scanner = new window.Html5QrcodeScanner("reader-equipo", { 
+          fps: 10, 
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0
+        }, false);
+        
+        scanner.render(
+          (decodedText) => {
+            loadEquipmentDetails(decodedText);
+            scanner.clear().catch(e => console.error(e));
+            setIsScanningEquipo(false);
+            setScannerInstance(null);
+          },
+          (errorMessage) => {
+            // Silent
+          }
+        );
+        setScannerInstance(scanner);
+      } catch (e) {
+        console.error('Error starting scanner:', e);
+        setEquipoSearchError('No se pudo acceder a la cámara. Revisa los permisos.');
+        setIsScanningEquipo(false);
+      }
+    }, 150);
+  };
+
+  const stopCameraScanEquipo = () => {
+    if (scannerInstance) {
+      scannerInstance.clear().catch(e => console.error(e));
+      setScannerInstance(null);
+    }
+    setIsScanningEquipo(false);
+  };
+
+  const handleFileChangeEquipo = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setEquipoSearchLoading(true);
+    setEquipoSearchError('');
+    setEquipoData(null);
+    
+    if (!window.Html5Qrcode) {
+      setEquipoSearchError('El decodificador de imagen no está listo aún. Por favor intenta de nuevo.');
+      setEquipoSearchLoading(false);
+      return;
+    }
+
+    try {
+      const html5QrCode = new window.Html5Qrcode("reader-equipo-hidden");
+      html5QrCode.scanFile(file, true)
+        .then(decodedText => {
+          loadEquipmentDetails(decodedText);
+        })
+        .catch(err => {
+          console.error("Error scanning file:", err);
+          setEquipoSearchError("No se pudo detectar un código QR o de barras en la imagen. Intenta tomar una foto más nítida de cerca o ingresa el código manualmente.");
+          setEquipoSearchLoading(false);
+        });
+    } catch (err) {
+      console.error("Failed to initialize scanner for file:", err);
+      setEquipoSearchError("Error al iniciar el decodificador de archivo.");
+      setEquipoSearchLoading(false);
+    }
+  };
+
   // Execution flow actions
   const handleStartWork = async (visitId) => {
     try {
@@ -1016,6 +1403,16 @@ export default function VisitasPage() {
     setDespuesFile(null);
     setSoporteUrl('');
     setSoporteFile(null);
+
+    setEquipoId(visit.equipo_id || '');
+    setEquipoData(null);
+    setEquipoSearchError('');
+    setIsScanningEquipo(false);
+    setSelectedCategoriaId(visit.categoria_id || '');
+
+    if (visit.equipo_id) {
+      loadEquipmentDetails(visit.equipo_id);
+    }
 
     setSolicitanteNombre(visit.solicitante_nombre || '');
     setSolicitanteDocumento(visit.solicitante_documento || '');
@@ -1123,6 +1520,11 @@ export default function VisitasPage() {
 
     // Validations for Technical / Systems Flow
     if (isTech) {
+      if (!equipoData) {
+        setSubmitError('Debe ingresar y verificar un equipo registrado (ID, QR o código de barras) antes de finalizar el trabajo.');
+        setSubmitLoading(false);
+        return;
+      }
       if (!antesUrl) {
         setSubmitError('La fotografía del ANTES es obligatoria en trabajos técnicos.');
         setSubmitLoading(false);
@@ -1145,6 +1547,15 @@ export default function VisitasPage() {
       }
       if (!firmaPdv) {
         setSubmitError('La firma del funcionario del Punto de Venta es obligatoria.');
+        setSubmitLoading(false);
+        return;
+      }
+    }
+
+    // Validation: Category is mandatory for systems/maintenance roles when area is Sistemas/Mantenimiento
+    if ([1, 4, 9, 12, 16].includes(userRole) && (activeExecutionVisit.area_id === 3 || activeExecutionVisit.area_id === 7)) {
+      if (!selectedCategoriaId) {
+        setSubmitError('Debe clasificar el soporte en una categoría antes de finalizar el trabajo.');
         setSubmitLoading(false);
         return;
       }
@@ -1182,7 +1593,9 @@ export default function VisitasPage() {
         solicitante_nombre: solicitanteNombre.trim(),
         solicitante_documento: solicitanteDocumento.trim(),
         solicitante_telefono: solicitanteTelefono.trim(),
-        firma_pdv: firmaPdv
+        firma_pdv: firmaPdv,
+        equipo_id: isTech && equipoData ? equipoData.id : null,
+        categoria_id: selectedCategoriaId ? parseInt(selectedCategoriaId) : null
       };
 
       const res = await fetch('/api/visitas', {
@@ -1289,6 +1702,16 @@ export default function VisitasPage() {
     setSubmitSuccess('');
     setSubmitLoading(true);
 
+    // Validation: Category is mandatory for systems/maintenance roles when area is Sistemas/Mantenimiento
+    const isSistemasOrMantenimiento = parseInt(selectedAreaId) === 3 || parseInt(selectedAreaId) === 7;
+    if (isSistemasOrMantenimiento && [1, 4, 9, 12, 16].includes(userRole)) {
+      if (!selectedCategoriaId) {
+        setSubmitError('Debe clasificar la visita en una categoría.');
+        setSubmitLoading(false);
+        return;
+      }
+    }
+
     try {
       const evidenciasArray = [];
       if (antesUrl) evidenciasArray.push({ url: antesUrl, nombre: antesFile.name, etiqueta: 'antes' });
@@ -1305,7 +1728,8 @@ export default function VisitasPage() {
         hora_fin: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false }),
         datos_formulario: formAnswers,
         observaciones: formObservaciones,
-        evidencias: evidenciasArray
+        evidencias: evidenciasArray,
+        categoria_id: selectedCategoriaId ? parseInt(selectedCategoriaId) : null
       };
 
       const res = await fetch('/api/visitas', {
@@ -1321,6 +1745,7 @@ export default function VisitasPage() {
       
       // Reset form
       setAntesFile(null);
+      setSelectedCategoriaId('');
       setAntesUrl('');
       setDespuesFile(null);
       setDespuesUrl('');
@@ -1567,6 +1992,115 @@ export default function VisitasPage() {
 
               <form onSubmit={handleFinishWork} className="visita-form">
                 
+                {/* 0. Equipment Verification for Technical Flow */}
+                {activeExecutionVisit.area_tipo_flujo === 'tecnico' && (
+                  <div className="equipment-association-section card shadow-sm" style={{ marginBottom: '20px', borderLeft: '4px solid #6B3A2A' }}>
+                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', backgroundColor: 'var(--color-bg-secondary)', borderBottom: '1px solid var(--color-border-light)' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--color-primary-dark)' }}>🖥️ Identificación de Equipo (Obligatorio)</h4>
+                      {equipoData && (
+                        <span className="badge" style={{ backgroundColor: '#2e7d32', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                          ✓ Vinculado
+                        </span>
+                      )}
+                    </div>
+                    <div className="card-body" style={{ padding: '15px' }}>
+                      <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '12px', marginTop: 0 }}>
+                        Ingresa el ID del equipo, sticker o escanea su código QR/barra para vincular el equipo a esta visita de soporte técnico.
+                      </p>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label" htmlFor="exec-equipo-id" style={{ fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '4px', display: 'block' }}>Código de Equipo, Serial o Sticker</label>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <input
+                              id="exec-equipo-id"
+                              type="text"
+                              className="form-input"
+                              style={{ textTransform: 'uppercase', flex: 1, padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}
+                              placeholder="Ej: EQ-1002"
+                              value={equipoId}
+                              onChange={(e) => setEquipoId(e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              style={{ whiteSpace: 'nowrap', padding: '8px 16px' }}
+                              onClick={() => loadEquipmentDetails(equipoId)}
+                              disabled={equipoSearchLoading || !equipoId.trim()}
+                            >
+                              {equipoSearchLoading ? 'Buscando...' : '🔍 Buscar'}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
+                          {isScanningEquipo ? (
+                            <button
+                              type="button"
+                              className="btn btn-danger btn-sm"
+                              onClick={stopCameraScanEquipo}
+                              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '0.8rem' }}
+                            >
+                              🛑 Detener Cámara
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              onClick={startCameraScanEquipo}
+                              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '0.8rem', background: 'linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%)', border: 'none' }}
+                            >
+                              📷 Escanear QR / Código de Barras
+                            </button>
+                          )}
+
+                          <label className="btn btn-secondary btn-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', margin: 0, padding: '6px 12px', fontSize: '0.8rem' }}>
+                            📁 Subir Imagen QR
+                            <input
+                              type="file"
+                              accept="image/*"
+                              style={{ display: 'none' }}
+                              onChange={handleFileChangeEquipo}
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Error Alert */}
+                      {equipoSearchError && (
+                        <div className="error-alert" style={{ marginTop: '12px', padding: '10px', fontSize: '0.85rem', borderRadius: 'var(--radius-md)', backgroundColor: '#ffebee', color: '#c62828', border: '1px solid #ffcdd2' }}>
+                          ⚠️ {equipoSearchError}
+                        </div>
+                      )}
+
+                      {/* Camera Container */}
+                      {isScanningEquipo && (
+                        <div style={{ marginTop: '15px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', backgroundColor: '#000', padding: '10px' }}>
+                          <div id="reader-equipo" style={{ width: '100%', maxWidth: '350px', margin: '0 auto' }}></div>
+                        </div>
+                      )}
+                      
+                      {/* Hidden helper for file scanning */}
+                      <div id="reader-equipo-hidden" style={{ display: 'none' }}></div>
+
+                      {/* Equipment Details Display */}
+                      {equipoData && (
+                        <div className="equipment-details-box" style={{ marginTop: '15px', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid #c8e6c9', backgroundColor: '#e8f5e9', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <h5 style={{ margin: 0, color: '#2e7d32', fontWeight: 'bold', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}>🖥️ Equipo Vinculado:</h5>
+                          <div style={{ fontSize: '0.8rem', color: '#2e7d32', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', paddingLeft: '4px' }}>
+                            <div><strong>Nombre:</strong> <span style={{color:'#333'}}>{equipoData.nombre}</span></div>
+                            <div><strong>ID/QR:</strong> <span style={{color:'#333'}}>{equipoData.id}</span></div>
+                            <div><strong>Marca:</strong> <span style={{color:'#333'}}>{equipoData.marca || 'N/A'}</span></div>
+                            <div><strong>Modelo:</strong> <span style={{color:'#333'}}>{equipoData.modelo || 'N/A'}</span></div>
+                            <div><strong>Serie:</strong> <span style={{color:'#333'}}>{equipoData.serie || 'N/A'}</span></div>
+                            <div><strong>PDV:</strong> <span style={{color:'#333'}}>{equipoData.pdv_nombre}</span></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
                 {/* Check list Renderer (conditional on template existance) */}
                 {(activePlantilla || (activeExecutionVisit && activeExecutionVisit.campos_personalizados)) && (
                   <div className="dynamic-template-section card shadow-sm">
@@ -1681,6 +2215,26 @@ export default function VisitasPage() {
                           ));
                         }
                       })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Category Selection for Sistemas / Mantenimiento in Execution Form */}
+                {[1, 4, 9, 12, 16].includes(userRole) && (activeExecutionVisit.area_id === 3 || activeExecutionVisit.area_id === 7) && (
+                  <div className="category-selection-section card shadow-sm" style={{ marginBottom: '20px', borderLeft: '4px solid #8B6914' }}>
+                    <div className="card-header" style={{ padding: '12px 20px', backgroundColor: 'var(--color-bg-secondary)', borderBottom: '1px solid var(--color-border-light)' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--color-primary-dark)' }}>📋 Categoría del Soporte (Obligatorio)</h4>
+                    </div>
+                    <div className="card-body" style={{ padding: '15px' }}>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label" htmlFor="exec-categoria-id" style={{ fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '4px', display: 'block' }}>Seleccionar Categoría / Subcategoría</label>
+                        <SearchableCategorySelect
+                          categories={categorias}
+                          selectedId={selectedCategoriaId}
+                          onChange={(val) => setSelectedCategoriaId(val)}
+                          areaId={activeExecutionVisit.area_id}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1808,32 +2362,6 @@ export default function VisitasPage() {
                           </div>
                         </div>
 
-                        {/* 3. Documento / PDF */}
-                        <div className="upload-card">
-                          <label className="form-label">Documento o PDF de Soporte</label>
-                          <div className="real-upload-control">
-                            <input
-                              id="exec-upload-soporte"
-                              type="file"
-                              accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"
-                              onChange={(e) => handleFileUpload(e, 'soporte', setSoporteFile, setSoporteUrl, setSoporteUploading)}
-                              style={{ display: 'none' }}
-                            />
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm btn-block"
-                              onClick={() => document.getElementById('exec-upload-soporte').click()}
-                              disabled={soporteUploading}
-                            >
-                              {soporteUploading ? 'Subiendo...' : '📎 Cargar Documento'}
-                            </button>
-                            {soporteUrl && (
-                              <div className="upload-success-badge">
-                                ✓ Subido: <a href={soporteUrl} target="_blank" rel="noreferrer">Ver archivo</a>
-                              </div>
-                            )}
-                          </div>
-                        </div>
 
                       </div>
                     </div>
@@ -2550,6 +3078,18 @@ export default function VisitasPage() {
                   </div>
                 )}
 
+                {selectedAreaId && (parseInt(selectedAreaId) === 3 || parseInt(selectedAreaId) === 7) && [1, 4, 9, 12, 16].includes(userRole) && (
+                  <div className="form-group animate-fade-in">
+                    <label className="form-label" htmlFor="visita-categoria">4. Seleccionar Categoría del Soporte</label>
+                    <SearchableCategorySelect
+                      categories={categorias}
+                      selectedId={selectedCategoriaId}
+                      onChange={(val) => setSelectedCategoriaId(val)}
+                      areaId={selectedAreaId}
+                    />
+                  </div>
+                )}
+
                 {activePlantilla && (
                   <div className="dynamic-template-section card shadow-sm animate-fade-in">
                     <div className="card-header">
@@ -2736,31 +3276,7 @@ export default function VisitasPage() {
                           </div>
                         </div>
 
-                        <div className="upload-card">
-                          <label className="form-label">Documento o PDF de Soporte</label>
-                          <div className="real-upload-control">
-                            <input
-                              id="upload-soporte"
-                              type="file"
-                              accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"
-                              onChange={(e) => handleFileUpload(e, 'soporte', setSoporteFile, setSoporteUrl, setSoporteUploading)}
-                              style={{ display: 'none' }}
-                            />
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm btn-block"
-                              onClick={() => document.getElementById('upload-soporte').click()}
-                              disabled={soporteUploading}
-                            >
-                              {soporteUploading ? 'Subiendo...' : '📎 Cargar Documento'}
-                            </button>
-                            {soporteUrl && (
-                              <div className="upload-success-badge">
-                                ✓ Subido: <a href={soporteUrl} target="_blank" rel="noreferrer">Ver archivo</a>
-                              </div>
-                            )}
-                          </div>
-                        </div>
+
                       </div>
                     </div>
                   </div>
@@ -3051,10 +3567,10 @@ export default function VisitasPage() {
                       return fallback;
                     };
                     
-                    const eqTipo = getVal(['tipo', 'equipo', 'elemento', 'tipo_equipo'], selectedVisit.tipo_visita_nombre || 'N/A');
-                    const eqMarca = getVal(['marca', 'modelo', 'marca_equipo']);
-                    const eqSerial = getVal(['serial', 'serie', 'serie_equipo', 'n/s']);
-                    const eqSticker = getVal(['sticker', 'placa', 'nro_sticker']);
+                    const eqTipo = selectedVisit.equipo_nombre || getVal(['tipo', 'equipo', 'elemento', 'tipo_equipo'], selectedVisit.tipo_visita_nombre || 'N/A');
+                    const eqMarca = selectedVisit.equipo_marca || selectedVisit.equipo_modelo ? `${selectedVisit.equipo_marca || ''} ${selectedVisit.equipo_modelo || ''}`.trim() : getVal(['marca', 'modelo', 'marca_equipo']);
+                    const eqSerial = selectedVisit.equipo_serie || getVal(['serial', 'serie', 'serie_equipo', 'n/s']);
+                    const eqSticker = selectedVisit.equipo_id || getVal(['sticker', 'placa', 'nro_sticker']);
 
                     return (
                       <div className="visita-tecnica-tech-sheet" style={{ fontFamily: 'Arial, sans-serif', color: '#000', padding: '0', fontSize: '0.82rem', border: '2px solid #2C1810', width: '100%', margin: '0 auto', backgroundColor: '#fff', borderRadius: '4px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
@@ -3161,6 +3677,18 @@ export default function VisitasPage() {
                             </tr>
                           </tbody>
                         </table>
+
+                        {/* Category Data */}
+                        {selectedVisit.categoria_nombre && (
+                          <>
+                            <div style={{ backgroundColor: '#2C1810', color: '#fff', padding: '5px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', borderBottom: '1.5px solid #2C1810', textAlign: 'center' }}>
+                              CATEGORÍA DEL SOPORTE
+                            </div>
+                            <div style={{ padding: '8px 10px', borderBottom: '1.5px solid #2C1810', backgroundColor: '#faf6f2', fontSize: '0.85rem' }}>
+                              <strong>{selectedVisit.categoria_padre_nombre ? `${selectedVisit.categoria_padre_nombre} › ` : ''}{selectedVisit.categoria_nombre}</strong>
+                            </div>
+                          </>
+                        )}
 
                         {/* Reason of Visit */}
                         <div style={{ backgroundColor: '#2C1810', color: '#fff', padding: '5px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', borderBottom: '1.5px solid #2C1810', textAlign: 'center' }}>
@@ -3279,6 +3807,9 @@ export default function VisitasPage() {
                       <p><strong>Hora Inicio/Fin:</strong> {selectedVisit.hora_inicio || '--:--'} a {selectedVisit.hora_fin || '--:--'}</p>
                       <p><strong>Área Inspectora:</strong> {selectedVisit.area_nombre}</p>
                       <p><strong>Tipo de Visita:</strong> {selectedVisit.tipo_visita_nombre || 'Sin definir'}</p>
+                      {selectedVisit.categoria_nombre && (
+                        <p><strong>Categoría:</strong> {selectedVisit.categoria_padre_nombre ? `${selectedVisit.categoria_padre_nombre} › ` : ''}{selectedVisit.categoria_nombre}</p>
+                      )}
                       <p><strong>Estado:</strong> <span className={`status-pill ${selectedVisit.estado}`}>{selectedVisit.estado.toUpperCase()}</span></p>
                     </div>
 
