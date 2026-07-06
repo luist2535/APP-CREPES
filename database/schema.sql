@@ -262,3 +262,25 @@ CREATE TABLE IF NOT EXISTS equipos (
 
 CREATE INDEX IF NOT EXISTS idx_equipos_pdv ON equipos(pdv_id);
 
+-- Repositorio Central de Archivos y Evidencias (Fotos, Excel, PDFs, Documentos)
+CREATE TABLE IF NOT EXISTS archivos_repositorio (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nombre_original TEXT NOT NULL,
+  nombre_guardado TEXT NOT NULL,
+  ruta_archivo TEXT NOT NULL,
+  tipo_archivo TEXT NOT NULL, -- 'excel', 'foto', 'pdf', 'documento', 'otro'
+  extension TEXT,
+  tamano_bytes INTEGER DEFAULT 0,
+  categoria TEXT DEFAULT 'general', -- 'evidencia_visita', 'reporte_excel', 'manual_equipo', 'documento_pdv', 'general'
+  referencia_id TEXT, -- Puede ser ID de visita, PDV, Equipo, etc.
+  user_id INTEGER,
+  observaciones TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_archivos_tipo ON archivos_repositorio(tipo_archivo);
+CREATE INDEX IF NOT EXISTS idx_archivos_cat ON archivos_repositorio(categoria);
+CREATE INDEX IF NOT EXISTS idx_archivos_ref ON archivos_repositorio(referencia_id);
+
+

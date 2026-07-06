@@ -1012,6 +1012,19 @@ export default function VisitasPage() {
     }
   }, []);
 
+  // Auto-open visit details if redirected from Reports or another module
+  useEffect(() => {
+    const targetId = localStorage.getItem('target_visita_id');
+    if (targetId && visitas.length > 0) {
+      const found = visitas.find(v => String(v.id) === String(targetId));
+      if (found) {
+        setSelectedVisit(found);
+        setModalTab('general');
+        localStorage.removeItem('target_visita_id');
+      }
+    }
+  }, [visitas]);
+
   // Dynamically load the CDN html5-qrcode scanner library
   useEffect(() => {
     if (window.Html5QrcodeScanner) {

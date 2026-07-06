@@ -81,6 +81,8 @@ export async function GET(request) {
       SELECT 
         v.id, v.fecha, v.hora_inicio, v.hora_fin, v.estado,
         v.observaciones, v.hallazgos, v.acciones_correctivas,
+        v.datos_formulario, v.repuestos, v.firma_auxiliar, v.firma_jefe, v.comentarios_jefe,
+        v.firma_pdv, v.solicitante_nombre, v.equipo_id,
         v.created_at,
         p.nombre as pdv_nombre,
         c.nombre as ciudad_nombre,
@@ -89,7 +91,8 @@ export async function GET(request) {
         u.nombre as creador_nombre,
         resp.nombre as responsable_nombre,
         cat.nombre as categoria_nombre,
-        cat_padre.nombre as categoria_padre_nombre
+        cat_padre.nombre as categoria_padre_nombre,
+        e.nombre as equipo_nombre, e.marca as equipo_marca, e.modelo as equipo_modelo
       FROM visitas v
       JOIN pdv p ON v.pdv_id = p.id
       JOIN ciudades c ON p.ciudad_id = c.id
@@ -99,6 +102,7 @@ export async function GET(request) {
       LEFT JOIN users resp ON v.responsable_id = resp.id
       LEFT JOIN categorias_visita cat ON v.categoria_id = cat.id
       LEFT JOIN categorias_visita cat_padre ON cat.padre_id = cat_padre.id
+      LEFT JOIN equipos e ON v.equipo_id = e.id
       WHERE ${whereClause}
       ORDER BY v.fecha DESC, v.created_at DESC
       LIMIT 1000
