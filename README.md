@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/logo.png" alt="Crepes en Punto Logo" width="180" />
+</p>
+
 # 🥞 Crepes en Punto — Sistema de Control y Gestión Operativa
 
 **Crepes en Punto** es una plataforma web integral diseñada para la gestión, auditoría y control operativo en tiempo real de los Puntos de Venta (PDV) de la red. La plataforma permite coordinar actividades de mantenimiento, calidad, sistemas y seguridad y salud en el trabajo (SST), asegurando trazabilidad absoluta en cada proceso.
