@@ -145,9 +145,13 @@ export default function EquiposPage() {
     setTimeout(() => {
       try {
         const scanner = new window.Html5QrcodeScanner("reader", { 
-          fps: 10, 
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0
+          fps: 15, 
+          qrbox: { width: 300, height: 180 },
+          aspectRatio: 1.3333,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+          },
+          rememberLastUsedCamera: true
         }, false);
         
         scanner.render(
@@ -165,7 +169,7 @@ export default function EquiposPage() {
         setScannerInstance(scanner);
       } catch (e) {
         console.error('Error starting scanner:', e);
-        setSearchError('No se pudo acceder a la cámara. Revisa los permisos.');
+        setSearchError('No se pudo acceder a la cámara. Revisa los permisos o asegúrate de usar HTTPS / localhost.');
         setIsScanning(false);
       }
     }, 100);
@@ -195,14 +199,18 @@ export default function EquiposPage() {
     }
 
     try {
-      const html5QrCode = new window.Html5Qrcode("reader-hidden");
+      const html5QrCode = new window.Html5Qrcode("reader-hidden", {
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
+        }
+      });
       html5QrCode.scanFile(file, true)
         .then(decodedText => {
           handleSearchEquipment(decodedText);
         })
         .catch(err => {
           console.error("Error scanning file:", err);
-          setSearchError("No se pudo detectar un código QR en la imagen. Intenta tomar una foto más nítida de cerca o ingresa el Sticker manualmente.");
+          setSearchError("No se pudo detectar un código QR ni código de barras en la imagen. Asegúrate de que el sticker esté bien iluminado y enfocado, o ingresa el código manualmente abajo.");
           setSearchLoading(false);
         });
     } catch (err) {
@@ -503,7 +511,7 @@ export default function EquiposPage() {
         <div className="scanner-control-col">
           <div className="card shadow-md">
             <div className="card-header">
-              <h3>📷 Escanear Código QR de Equipo</h3>
+              <h3>📷 Escanear Código QR o Código de Barras</h3>
             </div>
             <div className="card-body scanner-actions-body">
               
@@ -518,8 +526,12 @@ export default function EquiposPage() {
               ) : (
                 <div className="scan-placeholder-view" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                   <div className="qr-icon-large">📱</div>
-                  <p>Escanea el código QR o el código de barras (con el sticker de inventario) pegado en el equipo para ver su ficha técnica e historial.</p>
+                  <p>Escanea con tu celular el código QR o el <strong>código de barras</strong> del sticker pegado en el equipo para abrir su ficha técnica e historial al instante.</p>
                   
+                  <div style={{ backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', padding: '10px 14px', borderRadius: '8px', fontSize: '0.82rem', color: '#166534', width: '100%', textAlign: 'left' }}>
+                    <strong>💡 Tip para celular:</strong> Para leer códigos de barras (stickers rectangulares), mantén el teléfono a unos 10-15 cm en forma horizontal para que las líneas queden dentro del recuadro.
+                  </div>
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', alignItems: 'center' }}>
                     <button 
                       className="btn btn-primary btn-lg" 
@@ -550,7 +562,7 @@ export default function EquiposPage() {
                         margin: 0
                       }}
                     >
-                      <span>📁</span> Subir Foto del QR
+                      <span>📁</span> Subir Foto (QR / Barras)
                       <input 
                         type="file" 
                         accept="image/*" 
