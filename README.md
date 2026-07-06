@@ -60,6 +60,23 @@
 - Al activarse un bloqueo, el PDV cambia automáticamente su semáforo a `Provisional / Bloqueado` y se incluye la justificación.
 - Los coordinadores pueden dar de alta o finalizar el bloqueo manualmente para restaurar el estado original del PDV (`Trabajando en sitio`).
 
+### 8. 📁 Repositorio Documental y Gestión de Archivos
+- Módulo dedicado para la carga, almacenamiento, categorización y descarga de evidencias, manuales, hojas de vida de equipos y documentos corporativos.
+- Organización jerárquica en carpetas dentro del proyecto y en la base de datos por área operativa y Punto de Venta (PDV).
+- Soporte para adjuntar Excel, Word, PDF e imágenes fotográficas con previsualización directa en el navegador.
+
+### 9. 📈 Reportes por Área y Trazabilidad Operativa
+- Panel analítico con indicadores numéricos (KPIs) por área y filtros múltiples (Ciudad, Área, Categoría, Estado, Fechas).
+- **Modal de Detalle Completo (Sin salir del reporte)**: Al hacer clic en **"👁️ Ver Detalle"** en una operación, se despliega una ventana modal con 4 pestañas:
+  - 📌 **Resumen & Checklist**: Muestra todas las preguntas del formulario evaluadas, resaltando en tarjetas verdes los *SÍ*, en rojas los *NO* y en grises los *N/A*, junto con sus observaciones.
+  - 🛠️ **Repuestos & Hallazgos**: Despliega la información técnica de la maquinaria intervenida, diagnóstico del técnico, acciones correctivas y repuestos utilizados.
+  - 🖼️ **Evidencias Fotográficas**: Galería visual de las fotografías adjuntas a esa visita.
+  - ✍️ **Firmas y Trazabilidad**: Visualización de las firmas digitales capturadas (Técnico/Auxiliar, Funcionario del PDV y Aprobación del Jefe de Área).
+- **Navegación Inter-módulos**: Botón **"🔗 Ir a Gestión en Módulo Operativo"** que redirige al usuario a la pantalla de Visitas y abre automáticamente esa visita para su edición o seguimiento.
+- **Vista Móvil Responsive (Mobile Cards / PWA)**: Diseño *mobile-first* optimizado para operarios con celular en campo. Al acceder desde teléfonos o pantallas menores a 768px:
+  - Las tablas anchas desaparecen y se convierten automáticamente en una lista de **Tarjetas Operativas (*Mobile Cards*)** interactivas.
+  - Los indicadores superiores se transforman en un **carrusel horizontal deslizable con el dedo** (`scroll-snap`) para una experiencia de usuario nativa y fluida.
+
 ### ⚙️ Panel de Control del Administrador
 - Sección dedicada a la administración de variables maestras del negocio:
   - Creación, edición y suspensión de **Usuarios** (roles y ciudades).
@@ -82,7 +99,12 @@ crepes-app/
 ├── src/
 │   ├── app/             # Rutas y páginas de la aplicación Next.js
 │   │   ├── (dashboard)/ # Vistas protegidas por autenticación
+│   │   │   ├── archivos/ # Módulo de Repositorio Documental y carpetas
+│   │   │   ├── reportes/ # Analítica, KPIs y vista de tarjetas móviles
+│   │   │   └── visitas/  # Gestión y programación operativa de visitas
 │   │   ├── api/         # Servicios backend (endpoints JSON)
+│   │   │   ├── archivos/ # Endpoints CRUD para gestión y subida de archivos
+│   │   │   └── reportes/ # Consultas SQL optimizadas para trazabilidad
 │   │   ├── globals.css  # Diseño de estilos global (CSS corporativo)
 │   │   └── page.js      # Pantalla de Login de acceso principal
 │   └── lib/             # Helpers de base de datos y utilidades JWT
