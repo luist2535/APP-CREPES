@@ -447,6 +447,9 @@ export default function DashboardLayout({ children }) {
           </div>
 
           <div className="header-actions">
+            <div className="header-logo-container desktop-only-header" style={{ marginRight: '15px', display: 'flex', alignItems: 'center' }}>
+              <img src="/logo_crepes_waffles.svg" alt="Crepes & Waffles" style={{ height: '26px', width: 'auto', objectFit: 'contain' }} />
+            </div>
             {user.ciudad_nombre && (
               <span className="header-city-badge">
                 📍 {user.ciudad_nombre}

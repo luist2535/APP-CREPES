@@ -166,8 +166,13 @@ export default function DashboardPage() {
       
       {/* ===== Welcome Banner ===== */}
       <div className="welcome-banner">
-        <h2>¡{getGreetingText()}, {user ? user.nombre : 'Usuario'}! 👋</h2>
-        <p>{displayDate}</p>
+        <div className="welcome-text">
+          <h2>¡{getGreetingText()}, {user ? user.nombre : 'Usuario'}! 👋</h2>
+          <p>{displayDate}</p>
+        </div>
+        <div className="welcome-logo-box">
+          <img src="/logo_crepes_waffles.svg" alt="Crepes & Waffles" className="welcome-logo-img" />
+        </div>
       </div>
 
       {/* ===== 4 KPIs Row / Grid ===== */}
@@ -481,20 +486,65 @@ export default function DashboardPage() {
 
         .welcome-banner {
           display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 15px;
+          background: linear-gradient(135deg, #fffcf9 0%, #ffffff 100%);
+          padding: 22px 30px;
+          border-radius: var(--radius-xl);
+          border: 1px solid var(--color-border-light);
+          box-shadow: 0 4px 15px rgba(107, 58, 42, 0.05);
+        }
+
+        .welcome-text {
+          display: flex;
           flex-direction: column;
           gap: 4px;
         }
 
         .welcome-banner h2 {
           font-family: 'Playfair Display', serif;
-          font-size: 1.8rem;
+          font-size: 1.85rem;
           font-weight: 700;
           color: var(--color-primary-dark);
+          margin: 0;
         }
 
         .welcome-banner p {
-          font-size: 0.85rem;
+          font-size: 0.88rem;
           color: var(--color-text-muted);
+          margin: 0;
+          font-weight: 500;
+        }
+
+        .welcome-logo-box {
+          background: #ffffff;
+          padding: 10px 22px;
+          border-radius: var(--radius-lg);
+          border: 1px solid var(--color-border);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .welcome-logo-img {
+          height: 38px;
+          width: auto;
+          object-fit: contain;
+        }
+
+        @media (max-width: 768px) {
+          .welcome-banner {
+            flex-direction: column;
+            align-items: flex-start;
+            padding: 18px 20px;
+          }
+          .welcome-logo-box {
+            width: 100%;
+            justify-content: center;
+          }
         }
 
         /* ===== KPIs Grid ===== */
