@@ -132,5 +132,6 @@ INSERT INTO equipos (id, nombre, marca, modelo, serie, pdv_id, datos_tecnicos, u
   ('EQ-1003', 'Crepera Eléctrica Doble', 'Krampouz', 'CEBIV4-D', 'KRP-49281-C', 1, '{"diametro_placas":"40 cm x 2","potencia":"3000W x 2","voltaje":"220V Bifásico","termostato":"50°C a 300°C"}', '2026-06-01', '2026-09-01'),
   ('EQ-1004', 'Aire Acondicionado Cocina', 'Carrier', 'Split inverter 24k', 'CAR-10293-D', 1, '{"capacidad":"24000 BTU","eficiencia":"SEER 18","refrigerante":"R410A","corriente":"11.5 A"}', '2026-03-20', '2026-09-20'),
   ('EQ-2001', 'Crepera Eléctrica Doble', 'Krampouz', 'CEBIV4-D', 'KRP-50121-Z', 10, '{"diametro_placas":"40 cm x 2","potencia":"3000W x 2","voltaje":"220V Bifásico","termostato":"50°C a 300°C"}', '2026-05-20', '2026-08-20'),
-  ('EQ-3001', 'Licuadora Industrial', 'Vitamix', 'The Quiet One', 'VTX-909543-F', 18, '{"potencia":"1800W","voltaje":"110V","capacidad":"2.0 L","velocidades":"Control variable","certificacion":"NSF/SST"}', '2026-06-10', '2026-09-10');
+  ('EQ-3001', 'Licuadora Industrial', 'Vitamix', 'The Quiet One', 'VTX-909543-F', 18, '{"potencia":"1800W","voltaje":"110V","capacidad":"2.0 L","velocidades":"Control variable","certificacion":"NSF/SST"}', '2026-06-10', '2026-09-10'),
+  ('RCSUIBZ1412230144', 'Terminal POS Touch Screen', 'NCR / Elo Touch', 'POS-15-Capacitivo', 'SER-RCS-141223', 1, '{"procesador":"Intel Core i5","memoria":"8GB DDR4","almacenamiento":"256GB SSD","pantalla":"15 pulgadas táctil","sistema_operativo":"Windows 10 IoT Enterprise","uso":"Caja Registradora / Toma de Pedidos"}', '2026-06-01', '2026-09-01');
 

@@ -124,11 +124,11 @@ export default function EquiposPage() {
 
       setEquipo(data.equipo);
       setMantenimientos(data.mantenimientos);
-      setQrInput(code.trim().toUpperCase());
     } catch (err) {
       setSearchError(err.message);
     } finally {
       setSearchLoading(false);
+      setQrInput(''); // Limpieza automática del campo tras buscar o escanear
     }
   };
 
@@ -601,10 +601,23 @@ export default function EquiposPage() {
                       id="manual-qr-input"
                       type="text"
                       className="form-input"
-                      placeholder="Ej: EQ-1001 o ADM 000002539"
+                      placeholder="Ej: RCSUIBZ1412230144 o EQ-1001"
                       value={qrInput}
                       onChange={(e) => setQrInput(e.target.value)}
+                      onFocus={(e) => e.target.select()}
+                      autoFocus
                     />
+                    {qrInput && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setQrInput('')}
+                        title="Limpiar campo"
+                        style={{ padding: '0 14px', fontSize: '1rem', fontWeight: 'bold', color: '#991b1b', border: '1px solid var(--color-border)', cursor: 'pointer' }}
+                      >
+                        ✕
+                      </button>
+                    )}
                     <button 
                       type="submit"
                       className="btn btn-primary"
@@ -620,6 +633,7 @@ export default function EquiposPage() {
               <div className="quick-test-section">
                 <span>Ejemplos de Códigos y Stickers de Prueba:</span>
                 <div className="quick-test-buttons">
+                  <button className="btn btn-secondary btn-sm" onClick={() => handleSearchEquipment('RCSUIBZ1412230144')}>📦 RCSUIBZ... (Tu Sticker)</button>
                   <button className="btn btn-secondary btn-sm" onClick={() => handleSearchEquipment('EQ-1001')}>🔌 EQ-1001 (Licuadora)</button>
                   <button className="btn btn-secondary btn-sm" onClick={() => handleSearchEquipment('R05 000001613')}>🖥️ R05 000001613 (Servidor)</button>
                   <button className="btn btn-secondary btn-sm" onClick={() => handleSearchEquipment('ADM 000002539')}>💻 ADM 000002539 (Desktop)</button>
