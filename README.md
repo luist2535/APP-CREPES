@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/logo.png" alt="Crepes en Punto Logo" width="180" />
+  <img src="public/logo_crepes_waffles.svg" alt="Crepes &amp; Waffles Logo" width="420" />
 </p>
 
 # Crepes en Punto — Sistema de Control y Gestión Operativa
