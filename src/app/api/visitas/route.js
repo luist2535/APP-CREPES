@@ -194,6 +194,26 @@ export async function PUT(request) {
       return NextResponse.json({ message: 'Trabajo iniciado correctamente', hora_inicio: nowTime });
     }
 
+    if (action === 'guardar_progreso') {
+      const { datos_formulario, observaciones } = data;
+      db.prepare(`
+        UPDATE visitas 
+        SET datos_formulario = ?, observaciones = COALESCE(?, observaciones)
+        WHERE id = ?
+      `).run(
+        JSON.stringify(datos_formulario || {}),
+        observaciones || null,
+        id
+      );
+      
+      db.prepare(`
+        INSERT INTO historial_visitas (visita_id, accion, user_id, detalle)
+        VALUES (?, 'guardar_progreso', ?, 'Progreso del formulario guardado temporalmente')
+      `).run(id, user.id);
+
+      return NextResponse.json({ message: 'Progreso guardado exitosamente' });
+    }
+
     if (action === 'finalizar') {
       const { 
         datos_formulario, observaciones, evidencias, repuestos, 

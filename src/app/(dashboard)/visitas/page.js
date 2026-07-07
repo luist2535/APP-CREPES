@@ -371,192 +371,721 @@ function SignaturePad({ onSave, onClear, label, value }) {
   );
 }
 
-// Matrix and Simple checklist helper components for Quality Area
-const MatrixChecklistForm = ({ template, answers, onChange, activeTab, onTabChange }) => {
-  return (
-    <div className="matrix-checklist-execution" style={{ maxWidth: '650px', margin: '0 auto' }}>
-      {/* Scrollable sub-area tabs */}
-      <div className="tabs-header scrollable-tabs" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '15px', borderBottom: '1px solid var(--color-border-light)' }}>
-        {template.columnas.map((col) => (
-          <button
-            key={col}
-            type="button"
-            className={`tab-btn ${activeTab === col ? 'active' : ''}`}
-            onClick={() => onTabChange(col)}
-            style={{ whiteSpace: 'nowrap', padding: '6px 12px', borderRadius: 'var(--radius-sm)' }}
-          >
-            📍 {col}
-          </button>
-        ))}
-      </div>
+// Helper function to calculate Quality Checklist score (Calificación)
+const calculateVisitScore = (visit, plantillas) => {
+  if (!visit || !visit.datos_formulario) return null;
+  let data = {};
+  try {
+    data = JSON.parse(visit.datos_formulario || '{}');
+  } catch (e) {
+    return null;
+  }
 
-      {/* Checklist items for the active sub-area */}
-      <div className="matrix-items-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {template.secciones.map((sec, sIdx) => (
-          <div key={sIdx} className="section-block" style={{ backgroundColor: 'var(--color-bg-secondary)', padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-light)' }}>
-            <h5 style={{ color: 'var(--color-primary-dark)', borderBottom: '2px solid var(--color-border-light)', paddingBottom: '4px', marginBottom: '10px', textTransform: 'uppercase', fontSize: '0.78rem', fontWeight: 'bold' }}>
-              📁 {sec.nombre}
-            </h5>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {sec.filas.map((fila, fIdx) => {
-                const answerKey = `${fila}__${activeTab}`;
-                const currentValue = answers[answerKey] || '';
-                
-                return (
-                  <div key={fIdx} className="checklist-row-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '15px', padding: '6px 0', borderBottom: '1px dotted var(--color-border-light)' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: '500', color: 'var(--color-text-primary)', flex: '1', lineHeight: '1.2' }}>{fila}</span>
-                    <div className="btn-group" style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                      <button
-                        type="button"
-                        onClick={() => onChange(answerKey, currentValue === 'SI' ? '' : 'SI')}
-                        style={{
-                          padding: '4px 10px',
-                          fontSize: '0.72rem',
-                          fontWeight: 'bold',
-                          borderRadius: '15px',
-                          border: '1px solid ' + (currentValue === 'SI' ? 'var(--color-success)' : 'var(--color-border-light)'),
-                          backgroundColor: currentValue === 'SI' ? 'var(--color-success)' : 'transparent',
-                          color: currentValue === 'SI' ? 'white' : 'var(--color-text-secondary)',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        SI
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onChange(answerKey, currentValue === 'NO' ? '' : 'NO')}
-                        style={{
-                          padding: '4px 10px',
-                          fontSize: '0.72rem',
-                          fontWeight: 'bold',
-                          borderRadius: '15px',
-                          border: '1px solid ' + (currentValue === 'NO' ? 'var(--color-danger)' : 'var(--color-border-light)'),
-                          backgroundColor: currentValue === 'NO' ? 'var(--color-danger)' : 'transparent',
-                          color: currentValue === 'NO' ? 'white' : 'var(--color-text-secondary)',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        NO
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onChange(answerKey, currentValue === 'NA' ? '' : 'NA')}
-                        style={{
-                          padding: '4px 10px',
-                          fontSize: '0.72rem',
-                          fontWeight: 'bold',
-                          borderRadius: '15px',
-                          border: '1px solid ' + (currentValue === 'NA' ? '#6c757d' : 'var(--color-border-light)'),
-                          backgroundColor: currentValue === 'NA' ? '#6c757d' : 'transparent',
-                          color: currentValue === 'NA' ? 'white' : 'var(--color-text-secondary)',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        N/A
-                      </button>
+  let template = null;
+  let fields = null;
+  if (visit.campos_personalizados) {
+    try { fields = JSON.parse(visit.campos_personalizados); } catch(e) {}
+  } else if (visit.plantilla_id && plantillas) {
+    template = plantillas.find(p => p.id === visit.plantilla_id);
+    if (template) {
+      try { fields = JSON.parse(template.campos); } catch(e) {}
+    }
+  }
+
+  if (!fields || !fields[0]) return null;
+  const firstField = fields[0];
+  if (firstField.tipo !== 'matrix' && firstField.tipo !== 'simple_checklist') return null;
+
+  let totalAspectos = 0;
+  let satisfactorios = 0;
+  let noSatisfactorios = 0;
+  let noAplica = 0;
+
+  if (firstField.secciones) {
+    firstField.secciones.forEach(sec => {
+      if (sec.filas) {
+        sec.filas.forEach(fila => {
+          if (firstField.tipo === 'matrix' && firstField.columnas) {
+            firstField.columnas.forEach(col => {
+              totalAspectos++;
+              const val = data[`${fila}__${col}`];
+              if (val === 'SI') satisfactorios++;
+              else if (val === 'NO') noSatisfactorios++;
+              else if (val === 'NA') noAplica++;
+            });
+          } else {
+            totalAspectos++;
+            const val = data[fila] || (firstField.columnas && firstField.columnas[0] ? data[`${fila}__${firstField.columnas[0]}`] : null);
+            if (val === 'SI') satisfactorios++;
+            else if (val === 'NO') noSatisfactorios++;
+            else if (val === 'NA') noAplica++;
+          }
+        });
+      }
+    });
+  }
+
+  if (totalAspectos === 0) return null;
+  const evaluados = satisfactorios + noSatisfactorios + noAplica;
+  const denominador = totalAspectos - noAplica;
+  const porcentaje = denominador > 0 ? Math.round((satisfactorios / denominador) * 100) : (evaluados > 0 ? 100 : 0);
+
+  let badgeColor = '#15803D'; // Green
+  let badgeBg = '#DCFCE7';
+  let stars = '⭐⭐⭐⭐⭐';
+  if (porcentaje < 70) {
+    badgeColor = '#991B1B'; // Red
+    badgeBg = '#FEE2E2';
+    stars = '⭐⭐';
+  } else if (porcentaje < 90) {
+    badgeColor = '#92400E'; // Yellow/Orange
+    badgeBg = '#FEF3C7';
+    stars = '⭐⭐⭐⭐';
+  }
+
+  return {
+    totalAspectos,
+    satisfactorios,
+    noSatisfactorios,
+    noAplica,
+    evaluados,
+    porcentaje,
+    badgeColor,
+    badgeBg,
+    stars,
+    isChecklist: true
+  };
+};
+
+// Matrix and Simple checklist helper components for Quality Area
+const renderMatrixIcon = (colName, isActive) => {
+  const name = (colName || '').toUpperCase();
+  const color = isActive ? '#6B3A2A' : '#64748b';
+  
+  if (name.includes('CONO')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2L6 14h12L12 2z" fill={isActive ? '#fde68a' : 'none'} />
+        <path d="M12 14v8" />
+        <path d="M9 14l3 8 3-8" />
+        <line x1="8" y1="8" x2="16" y2="8" />
+        <line x1="7" y1="11" x2="17" y2="11" />
+      </svg>
+    );
+  }
+  if (name.includes('REPOSTER')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8" fill={isActive ? '#fbcfe8' : 'none'} />
+        <path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1" />
+        <path d="M2 21h20" />
+        <path d="M7 8v2" />
+        <path d="M12 8v2" />
+        <path d="M17 8v2" />
+        <circle cx="7" cy="5" r="1" fill={color} />
+        <circle cx="12" cy="5" r="1" fill={color} />
+        <circle cx="17" cy="5" r="1" fill={color} />
+      </svg>
+    );
+  }
+  if (name.includes('FRUVER') || name.includes('FRUTA') || name.includes('VERDU')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" fill={isActive ? '#e9d5ff' : 'none'} />
+        <path d="M12 4V2" />
+        <path d="M13 2a3 3 0 0 1 3 3" />
+        <path d="M12 20c-2.5-3-2.5-10 0-13" />
+        <path d="M12 20c2.5-3 2.5-10 0-13" />
+      </svg>
+    );
+  }
+  if (name.includes('CARNE')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" fill={isActive ? '#fecaca' : 'none'} />
+        <path d="M7 13.5c-2 0-4.5 1-4.5 3.5S5 21.5 8.5 21.5c2.5 0 3.5-2.5 3.5-4.5" fill={isActive ? '#fecaca' : 'none'} />
+        <circle cx="8" cy="18" r="1" fill={color} />
+      </svg>
+    );
+  }
+  if (name.includes('FORMUL') || name.includes('FORM')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" fill={isActive ? '#e0f2fe' : 'none'} />
+        <rect x="8" y="2" width="8" height="4" rx="1" ry="1" fill={isActive ? '#bae6fd' : 'none'} />
+        <path d="M9 12h6" />
+        <path d="M9 16h6" />
+      </svg>
+    );
+  }
+  if (name.includes('SALSA') || name.includes('ADEREZO')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10 2v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V2" />
+        <path d="M8.5 6h7l1.5 4v10a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V10L8.5 6z" fill={isActive ? '#fecaca' : 'none'} />
+        <path d="M7 13h10" />
+      </svg>
+    );
+  }
+  if (name.includes('PLATERO') || name.includes('PLATO') || name.includes('LAVADO')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <ellipse cx="12" cy="12" rx="9" ry="5" fill={isActive ? '#e0f2fe' : 'none'} />
+        <path d="M3 12v4c0 2.8 4 5 9 5s9-2.2 9-5v-4" fill={isActive ? '#bae6fd' : 'none'} />
+        <path d="M3 16v2c0 2.8 4 5 9 5s9-2.2 9-5v-2" />
+      </svg>
+    );
+  }
+  if (name.includes('EMPAQUE') || name.includes('ENFRIAMIENTO') || name.includes('FRIO')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" fill={isActive ? '#e0e7ff' : 'none'} />
+        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+        <line x1="12" y1="22.08" x2="12" y2="12" />
+        <path d="M12 2v4" stroke="#0284c7" />
+        <path d="M10 4l2 2 2-2" stroke="#0284c7" />
+      </svg>
+    );
+  }
+  if (name.includes('HELAD')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 8a6 6 0 0 0-12 0c0 5 6 7 6 12s6-7 6-12z" fill={isActive ? '#fce7f3' : 'none'} />
+        <circle cx="12" cy="5" r="1.5" fill={color} />
+        <path d="M7 11h10" />
+      </svg>
+    );
+  }
+  if (name.includes('PASILLO') || name.includes('TRANSITO') || name.includes('TRÁNSITO')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M13 4v16" strokeDasharray="3 3" />
+        <path d="M6 8l-4 4 4 4" />
+        <path d="M18 8l4 4-4 4" />
+        <rect x="3" y="3" width="18" height="18" rx="2" fill={isActive ? '#f3f4f6' : 'none'} />
+      </svg>
+    );
+  }
+  if (name.includes('PRODUCTO TERMINADO') || name.includes('TERMINADO')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2" fill={isActive ? '#dcfce7' : 'none'} />
+        <path d="M8 21h8" />
+        <path d="M12 17v4" />
+        <path d="M9 10l2 2 4-4" stroke="#16a34a" strokeWidth="2.5" />
+      </svg>
+    );
+  }
+  if (name.includes('POLLO') || name.includes('AVE')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 11a5 5 0 0 0-10 0v4a5 5 0 0 0 10 0v-4z" fill={isActive ? '#ffedd5' : 'none'} />
+        <path d="M15 15l3 3a2 2 0 0 0 3-3l-3-3" />
+        <path d="M9 15l-3 3a2 2 0 0 1-3-3l3-3" />
+      </svg>
+    );
+  }
+  if (name.includes('LACTEO') || name.includes('LÁCTEO') || name.includes('QUESO') || name.includes('LECHE')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M8 2h8v4l2 3v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9l2-3V2z" fill={isActive ? '#fef9c3' : 'none'} />
+        <path d="M8 6h8" />
+        <path d="M10 13h4" />
+      </svg>
+    );
+  }
+  if (name.includes('ALMACEN')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" fill={isActive ? '#fef3c7' : 'none'} />
+        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+        <line x1="12" y1="22.08" x2="12" y2="12" />
+      </svg>
+    );
+  }
+  if (name.includes('COMEDOR')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" fill={isActive ? '#d1fae5' : 'none'} />
+        <path d="M7 2v20" />
+        <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
+      </svg>
+    );
+  }
+  if (name.includes('BAÑO') || name.includes('LOCKER') || name.includes('MUJER') || name.includes('HOMBRE')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 6 6.5 3.5a1.5 1.5 0 0 0-1-.5C4.67 3 4 3.67 4 4.5V6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-.5c0-.83-.67-1.5-1.5-1.5a1.5 1.5 0 0 0-1 .5L17 6" />
+        <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" fill={isActive ? '#e0f2fe' : 'none'} />
+        <line x1="12" y1="12" x2="12" y2="16" />
+      </svg>
+    );
+  }
+  if (name.includes('COCINA')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z" fill={isActive ? '#ffedd5' : 'none'} />
+        <line x1="6" y1="17" x2="18" y2="17" />
+      </svg>
+    );
+  }
+  if (name.includes('DESPACHO')) {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1" y="3" width="15" height="13" fill={isActive ? '#e0e7ff' : 'none'} />
+        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" fill={isActive ? '#c7d2fe' : 'none'} />
+        <circle cx="5.5" cy="18.5" r="2.5" />
+        <circle cx="18.5" cy="18.5" r="2.5" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </svg>
+  );
+};
+
+const MatrixChecklistForm = ({ 
+  template, 
+  answers, 
+  onChange, 
+  activeTab, 
+  onTabChange,
+  observaciones,
+  onObservacionesChange,
+  onSaveProgress,
+  savingProgress
+}) => {
+  const [collapsedSections, setCollapsedSections] = useState({});
+
+  const toggleSection = (sIdx) => {
+    setCollapsedSections(prev => ({ ...prev, [sIdx]: !prev[sIdx] }));
+  };
+
+  const hasSubareaTabs = template.columnas && 
+    template.columnas.length > 0 && 
+    !template.columnas.some(c => c.toUpperCase().includes('SATISFACTORIO') || c.toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
+
+  const getAnswerKey = (fila) => {
+    if (hasSubareaTabs) {
+      return `${fila}__${activeTab}`;
+    }
+    if (template.tipo === 'matrix' && template.columnas && template.columnas.length > 0) {
+      return `${fila}__${template.columnas[0]}`;
+    }
+    return fila;
+  };
+
+  const handleRadioChange = (key, val, fila) => {
+    onChange(key, val);
+    if (!hasSubareaTabs && key !== fila) {
+      onChange(fila, val);
+    }
+  };
+
+  return (
+    <div className="matrix-checklist-container" style={{ width: '100%', margin: '0 auto' }}>
+      {/* Scrollable sub-area tabs (only when checklist has actual sub-areas) */}
+      {hasSubareaTabs && (
+        <div className="matrix-tabs-header" style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '20px', borderBottom: '2px solid #E8DDD4', justifyContent: 'flex-start', flexWrap: 'nowrap' }}>
+          {template.columnas.map((col) => {
+            const isActive = activeTab === col;
+            const isFormulaciones = col.toUpperCase() === 'FORMULACIONES';
+            return (
+              <button
+                key={col}
+                type="button"
+                className={`matrix-tab-btn ${isActive ? 'active' : ''}`}
+                onClick={() => onTabChange(col)}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '12px 16px',
+                  minWidth: '100px',
+                  borderRadius: '12px',
+                  border: isActive ? '2px solid #6B3A2A' : '1px solid #e2e8f0',
+                  backgroundColor: isActive ? '#fdf8f5' : '#ffffff',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: isActive ? '0 4px 12px rgba(107, 58, 42, 0.12)' : '0 1px 2px rgba(0,0,0,0.04)',
+                  flexShrink: 0
+                }}
+              >
+                <div className="tab-icon-wrapper">
+                  {renderMatrixIcon(col, isActive)}
+                </div>
+                <span style={{
+                  fontSize: '0.8rem',
+                  fontWeight: isActive ? '700' : '600',
+                  color: isActive ? '#6B3A2A' : '#64748b',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {isFormulaciones ? (
+                    <>
+                      <span className="desktop-only-inline">FORMULACIONES</span>
+                      <span className="mobile-only-inline">FORM.</span>
+                    </>
+                  ) : (
+                    col
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Checklist items for the active sub-area or sections */}
+      <div className="matrix-items-list" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {template.secciones.map((sec, sIdx) => {
+          const isCollapsed = !!collapsedSections[sIdx];
+          return (
+            <div key={sIdx} className="section-block shadow-sm" style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+              
+              {/* Accordion Header */}
+              <div
+                className="section-header-bar"
+                onClick={() => toggleSection(sIdx)}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '14px 18px',
+                  backgroundColor: '#f8fafc',
+                  borderBottom: isCollapsed ? 'none' : '1px solid #e2e8f0',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  transition: 'background-color 0.15s'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '0.8rem', color: '#6B3A2A', fontWeight: 'bold' }}>
+                    {isCollapsed ? '▶' : '▼'}
+                  </span>
+                  <h5 style={{ margin: 0, color: '#1e293b', fontSize: '0.88rem', fontWeight: '700', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    {sec.nombre}
+                  </h5>
+                </div>
+              </div>
+
+              {/* Column Headers + Rows (when not collapsed) */}
+              {!isCollapsed && (
+                <div className="section-content animate-fade-in">
+                  
+                  {/* Column Headers Badge Row */}
+                  <div className="section-column-headers" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 18px 8px', backgroundColor: '#ffffff', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{ flex: 1 }}></div>
+                    <div style={{ display: 'flex', width: '150px', justifyContent: 'space-between', paddingRight: '4px' }}>
+                      <span style={{ backgroundColor: '#d4edda', color: '#155724', padding: '2px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700', width: '42px', textAlign: 'center' }}>SÍ</span>
+                      <span style={{ backgroundColor: '#f8d7da', color: '#721c24', padding: '2px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700', width: '42px', textAlign: 'center' }}>NO</span>
+                      <span style={{ backgroundColor: '#e2e3e5', color: '#383d41', padding: '2px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700', width: '42px', textAlign: 'center' }}>N/A</span>
                     </div>
                   </div>
-                );
-              })}
+
+                  {/* Item Rows */}
+                  <div className="section-rows">
+                    {sec.filas.map((fila, fIdx) => {
+                      const answerKey = getAnswerKey(fila);
+                      const currentValue = answers[answerKey] || answers[fila] || '';
+                      
+                      return (
+                        <div key={fIdx} className="checklist-row-item" style={{ display: 'flex', flexDirection: 'column', padding: '12px 18px', borderBottom: fIdx === sec.filas.length - 1 ? 'none' : '1px solid #f1f5f9', transition: 'background-color 0.15s' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: '500', color: '#334155', flex: '1', lineHeight: '1.3', paddingRight: '15px' }}>{fila}</span>
+                            
+                            <div className="radio-buttons-group" style={{ display: 'flex', width: '150px', justifyContent: 'space-between', flexShrink: 0, paddingRight: '4px' }}>
+                              
+                              {/* SÍ Radio Button */}
+                              <div style={{ width: '42px', display: 'flex', justifyContent: 'center' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRadioChange(answerKey, currentValue === 'SI' ? '' : 'SI', fila)}
+                                  title="Sí: Cumple"
+                                  style={{
+                                    width: '24px',
+                                    height: '24px',
+                                    borderRadius: '50%',
+                                    border: currentValue === 'SI' ? '2px solid #2e7d32' : '2px solid #cbd5e1',
+                                    backgroundColor: currentValue === 'SI' ? '#e8f5e9' : '#ffffff',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    padding: 0
+                                  }}
+                                >
+                                  {currentValue === 'SI' && (
+                                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#2e7d32', display: 'block' }}></span>
+                                  )}
+                                </button>
+                              </div>
+
+                              {/* NO Radio Button */}
+                              <div style={{ width: '42px', display: 'flex', justifyContent: 'center' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRadioChange(answerKey, currentValue === 'NO' ? '' : 'NO', fila)}
+                                  title="NO: No cumple"
+                                  style={{
+                                    width: '24px',
+                                    height: '24px',
+                                    borderRadius: '50%',
+                                    border: currentValue === 'NO' ? '2px solid #c62828' : '2px solid #cbd5e1',
+                                    backgroundColor: currentValue === 'NO' ? '#ffebee' : '#ffffff',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    padding: 0
+                                  }}
+                                >
+                                  {currentValue === 'NO' && (
+                                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#c62828', display: 'block' }}></span>
+                                  )}
+                                </button>
+                              </div>
+
+                              {/* N/A Radio Button */}
+                              <div style={{ width: '42px', display: 'flex', justifyContent: 'center' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRadioChange(answerKey, currentValue === 'NA' ? '' : 'NA', fila)}
+                                  title="N/A: No aplica"
+                                  style={{
+                                    width: '24px',
+                                    height: '24px',
+                                    borderRadius: '50%',
+                                    border: currentValue === 'NA' ? '2px solid #616161' : '2px solid #cbd5e1',
+                                    backgroundColor: currentValue === 'NA' ? '#f5f5f5' : '#ffffff',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    padding: 0
+                                  }}
+                                >
+                                  {currentValue === 'NA' && (
+                                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#616161', display: 'block' }}></span>
+                                  )}
+                                </button>
+                              </div>
+
+                            </div>
+                          </div>
+
+                          {/* Campo de observación independiente para cada ítem */}
+                          <div style={{ marginTop: '8px', width: '100%' }}>
+                            <input
+                              type="text"
+                              placeholder="💬 Observación o hallazgo para este ítem (opcional)..."
+                              value={hasSubareaTabs ? (answers[`${answerKey}__obs`] || '') : (answers[`${answerKey}__obs`] || answers[`${fila}__obs`] || '')}
+                              onChange={(e) => {
+                                onChange(`${answerKey}__obs`, e.target.value);
+                                if (!hasSubareaTabs && answerKey !== fila) {
+                                  onChange(`${fila}__obs`, e.target.value);
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '6px 12px',
+                                fontSize: '0.78rem',
+                                borderRadius: '8px',
+                                border: '1px solid #e2e8f0',
+                                backgroundColor: '#f8fafc',
+                                outline: 'none',
+                                color: '#334155',
+                                transition: 'all 0.15s ease'
+                              }}
+                              onFocus={(e) => e.target.style.borderColor = '#6B3A2A'}
+                              onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                            />
+                          </div>
+
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend Bar */}
+      <div className="legend-bar" style={{ display: 'flex', justifyContent: 'center', gap: '24px', padding: '12px 20px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', marginTop: '24px', flexWrap: 'wrap', fontSize: '0.82rem', color: '#4b5563', fontWeight: '600' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #2e7d32', backgroundColor: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#2e7d32' }}></span>
+          </span>
+          <span>Sí: Cumple</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #c62828', backgroundColor: '#ffebee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#c62828' }}></span>
+          </span>
+          <span>NO: No cumple</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #616161', backgroundColor: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#616161' }}></span>
+          </span>
+          <span>N/A: No aplica</span>
+        </div>
+      </div>
+
+      {/* Live Score Summary Card */}
+      {(() => {
+        let liveTotal = 0;
+        let liveSi = 0;
+        let liveNo = 0;
+        let liveNa = 0;
+        if (template && template.secciones) {
+          template.secciones.forEach(sec => {
+            if (sec.filas) {
+              sec.filas.forEach(fila => {
+                if (hasSubareaTabs && template.columnas) {
+                  template.columnas.forEach(col => {
+                    liveTotal++;
+                    const val = answers[`${fila}__${col}`];
+                    if (val === 'SI') liveSi++;
+                    else if (val === 'NO') liveNo++;
+                    else if (val === 'NA') liveNa++;
+                  });
+                } else {
+                  liveTotal++;
+                  const val = answers[fila] || (template.columnas && template.columnas[0] ? answers[`${fila}__${template.columnas[0]}`] : null);
+                  if (val === 'SI') liveSi++;
+                  else if (val === 'NO') liveNo++;
+                  else if (val === 'NA') liveNa++;
+                }
+              });
+            }
+          });
+        }
+        const liveDenom = liveTotal - liveNa;
+        const liveScore = liveDenom > 0 ? Math.round((liveSi / liveDenom) * 100) : (liveSi > 0 ? 100 : 0);
+
+        return (
+          <div className="live-score-card shadow-sm" style={{ marginTop: '24px', backgroundColor: '#ffffff', borderRadius: '12px', border: '2px solid #E8DDD4', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ fontWeight: '800', color: '#6B3A2A', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📊</span> CALIFICACIÓN DEL CHECKLIST EN TIEMPO REAL
+              </div>
+              <div style={{ backgroundColor: liveScore >= 90 ? '#DCFCE7' : (liveScore >= 70 ? '#FEF3C7' : '#FEE2E2'), color: liveScore >= 90 ? '#15803D' : (liveScore >= 70 ? '#92400E' : '#991B1B'), fontWeight: '900', fontSize: '1rem', padding: '4px 14px', borderRadius: '20px', border: '1px solid currentColor' }}>
+                Calificación: {liveScore}%
+              </div>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', textAlign: 'center' }}>
+              <div style={{ backgroundColor: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Total Aspectos</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>{liveTotal}</div>
+              </div>
+              <div style={{ backgroundColor: '#f0fdf4', padding: '10px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                <div style={{ fontSize: '0.72rem', color: '#166534', fontWeight: '600', textTransform: 'uppercase' }}>🟢 Satisfactorio</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#15803d' }}>{liveSi} <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>({liveTotal > 0 ? Math.round((liveSi/liveTotal)*100) : 0}%)</span></div>
+              </div>
+              <div style={{ backgroundColor: '#fef2f2', padding: '10px', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                <div style={{ fontSize: '0.72rem', color: '#991b1b', fontWeight: '600', textTransform: 'uppercase' }}>❌ No Satisfactorio</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#dc2626' }}>{liveNo} <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>({liveTotal > 0 ? Math.round((liveNo/liveTotal)*100) : 0}%)</span></div>
+              </div>
+              <div style={{ backgroundColor: '#f1f5f9', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                <div style={{ fontSize: '0.72rem', color: '#475569', fontWeight: '600', textTransform: 'uppercase' }}>🔘 No Aplica</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#64748b' }}>{liveNa} <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>({liveTotal > 0 ? Math.round((liveNa/liveTotal)*100) : 0}%)</span></div>
+              </div>
+            </div>
+            
+            <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', textAlign: 'right' }}>
+              * Fórmula: Satisfactorio × 100 / (Total Aspectos - No Aplica)
             </div>
           </div>
-        ))}
+        );
+      })()}
+
+      {/* General Observations & Save Progress Button */}
+      <div className="observations-save-section" style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="form-group" style={{ margin: 0 }}>
+          <label htmlFor="matrix-observaciones" style={{ display: 'block', fontSize: '0.88rem', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
+            Observaciones generales (opcional)
+          </label>
+          <textarea
+            id="matrix-observaciones"
+            className="form-textarea"
+            rows={3}
+            placeholder="Escriba aquí tus observaciones..."
+            value={observaciones || ''}
+            onChange={(e) => onObservacionesChange && onObservacionesChange(e.target.value)}
+            style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.88rem', outline: 'none', transition: 'border-color 0.2s', fontFamily: 'inherit' }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+          <button
+            type="button"
+            onClick={onSaveProgress}
+            disabled={savingProgress}
+            className="btn-guardar-progreso"
+            style={{
+              backgroundColor: '#6B3A2A',
+              color: '#ffffff',
+              border: 'none',
+              padding: '12px 28px',
+              borderRadius: '10px',
+              fontSize: '0.9rem',
+              fontWeight: '700',
+              cursor: savingProgress ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 12px rgba(107, 58, 42, 0.2)',
+              transition: 'all 0.2s ease',
+              justifyContent: 'center',
+              opacity: savingProgress ? 0.7 : 1
+            }}
+          >
+            <span>💾</span> {savingProgress ? 'Guardando...' : 'Guardar progreso'}
+          </button>
+        </div>
       </div>
+
+      <style jsx>{`
+        .checklist-row-item:hover {
+          background-color: #f8fafc;
+        }
+        .section-header-bar:hover {
+          background-color: #f1f5f9 !important;
+        }
+        @media (max-width: 600px) {
+          .btn-guardar-progreso {
+            width: 100% !important;
+          }
+          .matrix-tab-btn {
+            min-width: 80px !important;
+            padding: 10px 12px !important;
+          }
+          .section-column-headers, .checklist-row-item {
+            padding-left: 12px !important;
+            padding-right: 12px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };
 
 const SimpleChecklistForm = ({ template, answers, onChange }) => {
-  return (
-    <div className="simple-checklist-execution" style={{ maxWidth: '650px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-      {template.secciones.map((sec, sIdx) => (
-        <div key={sIdx} className="section-block" style={{ backgroundColor: 'var(--color-bg-secondary)', padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-light)' }}>
-          <h5 style={{ color: 'var(--color-primary-dark)', borderBottom: '2px solid var(--color-border-light)', paddingBottom: '4px', marginBottom: '10px', textTransform: 'uppercase', fontSize: '0.78rem', fontWeight: 'bold' }}>
-              📁 {sec.nombre}
-          </h5>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {sec.filas.map((fila, fIdx) => {
-              const currentValue = answers[fila] || '';
-              const obsKey = `${fila}__obs`;
-              const currentObs = answers[obsKey] || '';
-              
-              return (
-                <div key={fIdx} className="checklist-row-item" style={{ display: 'flex', flexDirection: 'column', gap: '5px', paddingBottom: '8px', borderBottom: '1px solid var(--color-border-light)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '15px' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: '500', color: 'var(--color-text-primary)', flex: '1', lineHeight: '1.2' }}>{fila}</span>
-                    <div className="btn-group" style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                      <button
-                        type="button"
-                        onClick={() => onChange(fila, currentValue === 'SI' ? '' : 'SI')}
-                        style={{
-                          padding: '4px 10px',
-                          fontSize: '0.72rem',
-                          fontWeight: 'bold',
-                          borderRadius: '15px',
-                          border: '1px solid ' + (currentValue === 'SI' ? 'var(--color-success)' : 'var(--color-border-light)'),
-                          backgroundColor: currentValue === 'SI' ? 'var(--color-success)' : 'transparent',
-                          color: currentValue === 'SI' ? 'white' : 'var(--color-text-secondary)',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        SI
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onChange(fila, currentValue === 'NO' ? '' : 'NO')}
-                        style={{
-                          padding: '4px 10px',
-                          fontSize: '0.72rem',
-                          fontWeight: 'bold',
-                          borderRadius: '15px',
-                          border: '1px solid ' + (currentValue === 'NO' ? 'var(--color-danger)' : 'var(--color-border-light)'),
-                          backgroundColor: currentValue === 'NO' ? 'var(--color-danger)' : 'transparent',
-                          color: currentValue === 'NO' ? 'white' : 'var(--color-text-secondary)',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        NO
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onChange(fila, currentValue === 'NA' ? '' : 'NA')}
-                        style={{
-                          padding: '4px 10px',
-                          fontSize: '0.72rem',
-                          fontWeight: 'bold',
-                          borderRadius: '15px',
-                          border: '1px solid ' + (currentValue === 'NA' ? '#6c757d' : 'var(--color-border-light)'),
-                          backgroundColor: currentValue === 'NA' ? '#6c757d' : 'transparent',
-                          color: currentValue === 'NA' ? 'white' : 'var(--color-text-secondary)',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        N/A
-                      </button>
-                    </div>
-                  </div>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="Escribir comentario / observación..."
-                    style={{ fontSize: '0.74rem', padding: '3px 6px', marginTop: '2px', height: 'auto', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-light)' }}
-                    value={currentObs}
-                    onChange={(e) => onChange(obsKey, e.target.value)}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+  return null;
 };
 
 function SearchableCategorySelect({ categories, selectedId, onChange, areaId }) {
@@ -871,6 +1400,7 @@ export default function VisitasPage() {
   const [formHallazgos, setFormHallazgos] = useState('');
   const [formAccionesCorrectivas, setFormAccionesCorrectivas] = useState('');
   const [auxiliarSignature, setAuxiliarSignature] = useState('');
+  const [savingProgress, setSavingProgress] = useState(false);
   
   // Applicant details and PDV signature states
   const [solicitanteNombre, setSolicitanteNombre] = useState('');
@@ -1200,21 +1730,22 @@ export default function VisitasPage() {
         try {
           const fields = JSON.parse(template.campos);
           const initialAnswers = {};
-          if (fields[0] && fields[0].tipo === 'matrix') {
-            setActiveMatrixTab(fields[0].columnas[0]);
-            fields[0].secciones.forEach((sec) => {
-              sec.filas.forEach((fila) => {
-                fields[0].columnas.forEach((col) => {
-                  const key = `${fila}__${col}`;
-                  initialAnswers[key] = '';
-                });
-              });
-            });
-          } else if (fields[0] && fields[0].tipo === 'simple_checklist') {
+          if (fields[0] && (fields[0].tipo === 'matrix' || fields[0].tipo === 'simple_checklist')) {
+            const hasSubTabs = fields[0].columnas && fields[0].columnas.length > 0 && !fields[0].columnas.some(c => c.toUpperCase().includes('SATISFACTORIO') || c.toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
+            if (hasSubTabs && fields[0].columnas[0]) {
+              setActiveMatrixTab(fields[0].columnas[0]);
+            }
             fields[0].secciones.forEach((sec) => {
               sec.filas.forEach((fila) => {
                 initialAnswers[fila] = '';
                 initialAnswers[`${fila}__obs`] = '';
+                if (fields[0].columnas) {
+                  fields[0].columnas.forEach((col) => {
+                    const key = `${fila}__${col}`;
+                    initialAnswers[key] = '';
+                    initialAnswers[`${key}__obs`] = '';
+                  });
+                }
               });
             });
           } else {
@@ -1483,21 +2014,22 @@ export default function VisitasPage() {
           const existingAnswers = JSON.parse(visit.datos_formulario || '{}');
           const fields = JSON.parse(template.campos);
           const initialAnswers = {};
-          if (fields[0] && fields[0].tipo === 'matrix') {
-            setActiveMatrixTab(fields[0].columnas[0]);
-            fields[0].secciones.forEach((sec) => {
-              sec.filas.forEach((fila) => {
-                fields[0].columnas.forEach((col) => {
-                  const key = `${fila}__${col}`;
-                  initialAnswers[key] = existingAnswers[key] || '';
-                });
-              });
-            });
-          } else if (fields[0] && fields[0].tipo === 'simple_checklist') {
+          if (fields[0] && (fields[0].tipo === 'matrix' || fields[0].tipo === 'simple_checklist')) {
+            const hasSubTabs = fields[0].columnas && fields[0].columnas.length > 0 && !fields[0].columnas.some(c => c.toUpperCase().includes('SATISFACTORIO') || c.toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
+            if (hasSubTabs && fields[0].columnas[0]) {
+              setActiveMatrixTab(fields[0].columnas[0]);
+            }
             fields[0].secciones.forEach((sec) => {
               sec.filas.forEach((fila) => {
                 initialAnswers[fila] = existingAnswers[fila] || '';
                 initialAnswers[`${fila}__obs`] = existingAnswers[`${fila}__obs`] || existingAnswers[`${fila}_obs`] || '';
+                if (fields[0].columnas) {
+                  fields[0].columnas.forEach((col) => {
+                    const key = `${fila}__${col}`;
+                    initialAnswers[key] = existingAnswers[key] || '';
+                    initialAnswers[`${key}__obs`] = existingAnswers[`${key}__obs`] || existingAnswers[`${key}_obs`] || '';
+                  });
+                }
               });
             });
           } else {
@@ -1520,6 +2052,33 @@ export default function VisitasPage() {
         setActivePlantilla(null);
         setFormAnswers({});
       }
+    }
+  };
+
+  const handleSaveProgress = async () => {
+    if (!activeExecutionVisit) return;
+    setSavingProgress(true);
+    setSubmitError('');
+    setSubmitSuccess('');
+    try {
+      const res = await fetch('/api/visitas', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: activeExecutionVisit.id,
+          action: 'guardar_progreso',
+          datos_formulario: formAnswers,
+          observaciones: formObservaciones
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al guardar progreso');
+      setSubmitSuccess('Progreso guardado exitosamente.');
+      setTimeout(() => setSubmitSuccess(''), 3000);
+    } catch (err) {
+      setSubmitError(err.message);
+    } finally {
+      setSavingProgress(false);
     }
   };
 
@@ -2126,7 +2685,7 @@ export default function VisitasPage() {
                           ? JSON.parse(activeExecutionVisit.campos_personalizados) 
                           : (activePlantilla ? JSON.parse(activePlantilla.campos) : []);
                         const firstField = parsedCampos[0];
-                        if (firstField && firstField.tipo === 'matrix') {
+                        if (firstField && (firstField.tipo === 'matrix' || firstField.tipo === 'simple_checklist')) {
                           return (
                             <MatrixChecklistForm
                               template={firstField}
@@ -2134,14 +2693,10 @@ export default function VisitasPage() {
                               onChange={handleInputChange}
                               activeTab={activeMatrixTab}
                               onTabChange={setActiveMatrixTab}
-                            />
-                          );
-                        } else if (firstField && firstField.tipo === 'simple_checklist') {
-                          return (
-                            <SimpleChecklistForm
-                              template={firstField}
-                              answers={formAnswers}
-                              onChange={handleInputChange}
+                              observaciones={formObservaciones}
+                              onObservacionesChange={(val) => setFormObservaciones(val)}
+                              onSaveProgress={handleSaveProgress}
+                              savingProgress={savingProgress}
                             />
                           );
                         } else {
@@ -2260,16 +2815,20 @@ export default function VisitasPage() {
                   <div className="card-body">
                     
                     {/* General observations */}
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="exec-observaciones">Observaciones Generales</label>
-                      <textarea
-                        id="exec-observaciones"
-                        className="form-textarea"
-                        placeholder="Escriba aquí anotaciones del trabajo realizado..."
-                        value={formObservaciones}
-                        onChange={(e) => setFormObservaciones(e.target.value)}
-                      ></textarea>
-                    </div>
+                    {(!activePlantilla || !activePlantilla.campos || (() => {
+                      try { return JSON.parse(activePlantilla.campos)[0]?.tipo !== 'matrix'; } catch(e) { return true; }
+                    })()) && (
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="exec-observaciones">Observaciones Generales</label>
+                        <textarea
+                          id="exec-observaciones"
+                          className="form-textarea"
+                          placeholder="Escriba aquí anotaciones del trabajo realizado..."
+                          value={formObservaciones}
+                          onChange={(e) => setFormObservaciones(e.target.value)}
+                        ></textarea>
+                      </div>
+                    )}
 
                     {/* Specific Fields for Administrative Flow */}
                     {activeExecutionVisit.area_tipo_flujo !== 'tecnico' && (
@@ -2910,6 +3469,7 @@ export default function VisitasPage() {
                         <th>Tipo de Visita</th>
                         <th>Inspector</th>
                         <th>Responsable</th>
+                        <th>Calificación</th>
                         <th>Estado</th>
                         <th>Detalle</th>
                       </tr>
@@ -2928,6 +3488,17 @@ export default function VisitasPage() {
                             <td>{v.tipo_visita_nombre || 'Sin definir'}</td>
                             <td>{v.usuario_nombre}</td>
                             <td>{v.responsable_nombre || 'No asignado'}</td>
+                            <td>
+                              {(() => {
+                                const score = calculateVisitScore(v, plantillas);
+                                if (!score) return <span className="text-muted" style={{ fontSize: '0.8rem' }}>—</span>;
+                                return (
+                                  <span style={{ backgroundColor: score.badgeBg, color: score.badgeColor, fontWeight: '800', fontSize: '0.8rem', padding: '4px 10px', borderRadius: '20px', border: '1px solid currentColor', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                                    {score.porcentaje}% ({score.satisfactorios}/{score.totalAspectos - score.noAplica})
+                                  </span>
+                                );
+                              })()}
+                            </td>
                             <td>
                               <span className={`status-pill ${v.estado}`}>
                                 {v.estado === 'pendiente' && '⏳ Pendiente'}
@@ -2974,13 +3545,24 @@ export default function VisitasPage() {
                     return (
                       <div key={v.id} className="visita-pending-card" style={{ backgroundColor: '#fff', border: '1.5px solid #e8ddd4', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(44,24,16,0.05)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {/* Top: PDV + Badge */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                           <div style={{ fontWeight: '800', color: 'var(--color-primary-dark)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>📍</span> {v.pdv_nombre} ({v.ciudad_nombre})
                           </div>
-                          <span style={{ backgroundColor: st.bg, color: st.color, fontWeight: 'bold', fontSize: '0.72rem', padding: '4px 10px', borderRadius: '20px', whiteSpace: 'nowrap' }}>
-                            {st.label}
-                          </span>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            {(() => {
+                              const score = calculateVisitScore(v, plantillas);
+                              if (!score) return null;
+                              return (
+                                <span style={{ backgroundColor: score.badgeBg, color: score.badgeColor, fontWeight: '800', fontSize: '0.72rem', padding: '4px 8px', borderRadius: '20px', border: '1px solid currentColor', whiteSpace: 'nowrap' }}>
+                                  🏆 {score.porcentaje}%
+                                </span>
+                              );
+                            })()}
+                            <span style={{ backgroundColor: st.bg, color: st.color, fontWeight: 'bold', fontSize: '0.72rem', padding: '4px 10px', borderRadius: '20px', whiteSpace: 'nowrap' }}>
+                              {st.label}
+                            </span>
+                          </div>
                         </div>
 
                         {/* Content */}
@@ -3112,7 +3694,7 @@ export default function VisitasPage() {
                       {(() => {
                         const parsedCampos = JSON.parse(activePlantilla.campos);
                         const firstField = parsedCampos[0];
-                        if (firstField && firstField.tipo === 'matrix') {
+                        if (firstField && (firstField.tipo === 'matrix' || firstField.tipo === 'simple_checklist')) {
                           return (
                             <MatrixChecklistForm
                               template={firstField}
@@ -3120,14 +3702,10 @@ export default function VisitasPage() {
                               onChange={handleInputChange}
                               activeTab={activeMatrixTab}
                               onTabChange={setActiveMatrixTab}
-                            />
-                          );
-                        } else if (firstField && firstField.tipo === 'simple_checklist') {
-                          return (
-                            <SimpleChecklistForm
-                              template={firstField}
-                              answers={formAnswers}
-                              onChange={handleInputChange}
+                              observaciones={formObservaciones}
+                              onObservacionesChange={(val) => setFormObservaciones(val)}
+                              onSaveProgress={handleSaveProgress}
+                              savingProgress={savingProgress}
                             />
                           );
                         } else {
@@ -3564,6 +4142,47 @@ export default function VisitasPage() {
                 </div>
               )}
 
+              {/* Score Executive Banner for Quality Checklists */}
+              {(() => {
+                const score = calculateVisitScore(selectedVisit, plantillas);
+                if (!score) return null;
+                return (
+                  <div className="modal-score-card shadow-sm" style={{ marginBottom: '20px', backgroundColor: '#ffffff', borderRadius: '12px', border: '2px solid #6B3A2A', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ fontWeight: '800', color: '#6B3A2A', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>🏆</span> CALIFICACIÓN FINAL DEL CHECKLIST
+                      </div>
+                      <div style={{ backgroundColor: score.badgeBg, color: score.badgeColor, fontWeight: '900', fontSize: '1.1rem', padding: '4px 16px', borderRadius: '20px', border: '1px solid currentColor' }}>
+                        Calificación: {score.porcentaje}% {score.stars}
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', textAlign: 'center' }}>
+                      <div style={{ backgroundColor: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Total Aspectos</div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>{score.totalAspectos}</div>
+                      </div>
+                      <div style={{ backgroundColor: '#f0fdf4', padding: '10px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                        <div style={{ fontSize: '0.72rem', color: '#166534', fontWeight: '600', textTransform: 'uppercase' }}>🟢 Satisfactorio</div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#15803d' }}>{score.satisfactorios} <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>({score.totalAspectos > 0 ? Math.round((score.satisfactorios/score.totalAspectos)*100) : 0}%)</span></div>
+                      </div>
+                      <div style={{ backgroundColor: '#fef2f2', padding: '10px', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                        <div style={{ fontSize: '0.72rem', color: '#991b1b', fontWeight: '600', textTransform: 'uppercase' }}>❌ No Satisfactorio</div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#dc2626' }}>{score.noSatisfactorios} <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>({score.totalAspectos > 0 ? Math.round((score.noSatisfactorios/score.totalAspectos)*100) : 0}%)</span></div>
+                      </div>
+                      <div style={{ backgroundColor: '#f1f5f9', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                        <div style={{ fontSize: '0.72rem', color: '#475569', fontWeight: '600', textTransform: 'uppercase' }}>🔘 No Aplica</div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#64748b' }}>{score.noAplica} <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>({score.totalAspectos > 0 ? Math.round((score.noAplica/score.totalAspectos)*100) : 0}%)</span></div>
+                      </div>
+                    </div>
+                    
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', textAlign: 'right' }}>
+                      * Fórmula de evaluación: Satisfactorio × 100 / (Total Aspectos - No Aplica)
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* TAB 1: GENERAL INFO & APPROVAL */}
               <div className={`tab-content-general ${modalTab === 'general' ? 'active-tab' : ''}`} style={{ width: '100%' }}>
                 {selectedVisit.area_tipo_flujo === 'tecnico' ? (
@@ -3977,65 +4596,89 @@ export default function VisitasPage() {
                   <div className="responses-grid">
                     {(() => {
                       const firstField = selectedVisit.fields && selectedVisit.fields[0];
-                      if (firstField && firstField.tipo === 'matrix') {
-                        return (
-                          <div className="matrix-results">
-                            {firstField.columnas.map((col) => (
-                              <div key={col} className="matrix-col-section" style={{ marginBottom: '15px' }}>
-                                <h5 style={{ color: 'var(--color-primary-dark)', borderBottom: '2px solid var(--color-border-light)', paddingBottom: '3px', marginBottom: '8px', fontWeight: 'bold' }}>
-                                  📍 Sub-área: {col}
-                                </h5>
-                                <div className="responses-grid">
-                                  {firstField.secciones.flatMap(sec => sec.filas).map((fila, fIdx) => {
-                                    const answer = selectedVisit.data[`${fila}__${col}`];
-                                    let colorClass = 'text-muted';
-                                    let emoji = '⚪';
-                                    if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
-                                    else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
-                                    
-                                    return (
-                                      <div key={fIdx} className="response-row">
-                                        <span className="response-label">{fila}:</span>
-                                        <span className={`response-value ${colorClass}`}>
-                                          {emoji} {answer || 'No responde'}
-                                        </span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      } else if (firstField && firstField.tipo === 'simple_checklist') {
-                        return (
-                          <div className="responses-grid">
-                            {firstField.secciones.flatMap(sec => sec.filas).map((fila, fIdx) => {
-                              const answer = selectedVisit.data[fila];
-                              const obs = selectedVisit.data[`${fila}__obs` || `${fila}_obs`];
-                              let colorClass = 'text-muted';
-                              let emoji = '⚪';
-                              if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
-                              else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
-                              
-                              return (
-                                <div key={fIdx} className="response-row" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '8px', borderBottom: '1px solid var(--color-border-light)' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                    <span className="response-label">{fila}:</span>
-                                    <span className={`response-value ${colorClass}`}>
-                                      {emoji} {answer || 'No responde'}
-                                    </span>
+                      if (firstField && (firstField.tipo === 'matrix' || firstField.tipo === 'simple_checklist')) {
+                        const hasSubTabs = firstField.columnas && firstField.columnas.length > 0 && !firstField.columnas.some(c => c.toUpperCase().includes('SATISFACTORIO') || c.toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
+                        
+                        if (hasSubTabs) {
+                          return (
+                            <div className="matrix-results">
+                              {firstField.columnas.map((col) => (
+                                <div key={col} className="matrix-col-section" style={{ marginBottom: '18px', backgroundColor: '#fdf8f5', padding: '12px', borderRadius: '10px', border: '1px solid #E8DDD4' }}>
+                                  <h5 style={{ color: '#6B3A2A', borderBottom: '2px solid #E8DDD4', paddingBottom: '6px', marginBottom: '10px', fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span>📍</span> Sub-área: {col}
+                                  </h5>
+                                  <div className="responses-grid" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {firstField.secciones.flatMap(sec => sec.filas).map((fila, fIdx) => {
+                                      const answer = selectedVisit.data[`${fila}__${col}`];
+                                      const obs = selectedVisit.data[`${fila}__${col}__obs`] || selectedVisit.data[`${fila}__${col}_obs`];
+                                      let colorClass = 'text-muted';
+                                      let emoji = '⚪';
+                                      if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
+                                      else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
+                                      else if (answer === 'NA') { colorClass = 'text-muted'; emoji = '🔘'; }
+                                      
+                                      return (
+                                        <div key={fIdx} className="response-row" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '6px', borderBottom: '1px solid #e2e8f0' }}>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                            <span className="response-label" style={{ fontWeight: '500', color: '#334155' }}>{fila}</span>
+                                            <span className={`response-value ${colorClass}`} style={{ fontWeight: '700' }}>
+                                              {emoji} {answer || 'Sin responder'}
+                                            </span>
+                                          </div>
+                                          {obs && (
+                                            <span style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', paddingLeft: '8px', backgroundColor: '#ffffff', padding: '4px 8px', borderRadius: '4px', borderLeft: '3px solid #6B3A2A', marginTop: '2px' }}>
+                                              💬 {obs}
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
-                                  {obs && (
-                                    <span className="text-muted" style={{ fontSize: '0.78rem', fontStyle: 'italic', paddingLeft: '8px' }}>
-                                      ↳ Observación: {obs}
-                                    </span>
-                                  )}
                                 </div>
-                              );
-                            })}
-                          </div>
-                        );
+                              ))}
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <div className="matrix-results">
+                              {firstField.secciones.map((sec, sIdx) => (
+                                <div key={sIdx} className="matrix-col-section" style={{ marginBottom: '18px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                                  <h5 style={{ color: '#1e293b', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px', marginBottom: '10px', fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase' }}>
+                                    <span>📁</span> {sec.nombre}
+                                  </h5>
+                                  <div className="responses-grid" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {sec.filas.map((fila, fIdx) => {
+                                      const defaultColKey = (firstField.tipo === 'matrix' && firstField.columnas && firstField.columnas[0]) ? `${fila}__${firstField.columnas[0]}` : fila;
+                                      const answer = selectedVisit.data[defaultColKey] || selectedVisit.data[fila] || selectedVisit.data[`${fila}__SATISFACTORIO`];
+                                      const obs = selectedVisit.data[`${defaultColKey}__obs`] || selectedVisit.data[`${fila}__obs`] || selectedVisit.data[`${fila}_obs`];
+                                      let colorClass = 'text-muted';
+                                      let emoji = '⚪';
+                                      if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
+                                      else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
+                                      else if (answer === 'NA') { colorClass = 'text-muted'; emoji = '🔘'; }
+                                      
+                                      return (
+                                        <div key={fIdx} className="response-row" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '6px', borderBottom: '1px solid #e2e8f0' }}>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                            <span className="response-label" style={{ fontWeight: '500', color: '#334155' }}>{fila}</span>
+                                            <span className={`response-value ${colorClass}`} style={{ fontWeight: '700' }}>
+                                              {emoji} {answer || 'Sin responder'}
+                                            </span>
+                                          </div>
+                                          {obs && (
+                                            <span style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', paddingLeft: '8px', backgroundColor: '#ffffff', padding: '4px 8px', borderRadius: '4px', borderLeft: '3px solid #6B3A2A', marginTop: '2px' }}>
+                                              💬 {obs}
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        }
                       } else {
                         return (
                           <div className="responses-grid">
