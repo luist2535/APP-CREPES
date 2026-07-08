@@ -402,51 +402,80 @@ const calculateVisitScore = (visit, plantillas) => {
   let noAplica = 0;
   const seccionesScores = [];
 
+  const hasSubareaTabs = firstField.columnas && firstField.columnas.length > 0 && !firstField.columnas.some(c => c.toUpperCase().includes('SATISFACTORIO') || c.toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
+
   if (firstField.secciones) {
-    firstField.secciones.forEach((sec, idx) => {
-      let secTotal = 0;
-      let secSi = 0;
-      let secNo = 0;
-      let secNa = 0;
-      if (sec.filas) {
-        sec.filas.forEach(fila => {
-          if (firstField.tipo === 'matrix' && firstField.columnas) {
-            firstField.columnas.forEach(col => {
-              secTotal++;
+    if (hasSubareaTabs && firstField.columnas) {
+      firstField.columnas.forEach((col, idx) => {
+        let colTotal = 0;
+        let colSi = 0;
+        let colNo = 0;
+        let colNa = 0;
+        firstField.secciones.forEach(sec => {
+          if (sec.filas) {
+            sec.filas.forEach(fila => {
+              colTotal++;
               totalAspectos++;
               const val = data[`${fila}__${col}`];
-              if (val === 'SI') { secSi++; satisfactorios++; }
-              else if (val === 'NO') { secNo++; noSatisfactorios++; }
-              else if (val === 'NA') { secNa++; noAplica++; }
+              if (val === 'SI') { colSi++; satisfactorios++; }
+              else if (val === 'NO') { colNo++; noSatisfactorios++; }
+              else if (val === 'NA') { colNa++; noAplica++; }
             });
-          } else {
+          }
+        });
+        const denom = colTotal - colNa;
+        const por = denom > 0 ? Math.round((colSi / denom) * 100) : (colSi > 0 ? 100 : 0);
+        let badgeCol = '#15803D';
+        let badgeBgCol = '#DCFCE7';
+        if (por < 70) { badgeCol = '#991B1B'; badgeBgCol = '#FEE2E2'; }
+        else if (por < 90) { badgeCol = '#92400E'; badgeBgCol = '#FEF3C7'; }
+
+        seccionesScores.push({
+          nombre: col,
+          totalAspectos: colTotal,
+          satisfactorios: colSi,
+          noSatisfactorios: colNo,
+          noAplica: colNa,
+          porcentaje: por,
+          badgeColor: badgeCol,
+          badgeBg: badgeBgCol
+        });
+      });
+    } else {
+      firstField.secciones.forEach((sec, idx) => {
+        let secTotal = 0;
+        let secSi = 0;
+        let secNo = 0;
+        let secNa = 0;
+        if (sec.filas) {
+          sec.filas.forEach(fila => {
             secTotal++;
             totalAspectos++;
             const val = data[fila] || (firstField.columnas && firstField.columnas[0] ? data[`${fila}__${firstField.columnas[0]}`] : null);
             if (val === 'SI') { secSi++; satisfactorios++; }
             else if (val === 'NO') { secNo++; noSatisfactorios++; }
             else if (val === 'NA') { secNa++; noAplica++; }
-          }
-        });
-      }
-      const secDenom = secTotal - secNa;
-      const secPor = secDenom > 0 ? Math.round((secSi / secDenom) * 100) : (secSi > 0 ? 100 : 0);
-      let badgeCol = '#15803D';
-      let badgeBgCol = '#DCFCE7';
-      if (secPor < 70) { badgeCol = '#991B1B'; badgeBgCol = '#FEE2E2'; }
-      else if (secPor < 90) { badgeCol = '#92400E'; badgeBgCol = '#FEF3C7'; }
+          });
+        }
+        const secDenom = secTotal - secNa;
+        const secPor = secDenom > 0 ? Math.round((secSi / secDenom) * 100) : (secSi > 0 ? 100 : 0);
+        let badgeCol = '#15803D';
+        let badgeBgCol = '#DCFCE7';
+        if (secPor < 70) { badgeCol = '#991B1B'; badgeBgCol = '#FEE2E2'; }
+        else if (secPor < 90) { badgeCol = '#92400E'; badgeBgCol = '#FEF3C7'; }
 
-      seccionesScores.push({
-        nombre: sec.nombre || `Formato ${idx + 1}`,
-        totalAspectos: secTotal,
-        satisfactorios: secSi,
-        noSatisfactorios: secNo,
-        noAplica: secNa,
-        porcentaje: secPor,
-        badgeColor: badgeCol,
-        badgeBg: badgeBgCol
+        seccionesScores.push({
+          nombre: sec.nombre || `Formato ${idx + 1}`,
+          totalAspectos: secTotal,
+          satisfactorios: secSi,
+          noSatisfactorios: secNo,
+          noAplica: secNa,
+          porcentaje: secPor,
+          badgeColor: badgeCol,
+          badgeBg: badgeBgCol
+        });
       });
-    });
+    }
   }
 
   if (totalAspectos === 0) return null;
@@ -972,105 +1001,138 @@ const MatrixChecklistForm = ({
       {/* Live Score Summary Card */}
       {(() => {
         let liveTotal = 0;
-        let liveSi = 0;
-        let liveNo = 0;
-        let liveNa = 0;
-        const liveSecciones = [];
+        const liveCategorias = [];
 
-        if (template && template.secciones) {
-          template.secciones.forEach((sec, idx) => {
-            let secTotal = 0;
-            let secSi = 0;
-            let secNo = 0;
-            let secNa = 0;
-            if (sec.filas) {
-              sec.filas.forEach(fila => {
-                if (hasSubareaTabs && template.columnas) {
-                  template.columnas.forEach(col => {
-                    liveTotal++;
-                    secTotal++;
-                    const val = answers[`${fila}__${col}`];
-                    if (val === 'SI') { liveSi++; secSi++; }
-                    else if (val === 'NO') { liveNo++; secNo++; }
-                    else if (val === 'NA') { liveNa++; secNa++; }
-                  });
-                } else {
-                  liveTotal++;
+        if (template) {
+          if (hasSubareaTabs && template.columnas && template.columnas.length > 0) {
+            // El checklist está dividido por columnas/áreas (Ej: Helados, Conos, Bebidas, etc.)
+            template.columnas.forEach((col) => {
+              let colTotal = 0;
+              let colSi = 0;
+              let colNo = 0;
+              let colNa = 0;
+              if (template.secciones) {
+                template.secciones.forEach(sec => {
+                  if (sec.filas) {
+                    sec.filas.forEach(fila => {
+                      colTotal++;
+                      const val = answers[`${fila}__${col}`];
+                      if (val === 'SI') colSi++;
+                      else if (val === 'NO') colNo++;
+                      else if (val === 'NA') colNa++;
+                    });
+                  }
+                });
+              }
+              const denom = colTotal - colNa;
+              const por = denom > 0 ? Math.round((colSi / denom) * 100) : (colSi > 0 ? 100 : 0);
+              liveCategorias.push({
+                nombre: col,
+                total: colTotal,
+                si: colSi,
+                no: colNo,
+                na: colNa,
+                porcentaje: por
+              });
+            });
+          } else if (template.secciones) {
+            // El checklist está dividido por Formatos/Secciones (Ej: Aspectos Generales, Equipos y Utensilios)
+            template.secciones.forEach((sec, idx) => {
+              let secTotal = 0;
+              let secSi = 0;
+              let secNo = 0;
+              let secNa = 0;
+              if (sec.filas) {
+                sec.filas.forEach(fila => {
                   secTotal++;
                   const val = answers[fila] || (template.columnas && template.columnas[0] ? answers[`${fila}__${template.columnas[0]}`] : null);
-                  if (val === 'SI') { liveSi++; secSi++; }
-                  else if (val === 'NO') { liveNo++; secNo++; }
-                  else if (val === 'NA') { liveNa++; secNa++; }
-                }
+                  if (val === 'SI') secSi++;
+                  else if (val === 'NO') secNo++;
+                  else if (val === 'NA') secNa++;
+                });
+              }
+              const denom = secTotal - secNa;
+              const por = denom > 0 ? Math.round((secSi / denom) * 100) : (secSi > 0 ? 100 : 0);
+              liveCategorias.push({
+                nombre: sec.nombre || `Formato / Área ${idx + 1}`,
+                total: secTotal,
+                si: secSi,
+                no: secNo,
+                na: secNa,
+                porcentaje: por
               });
-            }
-            const secDenom = secTotal - secNa;
-            const secPor = secDenom > 0 ? Math.round((secSi / secDenom) * 100) : (secSi > 0 ? 100 : 0);
-            liveSecciones.push({
-              nombre: sec.nombre || `Formato ${idx + 1}`,
-              total: secTotal,
-              si: secSi,
-              porcentaje: secPor
             });
-          });
+          }
         }
-        const liveDenom = liveTotal - liveNa;
-        const liveScore = liveDenom > 0 ? Math.round((liveSi / liveDenom) * 100) : (liveSi > 0 ? 100 : 0);
 
         return (
-          <div className="live-score-card shadow-sm" style={{ marginTop: '24px', backgroundColor: '#ffffff', borderRadius: '12px', border: '2px solid #E8DDD4', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-              <div style={{ fontWeight: '800', color: '#6B3A2A', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>📊</span> CALIFICACIÓN DEL CHECKLIST EN TIEMPO REAL
+          <div className="live-score-container" style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FAF6F0', padding: '14px 20px', borderRadius: '12px', border: '2px solid #6B3A2A', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ fontWeight: '900', color: '#6B3A2A', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.3rem' }}>📊</span> CALIFICACIÓN SEPARADA POR ÁREAS / FORMATOS (EN TIEMPO REAL)
               </div>
-              <div style={{ backgroundColor: liveScore >= 90 ? '#DCFCE7' : (liveScore >= 70 ? '#FEF3C7' : '#FEE2E2'), color: liveScore >= 90 ? '#15803D' : (liveScore >= 70 ? '#92400E' : '#991B1B'), fontWeight: '900', fontSize: '1rem', padding: '4px 14px', borderRadius: '20px', border: '1px solid currentColor' }}>
-                Calificación General: {liveScore}%
-              </div>
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', textAlign: 'center' }}>
-              <div style={{ backgroundColor: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Total Aspectos</div>
-                <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>{liveTotal}</div>
-              </div>
-              <div style={{ backgroundColor: '#f0fdf4', padding: '10px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                <div style={{ fontSize: '0.72rem', color: '#166534', fontWeight: '600', textTransform: 'uppercase' }}>🟢 Satisfactorio</div>
-                <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#15803d' }}>{liveSi} <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>({liveTotal > 0 ? Math.round((liveSi/liveTotal)*100) : 0}%)</span></div>
-              </div>
-              <div style={{ backgroundColor: '#fef2f2', padding: '10px', borderRadius: '8px', border: '1px solid #fecaca' }}>
-                <div style={{ fontSize: '0.72rem', color: '#991b1b', fontWeight: '600', textTransform: 'uppercase' }}>❌ No Satisfactorio</div>
-                <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#dc2626' }}>{liveNo} <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>({liveTotal > 0 ? Math.round((liveNo/liveTotal)*100) : 0}%)</span></div>
-              </div>
-              <div style={{ backgroundColor: '#f1f5f9', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                <div style={{ fontSize: '0.72rem', color: '#475569', fontWeight: '600', textTransform: 'uppercase' }}>🔘 No Aplica</div>
-                <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#64748b' }}>{liveNa} <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>({liveTotal > 0 ? Math.round((liveNa/liveTotal)*100) : 0}%)</span></div>
+              <div style={{ fontSize: '0.82rem', color: '#6B3A2A', fontWeight: '700', backgroundColor: '#F3E9E0', padding: '6px 12px', borderRadius: '8px' }}>
+                ✅ Evaluado por separado (sin sumar todo en un general)
               </div>
             </div>
 
-            {liveSecciones && liveSecciones.length > 0 && (
-              <div style={{ marginTop: '4px', borderTop: '1px dashed #cbd5e1', paddingTop: '12px' }}>
-                <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#6B3A2A', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>📑</span> Calificación separada por Formatos / Categorías:
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '8px' }}>
-                  {liveSecciones.map((ls, index) => {
-                    let col = '#15803D';
-                    let bg = '#DCFCE7';
-                    if (ls.porcentaje < 70) { col = '#991B1B'; bg = '#FEE2E2'; }
-                    else if (ls.porcentaje < 90) { col = '#92400E'; bg = '#FEF3C7'; }
-                    return (
-                      <div key={index} style={{ backgroundColor: bg, color: col, padding: '8px 12px', borderRadius: '8px', border: '1px solid currentColor', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: '700', fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '130px' }} title={ls.nombre}>{ls.nombre}</span>
-                        <span style={{ fontWeight: '900', fontSize: '0.95rem' }}>{ls.porcentaje}% <small style={{ fontSize: '0.7rem' }}>({ls.si}/{ls.total})</small></span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+              {liveCategorias.map((cat, index) => {
+                let col = '#15803D';
+                let bg = '#DCFCE7';
+                let borderCol = '#86EFAC';
+                let badgeText = '🟢 Satisfactorio';
+                if (cat.porcentaje < 70) { col = '#991B1B'; bg = '#FEE2E2'; borderCol = '#FECACA'; badgeText = '🔴 Crítico'; }
+                else if (cat.porcentaje < 90) { col = '#92400E'; bg = '#FEF3C7'; borderCol = '#FDE68A'; badgeText = '🟡 Regular'; }
+
+                return (
+                  <div key={index} className="area-score-card animate-fade-in shadow-sm" style={{ backgroundColor: '#ffffff', borderRadius: '14px', border: `2px solid ${borderCol}`, padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative', overflow: 'hidden' }}>
+                    {/* Header del Formato/Área */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
+                      <div>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          ÁREA / FORMATO #{index + 1}
+                        </span>
+                        <h4 style={{ margin: '3px 0 0 0', fontSize: '1.15rem', fontWeight: '900', color: '#1e293b', wordBreak: 'break-word' }}>
+                          {cat.nombre}
+                        </h4>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            
+                      <div style={{ backgroundColor: bg, color: col, fontWeight: '900', fontSize: '1.25rem', padding: '6px 16px', borderRadius: '25px', border: `2px solid ${col}`, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                        <span>{cat.porcentaje}%</span>
+                      </div>
+                    </div>
+
+                    {/* Desglose numérico por separado */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', textAlign: 'center' }}>
+                      <div style={{ backgroundColor: '#f8fafc', padding: '10px 4px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Items</div>
+                        <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#1e293b', marginTop: '2px' }}>{cat.total}</div>
+                      </div>
+                      <div style={{ backgroundColor: '#f0fdf4', padding: '10px 4px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#166534', fontWeight: '700', textTransform: 'uppercase' }}>Cumple</div>
+                        <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#15803d', marginTop: '2px' }}>{cat.si}</div>
+                      </div>
+                      <div style={{ backgroundColor: '#fef2f2', padding: '10px 4px', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#991b1b', fontWeight: '700', textTransform: 'uppercase' }}>No Cumple</div>
+                        <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#dc2626', marginTop: '2px' }}>{cat.no}</div>
+                      </div>
+                      <div style={{ backgroundColor: '#f1f5f9', padding: '10px 4px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#475569', fontWeight: '700', textTransform: 'uppercase' }}>N/A</div>
+                        <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#64748b', marginTop: '2px' }}>{cat.na}</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', borderTop: '1px dashed #e2e8f0', paddingTop: '10px' }}>
+                      <span>Evaluados en {cat.nombre}: {cat.si + cat.no} / {cat.total - cat.na}</span>
+                      <span style={{ fontWeight: '800', color: col, fontSize: '0.85rem' }}>{badgeText}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
             <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', textAlign: 'right' }}>
-              * Fórmula de evaluación: Satisfactorio × 100 / (Total Aspectos - No Aplica)
+              * Fórmula por Área/Formato: Satisfactorio × 100 / (Total Aspectos en esta Área - No Aplica en esta Área)
             </div>
           </div>
         );
@@ -3756,6 +3818,17 @@ export default function VisitasPage() {
                               {(() => {
                                 const score = calculateVisitScore(v, plantillas);
                                 if (!score) return <span className="text-muted" style={{ fontSize: '0.8rem' }}>—</span>;
+                                if (score.seccionesScores && score.seccionesScores.length > 0) {
+                                  return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      {score.seccionesScores.map((sec, idx) => (
+                                        <span key={idx} style={{ backgroundColor: sec.badgeBg || score.badgeBg, color: sec.badgeColor || score.badgeColor, fontWeight: '800', fontSize: '0.75rem', padding: '2px 8px', borderRadius: '12px', border: '1px solid currentColor', display: 'inline-block', whiteSpace: 'nowrap' }} title={`${sec.nombre}: ${sec.satisfactorios}/${sec.totalAspectos - sec.noAplica}`}>
+                                          {sec.nombre.length > 18 ? sec.nombre.slice(0, 18) + '...' : sec.nombre}: {sec.porcentaje}%
+                                        </span>
+                                      ))}
+                                    </div>
+                                  );
+                                }
                                 return (
                                   <span style={{ backgroundColor: score.badgeBg, color: score.badgeColor, fontWeight: '800', fontSize: '0.8rem', padding: '4px 10px', borderRadius: '20px', border: '1px solid currentColor', display: 'inline-block', whiteSpace: 'nowrap' }}>
                                     {score.porcentaje}% ({score.satisfactorios}/{score.totalAspectos - score.noAplica})
@@ -4502,53 +4575,73 @@ export default function VisitasPage() {
                 const score = calculateVisitScore(selectedVisit, plantillas);
                 if (!score) return null;
                 return (
-                  <div className="modal-score-card shadow-sm" style={{ marginBottom: '20px', backgroundColor: '#ffffff', borderRadius: '12px', border: '2px solid #6B3A2A', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-                      <div style={{ fontWeight: '800', color: '#6B3A2A', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>🏆</span> CALIFICACIÓN FINAL DEL CHECKLIST
+                  <div className="modal-score-container" style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FAF6F0', padding: '14px 20px', borderRadius: '12px', border: '2px solid #6B3A2A', flexWrap: 'wrap', gap: '10px' }}>
+                      <div style={{ fontWeight: '900', color: '#6B3A2A', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '1.3rem' }}>🏆</span> CALIFICACIÓN SEPARADA POR ÁREAS / FORMATOS
                       </div>
-                      <div style={{ backgroundColor: score.badgeBg, color: score.badgeColor, fontWeight: '900', fontSize: '1.1rem', padding: '4px 16px', borderRadius: '20px', border: '1px solid currentColor' }}>
-                        Calificación: {score.porcentaje}% {score.stars}
-                      </div>
-                    </div>
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', textAlign: 'center' }}>
-                      <div style={{ backgroundColor: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Total Aspectos</div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>{score.totalAspectos}</div>
-                      </div>
-                      <div style={{ backgroundColor: '#f0fdf4', padding: '10px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                        <div style={{ fontSize: '0.72rem', color: '#166534', fontWeight: '600', textTransform: 'uppercase' }}>🟢 Satisfactorio</div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#15803d' }}>{score.satisfactorios} <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>({score.totalAspectos > 0 ? Math.round((score.satisfactorios/score.totalAspectos)*100) : 0}%)</span></div>
-                      </div>
-                      <div style={{ backgroundColor: '#fef2f2', padding: '10px', borderRadius: '8px', border: '1px solid #fecaca' }}>
-                        <div style={{ fontSize: '0.72rem', color: '#991b1b', fontWeight: '600', textTransform: 'uppercase' }}>❌ No Satisfactorio</div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#dc2626' }}>{score.noSatisfactorios} <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>({score.totalAspectos > 0 ? Math.round((score.noSatisfactorios/score.totalAspectos)*100) : 0}%)</span></div>
-                      </div>
-                      <div style={{ backgroundColor: '#f1f5f9', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                        <div style={{ fontSize: '0.72rem', color: '#475569', fontWeight: '600', textTransform: 'uppercase' }}>🔘 No Aplica</div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#64748b' }}>{score.noAplica} <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>({score.totalAspectos > 0 ? Math.round((score.noAplica/score.totalAspectos)*100) : 0}%)</span></div>
+                      <div style={{ fontSize: '0.82rem', color: '#6B3A2A', fontWeight: '700', backgroundColor: '#F3E9E0', padding: '6px 12px', borderRadius: '8px' }}>
+                        ✅ Evaluado de forma independiente por cada área
                       </div>
                     </div>
 
-                    {score.seccionesScores && score.seccionesScores.length > 0 && (
-                      <div style={{ marginTop: '4px', borderTop: '1px dashed #cbd5e1', paddingTop: '12px' }}>
-                        <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#6B3A2A', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>📑</span> Calificación separada por Formatos / Categorías:
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '8px' }}>
-                          {score.seccionesScores.map((ls, index) => (
-                            <div key={index} style={{ backgroundColor: ls.badgeBg, color: ls.badgeColor, padding: '8px 12px', borderRadius: '8px', border: '1px solid currentColor', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontWeight: '700', fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '130px' }} title={ls.nombre}>{ls.nombre}</span>
-                              <span style={{ fontWeight: '900', fontSize: '0.95rem' }}>{ls.porcentaje}% <small style={{ fontSize: '0.7rem' }}>({ls.satisfactorios}/{ls.totalAspectos})</small></span>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                      {(score.seccionesScores && score.seccionesScores.length > 0 ? score.seccionesScores : [{
+                        nombre: 'Evaluación General',
+                        totalAspectos: score.totalAspectos,
+                        satisfactorios: score.satisfactorios,
+                        noSatisfactorios: score.noSatisfactorios,
+                        noAplica: score.noAplica,
+                        porcentaje: score.porcentaje,
+                        badgeBg: score.badgeBg,
+                        badgeColor: score.badgeColor
+                      }]).map((ls, index) => {
+                        return (
+                          <div key={index} className="area-score-card shadow-sm" style={{ backgroundColor: '#ffffff', borderRadius: '14px', border: `2px solid ${ls.badgeColor || '#6B3A2A'}`, padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative', overflow: 'hidden' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
+                              <div>
+                                <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                  ÁREA / FORMATO #{index + 1}
+                                </span>
+                                <h4 style={{ margin: '3px 0 0 0', fontSize: '1.15rem', fontWeight: '900', color: '#1e293b', wordBreak: 'break-word' }}>
+                                  {ls.nombre}
+                                </h4>
+                              </div>
+                              <div style={{ backgroundColor: ls.badgeBg || '#DCFCE7', color: ls.badgeColor || '#15803D', fontWeight: '900', fontSize: '1.25rem', padding: '6px 16px', borderRadius: '25px', border: `2px solid ${ls.badgeColor || '#15803D'}`, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                                <span>{ls.porcentaje}%</span>
+                              </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', textAlign: 'center' }}>
+                              <div style={{ backgroundColor: '#f8fafc', padding: '10px 4px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Items</div>
+                                <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#1e293b', marginTop: '2px' }}>{ls.totalAspectos}</div>
+                              </div>
+                              <div style={{ backgroundColor: '#f0fdf4', padding: '10px 4px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                                <div style={{ fontSize: '0.7rem', color: '#166534', fontWeight: '700', textTransform: 'uppercase' }}>Cumple</div>
+                                <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#15803d', marginTop: '2px' }}>{ls.satisfactorios}</div>
+                              </div>
+                              <div style={{ backgroundColor: '#fef2f2', padding: '10px 4px', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                                <div style={{ fontSize: '0.7rem', color: '#991b1b', fontWeight: '700', textTransform: 'uppercase' }}>No Cumple</div>
+                                <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#dc2626', marginTop: '2px' }}>{ls.noSatisfactorios}</div>
+                              </div>
+                              <div style={{ backgroundColor: '#f1f5f9', padding: '10px 4px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                                <div style={{ fontSize: '0.7rem', color: '#475569', fontWeight: '700', textTransform: 'uppercase' }}>N/A</div>
+                                <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#64748b', marginTop: '2px' }}>{ls.noAplica}</div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', borderTop: '1px dashed #e2e8f0', paddingTop: '10px' }}>
+                              <span>Evaluados en {ls.nombre}: {ls.satisfactorios + ls.noSatisfactorios} / {ls.totalAspectos - ls.noAplica}</span>
+                              <span style={{ fontWeight: '800', color: ls.badgeColor || '#15803D', fontSize: '0.85rem' }}>{ls.porcentaje >= 90 ? '🟢 Excelente' : (ls.porcentaje >= 70 ? '🟡 Regular' : '🔴 Crítico')}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
                     <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', textAlign: 'right' }}>
-                      * Fórmula de evaluación: Satisfactorio × 100 / (Total Aspectos - No Aplica)
+                      * Fórmula por Área/Formato: Satisfactorio × 100 / (Total Aspectos en esta Área - No Aplica en esta Área)
                     </div>
                   </div>
                 );
