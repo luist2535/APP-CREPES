@@ -328,10 +328,10 @@ export async function DELETE(request) {
     if (!id) return NextResponse.json({ error: 'ID de evento requerido' }, { status: 400 });
 
     const db = getDb();
-    const evento = db.prepare('SELECT id, created_by, responsable_id FROM eventos_calendario WHERE id = ?').get(id);
+    const evento = db.prepare('SELECT id, user_id FROM eventos_calendario WHERE id = ?').get(id);
     if (!evento) return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
 
-    if (parseInt(user.rol_id) !== 1 && parseInt(user.rol_id) > 9 && parseInt(evento.created_by) !== parseInt(user.id) && parseInt(evento.responsable_id) !== parseInt(user.id)) {
+    if (parseInt(user.rol_id) !== 1 && parseInt(user.rol_id) > 9 && parseInt(evento.user_id) !== parseInt(user.id)) {
       return NextResponse.json({ error: 'No tienes permisos para eliminar este evento' }, { status: 403 });
     }
 

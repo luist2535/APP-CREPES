@@ -3584,21 +3584,25 @@ export default function VisitasPage() {
                                   <button 
                                     className="btn btn-sm"
                                     style={{ backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', padding: '4px 8px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
-                                    onClick={async () => {
-                                      if (confirm(`¿Estás seguro de que deseas eliminar la visita del ${v.fecha} en ${v.pdv_nombre}? Esta acción no se puede deshacer.`)) {
-                                        try {
-                                          const res = await fetch(`/api/visitas?id=${v.id}`, { method: 'DELETE' });
-                                          const data = await res.json();
-                                          if (res.ok) {
-                                            alert('✅ Visita eliminada correctamente');
-                                            fetchVisitas();
-                                          } else {
-                                            alert('❌ Error al eliminar: ' + (data.error || 'Desconocido'));
+                                    onClick={() => {
+                                      triggerConfirm(
+                                        '¿Eliminar Visita?',
+                                        `¿Estás seguro de que deseas eliminar la visita del ${v.fecha} en ${v.pdv_nombre}? Esta acción no se puede deshacer.`,
+                                        async () => {
+                                          try {
+                                            const res = await fetch(`/api/visitas?id=${v.id}`, { method: 'DELETE' });
+                                            const data = await res.json();
+                                            if (res.ok) {
+                                              triggerAlert('Visita Eliminada', 'La visita y todas sus evidencias se han eliminado correctamente.', 'success');
+                                              fetchVisitas();
+                                            } else {
+                                              triggerAlert('Error al eliminar', data.error || 'Ocurrió un error en el servidor al intentar eliminar la visita.', 'error');
+                                            }
+                                          } catch (err) {
+                                            triggerAlert('Error de Conexión', 'No se pudo contactar con el servidor para eliminar la visita.', 'error');
                                           }
-                                        } catch (err) {
-                                          alert('❌ Error de conexión al eliminar visita');
                                         }
-                                      }
+                                      );
                                     }}
                                     title="Eliminar visita por error o arrepentimiento"
                                   >
@@ -4182,22 +4186,26 @@ export default function VisitasPage() {
                   <button 
                     className="btn btn-sm"
                     style={{ backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
-                    onClick={async () => {
-                      if (confirm(`¿Estás seguro de que deseas eliminar la visita del ${selectedVisit.fecha} en ${selectedVisit.pdv_nombre}? Esta acción no se puede deshacer.`)) {
-                        try {
-                          const res = await fetch(`/api/visitas?id=${selectedVisit.id}`, { method: 'DELETE' });
-                          const data = await res.json();
-                          if (res.ok) {
-                            alert('✅ Visita eliminada correctamente');
-                            setSelectedVisit(null);
-                            fetchVisitas();
-                          } else {
-                            alert('❌ Error al eliminar: ' + (data.error || 'Desconocido'));
+                    onClick={() => {
+                      triggerConfirm(
+                        '¿Eliminar Visita?',
+                        `¿Estás seguro de que deseas eliminar la visita del ${selectedVisit.fecha} en ${selectedVisit.pdv_nombre}? Esta acción no se puede deshacer.`,
+                        async () => {
+                          try {
+                            const res = await fetch(`/api/visitas?id=${selectedVisit.id}`, { method: 'DELETE' });
+                            const data = await res.json();
+                            if (res.ok) {
+                              triggerAlert('Visita Eliminada', 'La visita se ha eliminado correctamente.', 'success');
+                              setSelectedVisit(null);
+                              fetchVisitas();
+                            } else {
+                              triggerAlert('Error al eliminar', data.error || 'Ocurrió un error en el servidor al intentar eliminar la visita.', 'error');
+                            }
+                          } catch (err) {
+                            triggerAlert('Error de Conexión', 'No se pudo contactar con el servidor para eliminar la visita.', 'error');
                           }
-                        } catch (err) {
-                          alert('❌ Error de conexión al eliminar visita');
                         }
-                      }
+                      );
                     }}
                     title="Eliminar visita por error o arrepentimiento"
                   >

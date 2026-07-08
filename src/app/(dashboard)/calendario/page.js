@@ -289,6 +289,42 @@ export default function CalendarioPage() {
   const [userRole, setUserRole] = useState(null);
   const [userId, setUserId] = useState(null);
 
+  // Custom Confirm & Alert Modal States
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+  });
+
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
+  const triggerConfirm = (title, message, callback) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        callback();
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
+  const triggerAlert = (title, message, type = 'info') => {
+    setAlertModal({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
   // Conflict override modal states (for area chiefs)
   const [conflictModal, setConflictModal] = useState(null); // { titulo, usuario_nombre, hora_inicio, hora_fin }
   const [overrideJustificacion, setOverrideJustificacion] = useState('');
@@ -788,25 +824,29 @@ export default function CalendarioPage() {
                               <span className={`status-badge-text ${isCompleted ? 'completado' : 'programado'}`}>
                                 {isCompleted ? '✓ Completada' : '⏳ Programada'}
                               </span>
-                              {(userRole === 1 || userRole > 9 || parseInt(ev.created_by) === userId || parseInt(ev.responsable_id) === userId) && (
+                              {(userRole === 1 || userRole > 9 || parseInt(ev.user_id) === userId) && (
                                 <button
                                   type="button"
-                                  onClick={async (e) => {
+                                  onClick={(e) => {
                                     e.stopPropagation();
-                                    if (confirm(`¿Estás seguro de que deseas eliminar este evento programado (${ev.titulo})? Esta acción también eliminará la visita si ya fue iniciada.`)) {
-                                      try {
-                                        const res = await fetch(`/api/calendario?id=${ev.id}`, { method: 'DELETE' });
-                                        if (res.ok) {
-                                          alert('✅ Evento eliminado correctamente');
-                                          loadData();
-                                        } else {
-                                          const data = await res.json();
-                                          alert('❌ Error al eliminar: ' + (data.error || 'Desconocido'));
+                                    triggerConfirm(
+                                      '¿Eliminar Evento?',
+                                      `¿Estás seguro de que deseas eliminar este evento programado (${ev.titulo})? Esta acción también eliminará la visita si ya fue iniciada.`,
+                                      async () => {
+                                        try {
+                                          const res = await fetch(`/api/calendario?id=${ev.id}`, { method: 'DELETE' });
+                                          if (res.ok) {
+                                            triggerAlert('Evento Eliminado', 'El evento y sus registros asociados se han eliminado correctamente.', 'success');
+                                            loadData();
+                                          } else {
+                                            const data = await res.json();
+                                            triggerAlert('Error al eliminar', data.error || 'Ocurrió un error en el servidor al intentar eliminar el evento.', 'error');
+                                          }
+                                        } catch (err) {
+                                          triggerAlert('Error de Conexión', 'No se pudo contactar con el servidor para eliminar el evento.', 'error');
                                         }
-                                      } catch (err) {
-                                        alert('❌ Error de conexión al eliminar evento');
                                       }
-                                    }
+                                    );
                                   }}
                                   style={{ background: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', borderRadius: '4px', padding: '2px 6px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}
                                   title="Eliminar evento de calendario por arrepentimiento o error"
@@ -1569,6 +1609,109 @@ export default function CalendarioPage() {
           cursor: not-allowed;
         }
       `}</style>
+
+      {/* Custom Confirm Modal */}
+      {confirmModal.isOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(44, 24, 16, 0.45)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--spacing-md)'
+        }}>
+          <div className="card animate-fade-in" style={{
+            width: '100%',
+            maxWidth: '400px',
+            backgroundColor: 'var(--color-bg-card)',
+            borderRadius: 'var(--radius-xl)',
+            boxShadow: 'var(--shadow-xl)',
+            overflow: 'hidden'
+          }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--spacing-md) var(--spacing-lg)' }}>
+              <h3 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--color-primary-dark)' }}>{confirmModal.title || '¿Estás seguro?'}</h3>
+              <button 
+                type="button"
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: 'var(--color-text-muted)', cursor: 'pointer' }}
+              >×</button>
+            </div>
+            <div className="card-body" style={{ padding: 'var(--spacing-lg)' }}>
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', margin: '0 0 var(--spacing-lg) 0', lineHeight: '1.5' }}>
+                {confirmModal.message}
+              </p>
+              <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-danger btn-sm"
+                  onClick={confirmModal.onConfirm}
+                >
+                  Aceptar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Alert Modal */}
+      {alertModal.isOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(44, 24, 16, 0.45)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--spacing-md)'
+        }}>
+          <div className="card animate-fade-in" style={{
+            width: '100%',
+            maxWidth: '400px',
+            backgroundColor: 'var(--color-bg-card)',
+            borderRadius: 'var(--radius-xl)',
+            boxShadow: 'var(--shadow-xl)',
+            overflow: 'hidden'
+          }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--spacing-md) var(--spacing-lg)' }}>
+              <h3 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--color-primary-dark)' }}>{alertModal.title || 'Aviso'}</h3>
+              <button 
+                type="button"
+                onClick={() => setAlertModal(prev => ({ ...prev, isOpen: false }))}
+                style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: 'var(--color-text-muted)', cursor: 'pointer' }}
+              >×</button>
+            </div>
+            <div className="card-body" style={{ padding: 'var(--spacing-lg)' }}>
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', margin: '0 0 var(--spacing-lg) 0', lineHeight: '1.5' }}>
+                {alertModal.message}
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setAlertModal(prev => ({ ...prev, isOpen: false }))}
+                >
+                  Aceptar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
