@@ -330,3 +330,40 @@ export async function PUT(request) {
     return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(request) {
+  try {
+    const { getUserFromRequest } = require('@/lib/auth');
+    const { getDb } = require('@/lib/db');
+    const user = getUserFromRequest(request);
+    if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'ID de visita requerido' }, { status: 400 });
+
+    const db = getDb();
+    const visita = db.prepare('SELECT id, user_id, evento_id FROM visitas WHERE id = ?').get(id);
+    if (!visita) return NextResponse.json({ error: 'Visita no encontrada' }, { status: 404 });
+
+    // Permisos: Admin (1), Jefe/Coordinador (2-9), o creador de la visita
+    if (parseInt(user.rol_id) !== 1 && parseInt(user.rol_id) > 9 && parseInt(visita.user_id) !== parseInt(user.id)) {
+      return NextResponse.json({ error: 'No tienes permisos para eliminar esta visita' }, { status: 403 });
+    }
+
+    const deleteTx = db.transaction(() => {
+      db.prepare('DELETE FROM evidencias WHERE visita_id = ?').run(id);
+      db.prepare('DELETE FROM historial_visitas WHERE visita_id = ?').run(id);
+      db.prepare('DELETE FROM visitas WHERE id = ?').run(id);
+      if (visita.evento_id) {
+        db.prepare('DELETE FROM eventos_calendario WHERE id = ?').run(visita.evento_id);
+      }
+    });
+    deleteTx();
+
+    return NextResponse.json({ success: true, message: 'Visita eliminada exitosamente' });
+  } catch (error) {
+    console.error('Error al eliminar visita:', error);
+    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+  }
+}

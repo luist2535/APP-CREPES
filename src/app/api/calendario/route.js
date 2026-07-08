@@ -315,3 +315,41 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(request) {
+  try {
+    const { getUserFromRequest } = require('@/lib/auth');
+    const { getDb } = require('@/lib/db');
+    const user = getUserFromRequest(request);
+    if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'ID de evento requerido' }, { status: 400 });
+
+    const db = getDb();
+    const evento = db.prepare('SELECT id, created_by, responsable_id FROM eventos_calendario WHERE id = ?').get(id);
+    if (!evento) return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
+
+    if (parseInt(user.rol_id) !== 1 && parseInt(user.rol_id) > 9 && parseInt(evento.created_by) !== parseInt(user.id) && parseInt(evento.responsable_id) !== parseInt(user.id)) {
+      return NextResponse.json({ error: 'No tienes permisos para eliminar este evento' }, { status: 403 });
+    }
+
+    const deleteTx = db.transaction(() => {
+      const linkedVisits = db.prepare('SELECT id FROM visitas WHERE evento_id = ?').all(id);
+      for (const lv of linkedVisits) {
+        db.prepare('DELETE FROM evidencias WHERE visita_id = ?').run(lv.id);
+        db.prepare('DELETE FROM historial_visitas WHERE visita_id = ?').run(lv.id);
+        db.prepare('DELETE FROM visitas WHERE id = ?').run(lv.id);
+      }
+      db.prepare('DELETE FROM solicitudes_visita WHERE evento_id = ?').run(id);
+      db.prepare('DELETE FROM eventos_calendario WHERE id = ?').run(id);
+    });
+    deleteTx();
+
+    return NextResponse.json({ success: true, message: 'Evento eliminado exitosamente' });
+  } catch (error) {
+    console.error('Error al eliminar evento de calendario:', error);
+    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+  }
+}

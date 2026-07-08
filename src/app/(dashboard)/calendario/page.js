@@ -287,6 +287,7 @@ export default function CalendarioPage() {
   
   // User info
   const [userRole, setUserRole] = useState(null);
+  const [userId, setUserId] = useState(null);
 
   // Conflict override modal states (for area chiefs)
   const [conflictModal, setConflictModal] = useState(null); // { titulo, usuario_nombre, hora_inicio, hora_fin }
@@ -349,6 +350,7 @@ export default function CalendarioPage() {
       try {
         const u = JSON.parse(storedUser);
         setUserRole(parseInt(u.rol_id));
+        if (u.id) setUserId(parseInt(u.id));
         
         // Auto-select area based on role
         const mappedArea = getAreaIdFromRol(u.rol_id);
@@ -782,9 +784,37 @@ export default function CalendarioPage() {
                         <div className="event-details">
                           <div className="event-title-line">
                             <h4>{ev.titulo}</h4>
-                            <span className={`status-badge-text ${isCompleted ? 'completado' : 'programado'}`}>
-                              {isCompleted ? '✓ Completada' : '⏳ Programada'}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span className={`status-badge-text ${isCompleted ? 'completado' : 'programado'}`}>
+                                {isCompleted ? '✓ Completada' : '⏳ Programada'}
+                              </span>
+                              {(userRole === 1 || userRole > 9 || parseInt(ev.created_by) === userId || parseInt(ev.responsable_id) === userId) && (
+                                <button
+                                  type="button"
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (confirm(`¿Estás seguro de que deseas eliminar este evento programado (${ev.titulo})? Esta acción también eliminará la visita si ya fue iniciada.`)) {
+                                      try {
+                                        const res = await fetch(`/api/calendario?id=${ev.id}`, { method: 'DELETE' });
+                                        if (res.ok) {
+                                          alert('✅ Evento eliminado correctamente');
+                                          loadData();
+                                        } else {
+                                          const data = await res.json();
+                                          alert('❌ Error al eliminar: ' + (data.error || 'Desconocido'));
+                                        }
+                                      } catch (err) {
+                                        alert('❌ Error de conexión al eliminar evento');
+                                      }
+                                    }
+                                  }}
+                                  style={{ background: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', borderRadius: '4px', padding: '2px 6px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}
+                                  title="Eliminar evento de calendario por arrepentimiento o error"
+                                >
+                                  🗑️
+                                </button>
+                              )}
+                            </div>
                           </div>
                           <p className="event-pdv">🏢 {ev.pdv_nombre} ({ev.ciudad_nombre})</p>
                           {ev.descripcion && <p className="event-desc">📝 {ev.descripcion}</p>}

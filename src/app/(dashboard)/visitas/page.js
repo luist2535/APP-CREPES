@@ -400,28 +400,52 @@ const calculateVisitScore = (visit, plantillas) => {
   let satisfactorios = 0;
   let noSatisfactorios = 0;
   let noAplica = 0;
+  const seccionesScores = [];
 
   if (firstField.secciones) {
-    firstField.secciones.forEach(sec => {
+    firstField.secciones.forEach((sec, idx) => {
+      let secTotal = 0;
+      let secSi = 0;
+      let secNo = 0;
+      let secNa = 0;
       if (sec.filas) {
         sec.filas.forEach(fila => {
           if (firstField.tipo === 'matrix' && firstField.columnas) {
             firstField.columnas.forEach(col => {
+              secTotal++;
               totalAspectos++;
               const val = data[`${fila}__${col}`];
-              if (val === 'SI') satisfactorios++;
-              else if (val === 'NO') noSatisfactorios++;
-              else if (val === 'NA') noAplica++;
+              if (val === 'SI') { secSi++; satisfactorios++; }
+              else if (val === 'NO') { secNo++; noSatisfactorios++; }
+              else if (val === 'NA') { secNa++; noAplica++; }
             });
           } else {
+            secTotal++;
             totalAspectos++;
             const val = data[fila] || (firstField.columnas && firstField.columnas[0] ? data[`${fila}__${firstField.columnas[0]}`] : null);
-            if (val === 'SI') satisfactorios++;
-            else if (val === 'NO') noSatisfactorios++;
-            else if (val === 'NA') noAplica++;
+            if (val === 'SI') { secSi++; satisfactorios++; }
+            else if (val === 'NO') { secNo++; noSatisfactorios++; }
+            else if (val === 'NA') { secNa++; noAplica++; }
           }
         });
       }
+      const secDenom = secTotal - secNa;
+      const secPor = secDenom > 0 ? Math.round((secSi / secDenom) * 100) : (secSi > 0 ? 100 : 0);
+      let badgeCol = '#15803D';
+      let badgeBgCol = '#DCFCE7';
+      if (secPor < 70) { badgeCol = '#991B1B'; badgeBgCol = '#FEE2E2'; }
+      else if (secPor < 90) { badgeCol = '#92400E'; badgeBgCol = '#FEF3C7'; }
+
+      seccionesScores.push({
+        nombre: sec.nombre || `Formato ${idx + 1}`,
+        totalAspectos: secTotal,
+        satisfactorios: secSi,
+        noSatisfactorios: secNo,
+        noAplica: secNa,
+        porcentaje: secPor,
+        badgeColor: badgeCol,
+        badgeBg: badgeBgCol
+      });
     });
   }
 
@@ -453,6 +477,7 @@ const calculateVisitScore = (visit, plantillas) => {
     badgeColor,
     badgeBg,
     stars,
+    seccionesScores,
     isChecklist: true
   };
 };
@@ -950,27 +975,43 @@ const MatrixChecklistForm = ({
         let liveSi = 0;
         let liveNo = 0;
         let liveNa = 0;
+        const liveSecciones = [];
+
         if (template && template.secciones) {
-          template.secciones.forEach(sec => {
+          template.secciones.forEach((sec, idx) => {
+            let secTotal = 0;
+            let secSi = 0;
+            let secNo = 0;
+            let secNa = 0;
             if (sec.filas) {
               sec.filas.forEach(fila => {
                 if (hasSubareaTabs && template.columnas) {
                   template.columnas.forEach(col => {
                     liveTotal++;
+                    secTotal++;
                     const val = answers[`${fila}__${col}`];
-                    if (val === 'SI') liveSi++;
-                    else if (val === 'NO') liveNo++;
-                    else if (val === 'NA') liveNa++;
+                    if (val === 'SI') { liveSi++; secSi++; }
+                    else if (val === 'NO') { liveNo++; secNo++; }
+                    else if (val === 'NA') { liveNa++; secNa++; }
                   });
                 } else {
                   liveTotal++;
+                  secTotal++;
                   const val = answers[fila] || (template.columnas && template.columnas[0] ? answers[`${fila}__${template.columnas[0]}`] : null);
-                  if (val === 'SI') liveSi++;
-                  else if (val === 'NO') liveNo++;
-                  else if (val === 'NA') liveNa++;
+                  if (val === 'SI') { liveSi++; secSi++; }
+                  else if (val === 'NO') { liveNo++; secNo++; }
+                  else if (val === 'NA') { liveNa++; secNa++; }
                 }
               });
             }
+            const secDenom = secTotal - secNa;
+            const secPor = secDenom > 0 ? Math.round((secSi / secDenom) * 100) : (secSi > 0 ? 100 : 0);
+            liveSecciones.push({
+              nombre: sec.nombre || `Formato ${idx + 1}`,
+              total: secTotal,
+              si: secSi,
+              porcentaje: secPor
+            });
           });
         }
         const liveDenom = liveTotal - liveNa;
@@ -983,7 +1024,7 @@ const MatrixChecklistForm = ({
                 <span>📊</span> CALIFICACIÓN DEL CHECKLIST EN TIEMPO REAL
               </div>
               <div style={{ backgroundColor: liveScore >= 90 ? '#DCFCE7' : (liveScore >= 70 ? '#FEF3C7' : '#FEE2E2'), color: liveScore >= 90 ? '#15803D' : (liveScore >= 70 ? '#92400E' : '#991B1B'), fontWeight: '900', fontSize: '1rem', padding: '4px 14px', borderRadius: '20px', border: '1px solid currentColor' }}>
-                Calificación: {liveScore}%
+                Calificación General: {liveScore}%
               </div>
             </div>
             
@@ -1005,9 +1046,31 @@ const MatrixChecklistForm = ({
                 <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#64748b' }}>{liveNa} <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>({liveTotal > 0 ? Math.round((liveNa/liveTotal)*100) : 0}%)</span></div>
               </div>
             </div>
+
+            {liveSecciones && liveSecciones.length > 0 && (
+              <div style={{ marginTop: '4px', borderTop: '1px dashed #cbd5e1', paddingTop: '12px' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#6B3A2A', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>📑</span> Calificación separada por Formatos / Categorías:
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '8px' }}>
+                  {liveSecciones.map((ls, index) => {
+                    let col = '#15803D';
+                    let bg = '#DCFCE7';
+                    if (ls.porcentaje < 70) { col = '#991B1B'; bg = '#FEE2E2'; }
+                    else if (ls.porcentaje < 90) { col = '#92400E'; bg = '#FEF3C7'; }
+                    return (
+                      <div key={index} style={{ backgroundColor: bg, color: col, padding: '8px 12px', borderRadius: '8px', border: '1px solid currentColor', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: '700', fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '130px' }} title={ls.nombre}>{ls.nombre}</span>
+                        <span style={{ fontWeight: '900', fontSize: '0.95rem' }}>{ls.porcentaje}% <small style={{ fontSize: '0.7rem' }}>({ls.si}/{ls.total})</small></span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             
             <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', textAlign: 'right' }}>
-              * Fórmula: Satisfactorio × 100 / (Total Aspectos - No Aplica)
+              * Fórmula de evaluación: Satisfactorio × 100 / (Total Aspectos - No Aplica)
             </div>
           </div>
         );
@@ -3510,12 +3573,39 @@ export default function VisitasPage() {
                               </span>
                             </td>
                             <td>
-                              <button 
-                                className="btn btn-secondary btn-sm"
-                                onClick={() => handleOpenVisitDetails(v)}
-                              >
-                                Ver Respuestas 👁️
-                              </button>
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                <button 
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => handleOpenVisitDetails(v)}
+                                >
+                                  Ver Respuestas 👁️
+                                </button>
+                                {(parseInt(user?.rol_id) === 1 || parseInt(user?.rol_id) > 9 || parseInt(v.user_id) === parseInt(user?.id)) && (
+                                  <button 
+                                    className="btn btn-sm"
+                                    style={{ backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', padding: '4px 8px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+                                    onClick={async () => {
+                                      if (confirm(`¿Estás seguro de que deseas eliminar la visita del ${v.fecha} en ${v.pdv_nombre}? Esta acción no se puede deshacer.`)) {
+                                        try {
+                                          const res = await fetch(`/api/visitas?id=${v.id}`, { method: 'DELETE' });
+                                          const data = await res.json();
+                                          if (res.ok) {
+                                            alert('✅ Visita eliminada correctamente');
+                                            fetchVisitas();
+                                          } else {
+                                            alert('❌ Error al eliminar: ' + (data.error || 'Desconocido'));
+                                          }
+                                        } catch (err) {
+                                          alert('❌ Error de conexión al eliminar visita');
+                                        }
+                                      }
+                                    }}
+                                    title="Eliminar visita por error o arrepentimiento"
+                                  >
+                                    🗑️
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -4088,6 +4178,32 @@ export default function VisitasPage() {
             <div className="card-header no-print">
               <h3>Auditoría Operativa de Punto de Venta</h3>
               <div className="modal-header-actions">
+                {(parseInt(user?.rol_id) === 1 || parseInt(user?.rol_id) > 9 || parseInt(selectedVisit.user_id) === parseInt(user?.id)) && (
+                  <button 
+                    className="btn btn-sm"
+                    style={{ backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+                    onClick={async () => {
+                      if (confirm(`¿Estás seguro de que deseas eliminar la visita del ${selectedVisit.fecha} en ${selectedVisit.pdv_nombre}? Esta acción no se puede deshacer.`)) {
+                        try {
+                          const res = await fetch(`/api/visitas?id=${selectedVisit.id}`, { method: 'DELETE' });
+                          const data = await res.json();
+                          if (res.ok) {
+                            alert('✅ Visita eliminada correctamente');
+                            setSelectedVisit(null);
+                            fetchVisitas();
+                          } else {
+                            alert('❌ Error al eliminar: ' + (data.error || 'Desconocido'));
+                          }
+                        } catch (err) {
+                          alert('❌ Error de conexión al eliminar visita');
+                        }
+                      }
+                    }}
+                    title="Eliminar visita por error o arrepentimiento"
+                  >
+                    🗑️ Eliminar Visita
+                  </button>
+                )}
                 {selectedVisit.fields && selectedVisit.fields[0] && selectedVisit.fields[0].code && (
                   <a 
                     href={`/api/visitas/export?id=${selectedVisit.id}`} 
@@ -4175,6 +4291,22 @@ export default function VisitasPage() {
                         <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#64748b' }}>{score.noAplica} <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>({score.totalAspectos > 0 ? Math.round((score.noAplica/score.totalAspectos)*100) : 0}%)</span></div>
                       </div>
                     </div>
+
+                    {score.seccionesScores && score.seccionesScores.length > 0 && (
+                      <div style={{ marginTop: '4px', borderTop: '1px dashed #cbd5e1', paddingTop: '12px' }}>
+                        <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#6B3A2A', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>📑</span> Calificación separada por Formatos / Categorías:
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '8px' }}>
+                          {score.seccionesScores.map((ls, index) => (
+                            <div key={index} style={{ backgroundColor: ls.badgeBg, color: ls.badgeColor, padding: '8px 12px', borderRadius: '8px', border: '1px solid currentColor', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontWeight: '700', fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '130px' }} title={ls.nombre}>{ls.nombre}</span>
+                              <span style={{ fontWeight: '900', fontSize: '0.95rem' }}>{ls.porcentaje}% <small style={{ fontSize: '0.7rem' }}>({ls.satisfactorios}/{ls.totalAspectos})</small></span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     
                     <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', textAlign: 'right' }}>
                       * Fórmula de evaluación: Satisfactorio × 100 / (Total Aspectos - No Aplica)
