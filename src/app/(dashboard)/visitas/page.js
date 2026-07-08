@@ -373,110 +373,114 @@ function SignaturePad({ onSave, onClear, label, value }) {
 
 // Helper function to calculate Quality Checklist score (Calificación)
 const calculateVisitScore = (visit, plantillas) => {
-  if (!visit || !visit.datos_formulario) return null;
-  let data = {};
   try {
-    data = JSON.parse(visit.datos_formulario || '{}');
-  } catch (e) {
-    return null;
-  }
-
-  let template = null;
-  let fields = null;
-  if (visit.campos_personalizados) {
-    try { fields = JSON.parse(visit.campos_personalizados); } catch(e) {}
-  } else if (visit.plantilla_id && plantillas) {
-    template = plantillas.find(p => p.id === visit.plantilla_id);
-    if (template) {
-      try { fields = JSON.parse(template.campos); } catch(e) {}
+    if (!visit || !visit.datos_formulario) return null;
+    let data = {};
+    try {
+      data = JSON.parse(visit.datos_formulario || '{}');
+    } catch (e) {
+      return null;
     }
-  }
 
-  if (!fields || !fields[0]) return null;
-  const firstField = fields[0];
-  if (firstField.tipo !== 'matrix' && firstField.tipo !== 'simple_checklist') return null;
+    let template = null;
+    let fields = null;
+    if (visit.campos_personalizados) {
+      try { fields = JSON.parse(visit.campos_personalizados); } catch(e) {}
+    } else if (visit.plantilla_id && plantillas) {
+      template = plantillas.find(p => p.id === visit.plantilla_id);
+      if (template) {
+        try { fields = JSON.parse(template.campos); } catch(e) {}
+      }
+    }
 
-  let totalAspectos = 0;
-  let satisfactorios = 0;
-  let noSatisfactorios = 0;
-  let noAplica = 0;
-  const seccionesScores = [];
+    if (!fields || !Array.isArray(fields) || !fields[0]) return null;
+    const firstField = fields[0];
+    if (firstField.tipo !== 'matrix' && firstField.tipo !== 'simple_checklist') return null;
 
-  const hasSubareaTabs = firstField.columnas && firstField.columnas.length > 0 && !firstField.columnas.some(c => c.toUpperCase().includes('SATISFACTORIO') || c.toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
+    let totalAspectos = 0;
+    let satisfactorios = 0;
+    let noSatisfactorios = 0;
+    let noAplica = 0;
+    const seccionesScores = [];
 
-  if (firstField.secciones) {
-    if (hasSubareaTabs && firstField.columnas) {
-      firstField.columnas.forEach((col, idx) => {
-        let colTotal = 0;
-        let colSi = 0;
-        let colNo = 0;
-        let colNa = 0;
-        firstField.secciones.forEach(sec => {
-          if (sec.filas) {
+    const hasSubareaTabs = Array.isArray(firstField.columnas) && firstField.columnas.length > 0 && !firstField.columnas.some(c => {
+      const cStr = String(c || '').toUpperCase();
+      return cStr.includes('SATISFACTORIO') || cStr.includes('OBSERVACION') || cStr === 'NA' || cStr === 'N/A';
+    });
+
+    if (Array.isArray(firstField.secciones)) {
+      if (hasSubareaTabs && Array.isArray(firstField.columnas)) {
+        firstField.columnas.forEach((col, idx) => {
+          let colTotal = 0;
+          let colSi = 0;
+          let colNo = 0;
+          let colNa = 0;
+          firstField.secciones.forEach(sec => {
+            if (sec && Array.isArray(sec.filas)) {
+              sec.filas.forEach(fila => {
+                colTotal++;
+                totalAspectos++;
+                const val = data[`${fila}__${col}`];
+                if (val === 'SI') { colSi++; satisfactorios++; }
+                else if (val === 'NO') { colNo++; noSatisfactorios++; }
+                else if (val === 'NA') { colNa++; noAplica++; }
+              });
+            }
+          });
+          const denom = colTotal - colNa;
+          const por = denom > 0 ? Math.round((colSi / denom) * 100) : (colSi > 0 ? 100 : 0);
+          let badgeCol = '#15803D';
+          let badgeBgCol = '#DCFCE7';
+          if (por < 70) { badgeCol = '#991B1B'; badgeBgCol = '#FEE2E2'; }
+          else if (por < 90) { badgeCol = '#92400E'; badgeBgCol = '#FEF3C7'; }
+
+          seccionesScores.push({
+            nombre: String(col || `Área ${idx + 1}`),
+            totalAspectos: colTotal,
+            satisfactorios: colSi,
+            noSatisfactorios: colNo,
+            noAplica: colNa,
+            porcentaje: por,
+            badgeColor: badgeCol,
+            badgeBg: badgeBgCol
+          });
+        });
+      } else {
+        firstField.secciones.forEach((sec, idx) => {
+          let secTotal = 0;
+          let secSi = 0;
+          let secNo = 0;
+          let secNa = 0;
+          if (sec && Array.isArray(sec.filas)) {
             sec.filas.forEach(fila => {
-              colTotal++;
+              secTotal++;
               totalAspectos++;
-              const val = data[`${fila}__${col}`];
-              if (val === 'SI') { colSi++; satisfactorios++; }
-              else if (val === 'NO') { colNo++; noSatisfactorios++; }
-              else if (val === 'NA') { colNa++; noAplica++; }
+              const val = data[fila] || (Array.isArray(firstField.columnas) && firstField.columnas[0] ? data[`${fila}__${firstField.columnas[0]}`] : null);
+              if (val === 'SI') { secSi++; satisfactorios++; }
+              else if (val === 'NO') { secNo++; noSatisfactorios++; }
+              else if (val === 'NA') { secNa++; noAplica++; }
             });
           }
-        });
-        const denom = colTotal - colNa;
-        const por = denom > 0 ? Math.round((colSi / denom) * 100) : (colSi > 0 ? 100 : 0);
-        let badgeCol = '#15803D';
-        let badgeBgCol = '#DCFCE7';
-        if (por < 70) { badgeCol = '#991B1B'; badgeBgCol = '#FEE2E2'; }
-        else if (por < 90) { badgeCol = '#92400E'; badgeBgCol = '#FEF3C7'; }
+          const secDenom = secTotal - secNa;
+          const secPor = secDenom > 0 ? Math.round((secSi / secDenom) * 100) : (secSi > 0 ? 100 : 0);
+          let badgeCol = '#15803D';
+          let badgeBgCol = '#DCFCE7';
+          if (secPor < 70) { badgeCol = '#991B1B'; badgeBgCol = '#FEE2E2'; }
+          else if (secPor < 90) { badgeCol = '#92400E'; badgeBgCol = '#FEF3C7'; }
 
-        seccionesScores.push({
-          nombre: col,
-          totalAspectos: colTotal,
-          satisfactorios: colSi,
-          noSatisfactorios: colNo,
-          noAplica: colNa,
-          porcentaje: por,
-          badgeColor: badgeCol,
-          badgeBg: badgeBgCol
-        });
-      });
-    } else {
-      firstField.secciones.forEach((sec, idx) => {
-        let secTotal = 0;
-        let secSi = 0;
-        let secNo = 0;
-        let secNa = 0;
-        if (sec.filas) {
-          sec.filas.forEach(fila => {
-            secTotal++;
-            totalAspectos++;
-            const val = data[fila] || (firstField.columnas && firstField.columnas[0] ? data[`${fila}__${firstField.columnas[0]}`] : null);
-            if (val === 'SI') { secSi++; satisfactorios++; }
-            else if (val === 'NO') { secNo++; noSatisfactorios++; }
-            else if (val === 'NA') { secNa++; noAplica++; }
+          seccionesScores.push({
+            nombre: String(sec?.nombre || `Formato ${idx + 1}`),
+            totalAspectos: secTotal,
+            satisfactorios: secSi,
+            noSatisfactorios: secNo,
+            noAplica: secNa,
+            porcentaje: secPor,
+            badgeColor: badgeCol,
+            badgeBg: badgeBgCol
           });
-        }
-        const secDenom = secTotal - secNa;
-        const secPor = secDenom > 0 ? Math.round((secSi / secDenom) * 100) : (secSi > 0 ? 100 : 0);
-        let badgeCol = '#15803D';
-        let badgeBgCol = '#DCFCE7';
-        if (secPor < 70) { badgeCol = '#991B1B'; badgeBgCol = '#FEE2E2'; }
-        else if (secPor < 90) { badgeCol = '#92400E'; badgeBgCol = '#FEF3C7'; }
-
-        seccionesScores.push({
-          nombre: sec.nombre || `Formato ${idx + 1}`,
-          totalAspectos: secTotal,
-          satisfactorios: secSi,
-          noSatisfactorios: secNo,
-          noAplica: secNa,
-          porcentaje: secPor,
-          badgeColor: badgeCol,
-          badgeBg: badgeBgCol
         });
-      });
+      }
     }
-  }
 
   if (totalAspectos === 0) return null;
   const evaluados = satisfactorios + noSatisfactorios + noAplica;
@@ -509,6 +513,10 @@ const calculateVisitScore = (visit, plantillas) => {
     seccionesScores,
     isChecklist: true
   };
+  } catch (err) {
+    console.error('Error calculating visit score:', err);
+    return null;
+  }
 };
 
 // Matrix and Simple checklist helper components for Quality Area
@@ -3821,11 +3829,14 @@ export default function VisitasPage() {
                                 if (score.seccionesScores && score.seccionesScores.length > 0) {
                                   return (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      {score.seccionesScores.map((sec, idx) => (
-                                        <span key={idx} style={{ backgroundColor: sec.badgeBg || score.badgeBg, color: sec.badgeColor || score.badgeColor, fontWeight: '800', fontSize: '0.75rem', padding: '2px 8px', borderRadius: '12px', border: '1px solid currentColor', display: 'inline-block', whiteSpace: 'nowrap' }} title={`${sec.nombre}: ${sec.satisfactorios}/${sec.totalAspectos - sec.noAplica}`}>
-                                          {sec.nombre.length > 18 ? sec.nombre.slice(0, 18) + '...' : sec.nombre}: {sec.porcentaje}%
-                                        </span>
-                                      ))}
+                                      {score.seccionesScores.map((sec, idx) => {
+                                        const nom = String(sec?.nombre || `Área ${idx + 1}`);
+                                        return (
+                                          <span key={idx} style={{ backgroundColor: sec?.badgeBg || score.badgeBg, color: sec?.badgeColor || score.badgeColor, fontWeight: '800', fontSize: '0.75rem', padding: '2px 8px', borderRadius: '12px', border: '1px solid currentColor', display: 'inline-block', whiteSpace: 'nowrap' }} title={`${nom}: ${sec?.satisfactorios || 0}/${(sec?.totalAspectos || 0) - (sec?.noAplica || 0)}`}>
+                                            {nom.length > 18 ? nom.slice(0, 18) + '...' : nom}: {sec?.porcentaje || 0}%
+                                          </span>
+                                        );
+                                      })}
                                     </div>
                                   );
                                 }
