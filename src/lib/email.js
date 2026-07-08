@@ -36,18 +36,28 @@ async function sendNotificationEmail({ to, subject, html }) {
       port,
       secure: port === 465,
       auth: { user, pass },
+      connectionTimeout: 4000, // 4 segundos máximo para conectar
+      greetingTimeout: 4000,
+      socketTimeout: 4500,
     });
 
-    const info = await transporter.sendMail({
-      from: `"Crepes en Punto" <${user}>`,
-      to,
-      subject,
-      html,
-    });
+    // Envolver sendMail en Promise.race para garantizar que nunca exceda los 4.5s si el firewall bloquea el puerto
+    const info = await Promise.race([
+      transporter.sendMail({
+        from: `"Crepes en Punto" <${user}>`,
+        to,
+        subject,
+        html,
+      }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout de conexión SMTP (4.5s limit): El puerto de correos está bloqueado o el servidor SMTP no responde.')), 4500)
+      )
+    ]);
+
     console.log(`✅ Correo enviado con éxito a ${to}. ID: ${info.messageId}`);
     return true;
   } catch (error) {
-    console.error('❌ Error al enviar correo de notificación:', error);
+    console.warn(`⚠️ Aviso de Correo no enviado a ${to}: ${error.message}. (La operación principal continúa normalmente sin bloquearse)`);
     return false;
   }
 }

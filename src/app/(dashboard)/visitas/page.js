@@ -1444,6 +1444,8 @@ export default function VisitasPage() {
   const [error, setError] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
+  const [offlineQueueCount, setOfflineQueueCount] = useState(0);
+  const [isSyncingOffline, setIsSyncingOffline] = useState(false);
 
   // Active navigation tab: 'pending_tasks', 'awaiting_approval', 'list', 'new'
   const [activeTab, setActiveTab] = useState('list');
@@ -1513,6 +1515,73 @@ export default function VisitasPage() {
   // Selected visit details modal
   const [selectedVisit, setSelectedVisit] = useState(null);
   const [modalTab, setModalTab] = useState('general');
+
+  const checkOfflineQueue = () => {
+    try {
+      const q = JSON.parse(localStorage.getItem('crepes_offline_sync_queue') || '[]');
+      setOfflineQueueCount(Array.isArray(q) ? q.length : 0);
+    } catch (e) {
+      setOfflineQueueCount(0);
+    }
+  };
+
+  const syncOfflineQueue = async () => {
+    try {
+      const q = JSON.parse(localStorage.getItem('crepes_offline_sync_queue') || '[]');
+      if (!Array.isArray(q) || q.length === 0) return;
+      setIsSyncingOffline(true);
+      let syncedCount = 0;
+      const remainingQueue = [];
+      for (const item of q) {
+        try {
+          const res = await fetch('/api/visitas', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item),
+          });
+          if (res.ok) {
+            syncedCount++;
+          } else {
+            remainingQueue.push(item);
+          }
+        } catch (err) {
+          remainingQueue.push(item);
+        }
+      }
+      localStorage.setItem('crepes_offline_sync_queue', JSON.stringify(remainingQueue));
+      setOfflineQueueCount(remainingQueue.length);
+      if (syncedCount > 0) {
+        triggerAlert('🟢 Sincronización Exitosa', `Se han enviado y guardado en el servidor ${syncedCount} auditoría(s) que tenías en memoria offline.`, 'success');
+        loadData();
+      } else if (remainingQueue.length > 0) {
+        triggerAlert('⚠️ Sin Conexión al Servidor', 'No se pudo contactar al servidor en este intento. Tus auditorías siguen guardadas de forma segura y podrás sincronizar cuando recuperes el internet.', 'info');
+      }
+    } catch (e) {
+      console.error('Error syncing offline queue:', e);
+    } finally {
+      setIsSyncingOffline(false);
+    }
+  };
+
+  const saveToOfflineQueue = (payload) => {
+    try {
+      const q = JSON.parse(localStorage.getItem('crepes_offline_sync_queue') || '[]');
+      q.push({ ...payload, offline_saved_at: new Date().toISOString() });
+      localStorage.setItem('crepes_offline_sync_queue', JSON.stringify(q));
+      setOfflineQueueCount(q.length);
+      if (activeExecutionVisit) {
+        localStorage.removeItem(`crepes_offline_draft_${activeExecutionVisit.id}`);
+      }
+      setActiveExecutionVisit(null);
+      triggerAlert(
+        '📱 Auditoría Guardada Sin Conexión (Offline)',
+        'Tu teléfono no tiene conexión a Internet o el servidor no responde en este momento. Hemos guardado tu auditoría completa, firmas y fotos en la cola offline de tu celular de manera 100% segura. En cuanto recuperes señal de Wi-Fi o red móvil, pulsa el botón naranja "🔄 Sincronizar Ahora" arriba para subirla al servidor.',
+        'info'
+      );
+    } catch (e) {
+      triggerAlert('Error Crítico', 'La memoria de tu teléfono está llena o bloqueó el almacenamiento de borrador sin conexión. ' + e.message, 'error');
+    }
+  };
 
   const isTechnicalArea = (areaId) => {
     const area = areas.find(a => a.id === parseInt(areaId));
@@ -1604,6 +1673,35 @@ export default function VisitasPage() {
       } catch (e) {}
     }
   }, []);
+
+  useEffect(() => {
+    checkOfflineQueue();
+    const handleOnline = () => {
+      syncOfflineQueue();
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, []);
+
+  // Auto-guardado en borrador de respuestas en el dispositivo móvil (para protección offline o pérdida accidental de señal)
+  useEffect(() => {
+    if (activeExecutionVisit && Object.keys(formAnswers).length > 0) {
+      const draftKey = `crepes_offline_draft_${activeExecutionVisit.id}`;
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({
+          formAnswers,
+          formObservaciones,
+          formRepuestos,
+          formHallazgos,
+          formAccionesCorrectivas,
+          solicitanteNombre,
+          solicitanteDocumento,
+          solicitanteTelefono,
+          timestamp: new Date().toISOString()
+        }));
+      } catch (e) {}
+    }
+  }, [activeExecutionVisit, formAnswers, formObservaciones, formRepuestos, formHallazgos, formAccionesCorrectivas, solicitanteNombre, solicitanteDocumento, solicitanteTelefono]);
 
   // Auto-open visit details if redirected from Reports or another module
   useEffect(() => {
@@ -2116,6 +2214,33 @@ export default function VisitasPage() {
         setFormAnswers({});
       }
     }
+
+    // Offline draft restoration check
+    try {
+      const savedDraftStr = localStorage.getItem(`crepes_offline_draft_${visit.id}`);
+      if (savedDraftStr) {
+        const draft = JSON.parse(savedDraftStr);
+        if (draft && draft.formAnswers && Object.keys(draft.formAnswers).length > 0) {
+          setTimeout(() => {
+            triggerConfirm(
+              '📱 Borrador Offline Encontrado',
+              `Detectamos respuestas guardadas sin conexión de tu última sesión en este teléfono (${new Date(draft.timestamp || Date.now()).toLocaleTimeString()}). ¿Deseas restaurar ese borrador?`,
+              () => {
+                setFormAnswers(draft.formAnswers || {});
+                if (draft.formObservaciones) setFormObservaciones(draft.formObservaciones);
+                if (draft.formRepuestos) setFormRepuestos(draft.formRepuestos);
+                if (draft.formHallazgos) setFormHallazgos(draft.formHallazgos);
+                if (draft.formAccionesCorrectivas) setFormAccionesCorrectivas(draft.formAccionesCorrectivas);
+                if (draft.solicitanteNombre) setSolicitanteNombre(draft.solicitanteNombre);
+                if (draft.solicitanteDocumento) setSolicitanteDocumento(draft.solicitanteDocumento);
+                if (draft.solicitanteTelefono) setSolicitanteTelefono(draft.solicitanteTelefono);
+                triggerAlert('Borrador Cargado', 'Se han restaurado tus respuestas desde la memoria local.', 'success');
+              }
+            );
+          }, 300);
+        }
+      }
+    } catch (e) {}
   };
 
   const handleSaveProgress = async () => {
@@ -2123,6 +2248,25 @@ export default function VisitasPage() {
     setSavingProgress(true);
     setSubmitError('');
     setSubmitSuccess('');
+    
+    // Si el dispositivo está sin internet, guardamos directamente el borrador en memoria local
+    if (!navigator.onLine) {
+      const draftKey = `crepes_offline_draft_${activeExecutionVisit.id}`;
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({
+          formAnswers, formObservaciones, formRepuestos, formHallazgos, formAccionesCorrectivas,
+          solicitanteNombre, solicitanteDocumento, solicitanteTelefono, timestamp: new Date().toISOString()
+        }));
+        setSubmitSuccess('📶 Sin conexión: Tu progreso se ha guardado de forma segura en la memoria interna de este dispositivo.');
+        setTimeout(() => setSubmitSuccess(''), 4000);
+      } catch (e) {
+        setSubmitError('No fue posible guardar en la memoria local.');
+      } finally {
+        setSavingProgress(false);
+      }
+      return;
+    }
+
     try {
       const res = await fetch('/api/visitas', {
         method: 'PUT',
@@ -2233,6 +2377,11 @@ export default function VisitasPage() {
         categoria_id: selectedCategoriaId ? parseInt(selectedCategoriaId) : null
       };
 
+      if (!navigator.onLine) {
+        saveToOfflineQueue(payload);
+        return;
+      }
+
       const res = await fetch('/api/visitas', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -2251,7 +2400,11 @@ export default function VisitasPage() {
         setActiveTab(isUserAuxiliar(userRole) ? 'pending_tasks' : 'list');
       }, 2000);
     } catch (err) {
-      setSubmitError(err.message);
+      if (!navigator.onLine || err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+        saveToOfflineQueue(payload);
+      } else {
+        setSubmitError(err.message);
+      }
     } finally {
       setSubmitLoading(false);
     }
@@ -2494,6 +2647,54 @@ export default function VisitasPage() {
 
   return (
     <div className="visitas-page-container">
+      {/* Offline Sync Banner */}
+      {offlineQueueCount > 0 && (
+        <div className="no-print animate-fade-in" style={{
+          background: 'linear-gradient(135deg, #FFF7ED, #FFEDD5)',
+          border: '2px solid #F97316',
+          borderRadius: '12px',
+          padding: '14px 20px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px',
+          boxShadow: '0 4px 12px rgba(249, 115, 22, 0.15)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '1.6rem' }}>📶</span>
+            <div>
+              <h4 style={{ margin: 0, color: '#C2410C', fontSize: '1rem', fontWeight: 'bold' }}>
+                Auditorías guardadas sin conexión ({offlineQueueCount})
+              </h4>
+              <p style={{ margin: '2px 0 0 0', color: '#9A3412', fontSize: '0.85rem' }}>
+                Tienes auditorías en memoria esperando señal de Internet para subir al servidor.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={syncOfflineQueue}
+            disabled={isSyncingOffline}
+            style={{
+              background: '#EA580C',
+              color: '#fff',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              fontWeight: 'bold',
+              cursor: isSyncingOffline ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 2px 8px rgba(234, 88, 12, 0.3)'
+            }}
+          >
+            <span>🔄</span> {isSyncingOffline ? 'Sincronizando...' : 'Sincronizar Ahora'}
+          </button>
+        </div>
+      )}
       
       {/* Navigation tabs */}
       <div className="tabs-header no-print" style={{ display: 'flex', borderBottom: '2px solid #E8DDD4', marginBottom: '20px', gap: '20px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
