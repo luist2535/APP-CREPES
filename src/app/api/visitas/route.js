@@ -223,6 +223,8 @@ export async function PUT(request) {
       } = data;
       
       const nowTime = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false });
+      const isJefeExecuting = [1, 3, 4, 5, 6, 7, 9].includes(parseInt(user.rol_id));
+      const targetEstado = isJefeExecuting ? 'cerrada' : 'finalizada';
       
       db.prepare(`
         UPDATE visitas 
@@ -230,7 +232,7 @@ export async function PUT(request) {
             firma_auxiliar = ?, hallazgos = ?, acciones_correctivas = ?, 
             tipo_visita_id = COALESCE(?, tipo_visita_id), plantilla_id = COALESCE(?, plantilla_id),
             firma_pdv = ?, solicitante_nombre = ?, solicitante_documento = ?, solicitante_telefono = ?,
-            equipo_id = ?, categoria_id = COALESCE(?, categoria_id), estado = 'finalizada' 
+            equipo_id = ?, categoria_id = COALESCE(?, categoria_id), estado = ? 
         WHERE id = ?
       `).run(
         nowTime,
@@ -248,6 +250,7 @@ export async function PUT(request) {
         solicitante_telefono || null,
         equipo_id || null,
         categoria_id || null,
+        targetEstado,
         id
       );
 
@@ -265,12 +268,23 @@ export async function PUT(request) {
         }
       }
 
+      if (isJefeExecuting && visit.evento_id) {
+        db.prepare("UPDATE eventos_calendario SET estado = 'completado' WHERE id = ?").run(visit.evento_id);
+        db.prepare("UPDATE solicitudes_visita SET estado = 'cerrada' WHERE evento_id = ?").run(visit.evento_id);
+      }
+
+      const detalleAccion = isJefeExecuting 
+        ? `Trabajo y inspección ejecutados directamente por Jefatura/Admin a las ${nowTime}. Aprobado inmediato (cerrada).`
+        : `Trabajo finalizado a las ${nowTime}. Esperando aprobación.`;
+
       db.prepare(`
         INSERT INTO historial_visitas (visita_id, accion, user_id, detalle)
-        VALUES (?, 'finalizar_trabajo', ?, ?)
-      `).run(id, user.id, `Trabajo finalizado a las ${nowTime}. Esperando aprobación.`);
+        VALUES (?, ?, ?, ?)
+      `).run(id, isJefeExecuting ? 'aprobar_visita_inmediata' : 'finalizar_trabajo', user.id, detalleAccion);
 
-      return NextResponse.json({ message: 'Visita enviada al Jefe para su aprobación' });
+      return NextResponse.json({ 
+        message: isJefeExecuting ? 'Inspección completada y aprobada inmediatamente por Jefatura (cerrada)' : 'Visita enviada al Jefe para su aprobación' 
+      });
     }
 
     if (action === 'aprobar') {

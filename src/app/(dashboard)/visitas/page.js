@@ -2721,7 +2721,7 @@ export default function VisitasPage() {
           </button>
         )}
 
-        {isUserAuxiliar(userRole) && (
+        {(isUserAuxiliar(userRole) || isUserJefe(userRole) || userRole === 1 || userRole === 2) && (
           <button 
             className={`tab-btn ${activeTab === 'pending_tasks' ? 'active' : ''}`}
             onClick={() => { setActiveTab('pending_tasks'); setActiveExecutionVisit(null); }}
@@ -2739,7 +2739,7 @@ export default function VisitasPage() {
               whiteSpace: 'nowrap'
             }}
           >
-            Mis Tareas ({pendingVisits.length})
+            🛠️ Tareas por Ejecutar ({pendingVisits.length})
           </button>
         )}
         
@@ -3774,7 +3774,22 @@ export default function VisitasPage() {
                               </span>
                             </td>
                             <td>
-                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                {v.estado === 'pendiente' && (
+                                  <button className="btn btn-primary btn-sm" onClick={() => handleStartWork(v.id)}>
+                                    Iniciar Trabajo 🚀
+                                  </button>
+                                )}
+                                {v.estado === 'devuelta' && (
+                                  <button className="btn btn-warning btn-sm" onClick={() => handleOpenExecutionForm(v)}>
+                                    Corregir ⚙️
+                                  </button>
+                                )}
+                                {v.estado === 'en_progreso' && (
+                                  <button className="btn btn-success btn-sm" onClick={() => handleOpenExecutionForm(v)}>
+                                    Diligenciar Formulario 📋
+                                  </button>
+                                )}
                                 <button 
                                   className="btn btn-secondary btn-sm"
                                   onClick={() => handleOpenVisitDetails(v)}
@@ -3816,7 +3831,7 @@ export default function VisitasPage() {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="8" style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-muted)' }}>
+                          <td colSpan="9" style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-muted)' }}>
                             No se encontraron visitas que coincidan con la búsqueda.
                           </td>
                         </tr>
@@ -3881,7 +3896,22 @@ export default function VisitasPage() {
                         </div>
 
                         {/* Footer */}
-                        <div className="pending-card-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #f2ece6', paddingTop: '10px' }}>
+                        <div className="pending-card-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap', borderTop: '1px solid #f2ece6', paddingTop: '10px' }}>
+                          {v.estado === 'pendiente' && (
+                            <button className="btn btn-primary btn-sm" onClick={() => handleStartWork(v.id)} style={{ padding: '8px 14px', fontSize: '0.82rem' }}>
+                              Iniciar Trabajo 🚀
+                            </button>
+                          )}
+                          {v.estado === 'devuelta' && (
+                            <button className="btn btn-warning btn-sm" onClick={() => handleOpenExecutionForm(v)} style={{ padding: '8px 14px', fontSize: '0.82rem' }}>
+                              Corregir ⚙️
+                            </button>
+                          )}
+                          {v.estado === 'en_progreso' && (
+                            <button className="btn btn-success btn-sm" onClick={() => handleOpenExecutionForm(v)} style={{ padding: '8px 14px', fontSize: '0.82rem' }}>
+                              Diligenciar Formulario 📋
+                            </button>
+                          )}
                           <button
                             onClick={() => handleOpenVisitDetails(v)}
                             style={{ backgroundColor: '#6B3A2A', color: '#fff', fontWeight: 'bold', fontSize: '0.82rem', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', border: 'none' }}
