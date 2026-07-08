@@ -43,6 +43,9 @@ export async function GET(request) {
 
     // No area filtering: all roles should see all visits on the calendar to avoid overlap conflicts
     // However, if the user is a PDV (Rol 17), they must ONLY see events for their store
+    const { getUserAssignedCityId } = require('@/lib/auth');
+    const assignedCityId = getUserAssignedCityId(user, db);
+
     const rolInt = parseInt(user.rol_id);
     if (rolInt === 17) {
       const dbUser = db.prepare('SELECT pdv_id FROM users WHERE id = ?').get(user.id);
@@ -50,6 +53,10 @@ export async function GET(request) {
       query += ' AND e.pdv_id = ?';
       params.push(activePdvId);
     } else {
+      if (assignedCityId) {
+        query += ' AND p.ciudad_id = ?';
+        params.push(assignedCityId);
+      }
       if (pdvId) {
         query += ' AND e.pdv_id = ?';
         params.push(pdvId);

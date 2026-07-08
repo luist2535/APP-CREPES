@@ -50,4 +50,32 @@ function getUserFromRequest(request) {
   return verifyToken(token);
 }
 
-module.exports = { generateToken, verifyToken, hashPassword, comparePassword, getUserFromRequest };
+function getUserAssignedCityId(user, db) {
+  if (!user || !user.id) return null;
+  let ciudadId = user.ciudad_id ? parseInt(user.ciudad_id) : null;
+  let ciudadNombre = user.ciudad_nombre || '';
+
+  if (db && user.id) {
+    try {
+      const row = db.prepare(`
+        SELECT u.ciudad_id, c.nombre as ciudad_nombre 
+        FROM users u 
+        LEFT JOIN ciudades c ON u.ciudad_id = c.id 
+        WHERE u.id = ?
+      `).get(user.id);
+      if (row) {
+        ciudadId = row.ciudad_id ? parseInt(row.ciudad_id) : null;
+        ciudadNombre = row.ciudad_nombre || '';
+      }
+    } catch (e) {}
+  }
+
+  if (!ciudadId || isNaN(ciudadId)) return null;
+  const nom = ciudadNombre.toLowerCase();
+  if (nom.includes('nacional') || nom.includes('todas') || nom === 'colombia') {
+    return null;
+  }
+  return ciudadId;
+}
+
+module.exports = { generateToken, verifyToken, hashPassword, comparePassword, getUserFromRequest, getUserAssignedCityId };

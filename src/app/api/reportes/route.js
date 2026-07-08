@@ -57,7 +57,12 @@ export async function GET(request) {
       conditions.push('(v.categoria_id = ? OR cat.padre_id = ?)');
       params.push(parseInt(categoria_id), parseInt(categoria_id));
     }
-    if (ciudad_id) {
+    const { getUserAssignedCityId } = require('@/lib/auth');
+    const assignedCityId = getUserAssignedCityId(user, db);
+    if (assignedCityId && rolInt !== 17) {
+      conditions.push('c.id = ?');
+      params.push(assignedCityId);
+    } else if (ciudad_id) {
       conditions.push('c.id = ?');
       params.push(parseInt(ciudad_id));
     }

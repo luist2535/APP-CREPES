@@ -22,9 +22,14 @@ export async function GET(request) {
       LEFT JOIN ciudades c ON p.ciudad_id = c.id
       WHERE p.activo = 1
     `;
+    const { getUserAssignedCityId } = require('@/lib/auth');
+    const assignedCityId = getUserAssignedCityId(user, db);
     const params = [];
     
-    if (ciudadId) {
+    if (assignedCityId) {
+      query += ' AND p.ciudad_id = ?';
+      params.push(assignedCityId);
+    } else if (ciudadId) {
       query += ' AND p.ciudad_id = ?';
       params.push(ciudadId);
     }
@@ -32,7 +37,14 @@ export async function GET(request) {
     query += ' ORDER BY c.nombre, p.nombre';
     
     const pdvs = db.prepare(query).all(...params);
-    const ciudades = db.prepare('SELECT * FROM ciudades WHERE activa = 1 ORDER BY nombre').all();
+    let ciudadesQuery = 'SELECT * FROM ciudades WHERE activa = 1';
+    const ciudadesParams = [];
+    if (assignedCityId) {
+      ciudadesQuery += ' AND id = ?';
+      ciudadesParams.push(assignedCityId);
+    }
+    ciudadesQuery += ' ORDER BY nombre';
+    const ciudades = db.prepare(ciudadesQuery).all(...ciudadesParams);
     const estados = db.prepare('SELECT * FROM estados_pdv WHERE activo = 1').all();
     
     return NextResponse.json({ pdvs, ciudades, estados });

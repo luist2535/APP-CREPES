@@ -22,9 +22,12 @@ export async function GET(request) {
 
     // 3. Query visit details from DB
     const db = getDb();
+    const { getUserAssignedCityId } = require('@/lib/auth');
+    const assignedCityId = getUserAssignedCityId(user, db);
+
     const visit = db.prepare(`
       SELECT v.*, p.campos, p.nombre as plantilla_nombre, 
-             u.nombre as auditor_nombre, pdv.nombre as pdv_nombre
+             u.nombre as auditor_nombre, pdv.nombre as pdv_nombre, pdv.ciudad_id as pdv_ciudad_id
       FROM visitas v
       LEFT JOIN plantillas p ON v.plantilla_id = p.id
       LEFT JOIN users u ON v.user_id = u.id
@@ -34,6 +37,10 @@ export async function GET(request) {
 
     if (!visit) {
       return NextResponse.json({ error: 'Visita no encontrada' }, { status: 404 });
+    }
+
+    if (assignedCityId && visit.pdv_ciudad_id && parseInt(visit.pdv_ciudad_id) !== assignedCityId) {
+      return NextResponse.json({ error: 'No autorizado para exportar visitas de otra ciudad' }, { status: 403 });
     }
 
     if (!visit.campos) {

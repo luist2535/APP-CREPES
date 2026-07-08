@@ -74,6 +74,13 @@ export async function GET(request) {
       }
     }
 
+    const { getUserAssignedCityId } = require('@/lib/auth');
+    const assignedCityId = getUserAssignedCityId(user, db);
+    if (assignedCityId && rolInt !== 17) {
+      query += ' AND p.ciudad_id = ?';
+      params.push(assignedCityId);
+    }
+
     if (pdvId) { query += ' AND v.pdv_id = ?'; params.push(pdvId); }
     if (areaId) { query += ' AND v.area_id = ?'; params.push(areaId); }
     

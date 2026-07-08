@@ -13,16 +13,25 @@ export async function GET(request) {
     const id = searchParams.get('id'); // e.g. 'EQ-1001'
     const pdvId = searchParams.get('pdv_id');
 
+    const { getUserAssignedCityId } = require('@/lib/auth');
+    const assignedCityId = getUserAssignedCityId(user, db);
+
     // Case 1: Fetch list of equipment for a PDV
     if (pdvId) {
-      const list = db.prepare(`
+      let q = `
         SELECT e.*, p.nombre as pdv_nombre, c.nombre as ciudad_nombre
         FROM equipos e
         JOIN pdv p ON e.pdv_id = p.id
         JOIN ciudades c ON p.ciudad_id = c.id
         WHERE e.pdv_id = ? AND e.activo = 1
-        ORDER BY e.nombre
-      `).all(parseInt(pdvId));
+      `;
+      const prms = [parseInt(pdvId)];
+      if (assignedCityId) {
+        q += ' AND p.ciudad_id = ?';
+        prms.push(assignedCityId);
+      }
+      q += ' ORDER BY e.nombre';
+      const list = db.prepare(q).all(...prms);
       return NextResponse.json({ equipos: list });
     }
 
