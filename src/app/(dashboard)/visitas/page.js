@@ -372,6 +372,17 @@ function SignaturePad({ onSave, onClear, label, value }) {
 }
 
 // Helper function to calculate Quality Checklist score (Calificación)
+const getInitials = (name) => {
+  try {
+    if (!name || typeof name !== 'string') return 'AX';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return 'AX';
+    return parts.map(n => n[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || 'AX';
+  } catch (e) {
+    return 'AX';
+  }
+};
+
 const calculateVisitScore = (visit, plantillas) => {
   try {
     if (!visit || !visit.datos_formulario) return null;
@@ -728,7 +739,7 @@ const MatrixChecklistForm = ({
 
   const hasSubareaTabs = template.columnas && 
     template.columnas.length > 0 && 
-    !template.columnas.some(c => c.toUpperCase().includes('SATISFACTORIO') || c.toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
+    !template.columnas.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
 
   const getAnswerKey = (fila) => {
     if (hasSubareaTabs) {
@@ -1962,7 +1973,7 @@ export default function VisitasPage() {
           const fields = JSON.parse(template.campos);
           const initialAnswers = {};
           if (fields[0] && (fields[0].tipo === 'matrix' || fields[0].tipo === 'simple_checklist')) {
-            const hasSubTabs = fields[0].columnas && fields[0].columnas.length > 0 && !fields[0].columnas.some(c => c.toUpperCase().includes('SATISFACTORIO') || c.toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
+            const hasSubTabs = fields[0].columnas && fields[0].columnas.length > 0 && !fields[0].columnas.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
             if (hasSubTabs && fields[0].columnas[0]) {
               setActiveMatrixTab(fields[0].columnas[0]);
             }
@@ -2246,7 +2257,7 @@ export default function VisitasPage() {
           const fields = JSON.parse(template.campos);
           const initialAnswers = {};
           if (fields[0] && (fields[0].tipo === 'matrix' || fields[0].tipo === 'simple_checklist')) {
-            const hasSubTabs = fields[0].columnas && fields[0].columnas.length > 0 && !fields[0].columnas.some(c => c.toUpperCase().includes('SATISFACTORIO') || c.toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
+            const hasSubTabs = fields[0].columnas && fields[0].columnas.length > 0 && !fields[0].columnas.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
             if (hasSubTabs && fields[0].columnas[0]) {
               setActiveMatrixTab(fields[0].columnas[0]);
             }
@@ -3666,7 +3677,7 @@ export default function VisitasPage() {
                                     />
                                   ) : (
                                     <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#FAF6F0', color: '#6B3A2A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.85rem', border: '1px solid #e8ddd4' }}>
-                                      {v.responsable_nombre ? v.responsable_nombre.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'AX'}
+                                      {getInitials(v.responsable_nombre)}
                                     </div>
                                   )}
                                   <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -3969,7 +3980,7 @@ export default function VisitasPage() {
                           {v.responsable_nombre && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <div style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: '#FAF6F0', color: '#6B3A2A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.8rem', border: '1px solid #e8ddd4', flexShrink: 0 }}>
-                                {v.responsable_nombre.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
+                                {getInitials(v.responsable_nombre)}
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column' }}>
                                 <span style={{ fontSize: '0.7rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Técnico</span>
@@ -5072,7 +5083,7 @@ export default function VisitasPage() {
                     {(() => {
                       const firstField = selectedVisit.fields && selectedVisit.fields[0];
                       if (firstField && (firstField.tipo === 'matrix' || firstField.tipo === 'simple_checklist')) {
-                        const hasSubTabs = firstField.columnas && firstField.columnas.length > 0 && !firstField.columnas.some(c => c.toUpperCase().includes('SATISFACTORIO') || c.toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
+                        const hasSubTabs = firstField.columnas && firstField.columnas.length > 0 && !firstField.columnas.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
                         
                         if (hasSubTabs) {
                           return (
