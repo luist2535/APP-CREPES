@@ -17,6 +17,7 @@ export async function POST(request) {
     const categoria = formData.get('categoria') || (visitaId ? 'evidencia_visita' : 'general');
     const referenciaId = formData.get('referencia_id') || visitaId || null;
     const observaciones = formData.get('observaciones') || '';
+    const tipoDocumento = formData.get('tipo_documento') || 'Soporte';
 
     if (!file) {
       return NextResponse.json({ error: 'No se recibió ningún archivo' }, { status: 400 });
@@ -62,13 +63,16 @@ export async function POST(request) {
     const fileUrl = `/archivos/${subcarpeta}/${filename}`;
 
     const db = getDb();
+    try {
+      db.prepare('ALTER TABLE archivos_repositorio ADD COLUMN tipo_documento TEXT').run();
+    } catch (e) {}
 
     // 1. Registrar en la tabla maestra de archivos (Repositorio Documental)
     const result = db.prepare(`
       INSERT INTO archivos_repositorio (
         nombre_original, nombre_guardado, ruta_archivo, tipo_archivo, 
-        extension, tamano_bytes, categoria, referencia_id, user_id, observaciones
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        extension, tamano_bytes, categoria, referencia_id, user_id, observaciones, tipo_documento
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       file.name, 
       filename, 
@@ -79,7 +83,8 @@ export async function POST(request) {
       categoria, 
       referenciaId ? String(referenciaId) : null, 
       user.id, 
-      observaciones
+      observaciones,
+      tipoDocumento
     );
 
     // 2. Si es una evidencia de visita, mantener compatibilidad con la tabla evidencias

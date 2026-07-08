@@ -72,7 +72,27 @@ export async function GET(request) {
       m.evidencias = db.prepare('SELECT * FROM evidencias WHERE visita_id = ?').all(m.id);
     }
 
-    return NextResponse.json({ equipo, mantenimientos });
+    try {
+      db.prepare('ALTER TABLE archivos_repositorio ADD COLUMN tipo_documento TEXT').run();
+    } catch (e) {}
+
+    const archivos = db.prepare(`
+      SELECT a.*, u.nombre as usuario_nombre
+      FROM archivos_repositorio a
+      LEFT JOIN users u ON a.user_id = u.id
+      WHERE a.categoria = 'equipo' AND a.referencia_id = ?
+      ORDER BY a.created_at DESC
+    `).all(String(equipo.id));
+
+    for (const a of archivos) {
+      const bytes = a.tamano_bytes || 0;
+      if (bytes === 0) a.tamano_texto = 'Desconocido';
+      else if (bytes < 1024) a.tamano_texto = bytes + ' B';
+      else if (bytes < 1024 * 1024) a.tamano_texto = (bytes / 1024).toFixed(1) + ' KB';
+      else a.tamano_texto = (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+    }
+
+    return NextResponse.json({ equipo, mantenimientos, archivos });
   } catch (error) {
     console.error('Equipos GET error:', error);
     return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });

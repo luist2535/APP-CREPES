@@ -14,8 +14,19 @@ export default function EquiposPage() {
   // Search results
   const [equipo, setEquipo] = useState(null);
   const [mantenimientos, setMantenimientos] = useState([]);
+  const [archivosEquipo, setArchivosEquipo] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState('');
+
+  // Attach File to Equipment state
+  const [showAttachModal, setShowAttachModal] = useState(false);
+  const [attachFile, setAttachFile] = useState(null);
+  const [attachTipoDoc, setAttachTipoDoc] = useState('Factura');
+  const [attachTipoDocCustom, setAttachTipoDocCustom] = useState('');
+  const [attachObservaciones, setAttachObservaciones] = useState('');
+  const [attachLoading, setAttachLoading] = useState(false);
+  const [attachError, setAttachError] = useState('');
+  const [attachSuccess, setAttachSuccess] = useState('');
 
   // Maintenance Reporting Modal States
   const [showMaintModal, setShowMaintModal] = useState(false);
@@ -123,12 +134,62 @@ export default function EquiposPage() {
       }
 
       setEquipo(data.equipo);
-      setMantenimientos(data.mantenimientos);
+      setMantenimientos(data.mantenimientos || []);
+      setArchivosEquipo(data.archivos || []);
     } catch (err) {
       setSearchError(err.message);
     } finally {
       setSearchLoading(false);
       setQrInput(''); // Limpieza automática del campo tras buscar o escanear
+    }
+  };
+
+  const handleUploadAttachFile = async (e) => {
+    e.preventDefault();
+    if (!attachFile) {
+      setAttachError('Por favor selecciona un archivo');
+      return;
+    }
+    setAttachLoading(true);
+    setAttachError('');
+    setAttachSuccess('');
+
+    try {
+      const finalTipoDoc = attachTipoDoc === 'Otro' ? (attachTipoDocCustom.trim() || 'Otro') : attachTipoDoc;
+      const formData = new FormData();
+      formData.append('file', attachFile);
+      formData.append('categoria', 'equipo');
+      formData.append('referencia_id', equipo.id);
+      formData.append('tipo_documento', finalTipoDoc);
+      formData.append('observaciones', attachObservaciones);
+
+      const res = await fetch('/api/uploads', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al subir archivo');
+
+      setAttachSuccess('¡Archivo adjuntado y registrado exitosamente!');
+      setAttachFile(null);
+      setAttachObservaciones('');
+      setAttachTipoDocCustom('');
+      
+      // Refresh equipment info to get updated files
+      const resEquip = await fetch(`/api/equipos?id=${equipo.id}`);
+      const dataEquip = await resEquip.json();
+      if (resEquip.ok) {
+        setArchivosEquipo(dataEquip.archivos || []);
+      }
+
+      setTimeout(() => {
+        setShowAttachModal(false);
+        setAttachSuccess('');
+      }, 1500);
+    } catch (err) {
+      setAttachError(err.message);
+    } finally {
+      setAttachLoading(false);
     }
   };
 
@@ -789,6 +850,104 @@ export default function EquiposPage() {
                   )}
                 </div>
 
+                {/* Attached Files & Equipment Documentation Repository */}
+                <div className="equipment-files-repository shadow-sm" style={{ marginTop: '24px', backgroundColor: '#F8FAFC', borderRadius: '14px', border: '2px solid #E2E8F0', padding: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px', borderBottom: '2px solid #CBD5E1', paddingBottom: '12px' }}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#1E293B', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>📁</span> Documentación y Archivos del Equipo
+                      </h4>
+                      <p style={{ margin: '3px 0 0 0', fontSize: '0.8rem', color: '#64748B' }}>
+                        Historial centralizado de facturas, soportes, garantías, manuales, fotos y actas (sin pérdida de trazabilidad).
+                      </p>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setAttachFile(null);
+                        setAttachObservaciones('');
+                        setAttachTipoDoc('Factura');
+                        setAttachTipoDocCustom('');
+                        setAttachError('');
+                        setAttachSuccess('');
+                        setShowAttachModal(true);
+                      }}
+                      className="btn btn-primary shadow-sm"
+                      style={{
+                        padding: '10px 18px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: '#2563EB',
+                        color: '#ffffff',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '0.9rem'
+                      }}
+                    >
+                      <span>+ 📎</span> Adjuntar Archivo
+                    </button>
+                  </div>
+
+                  {archivosEquipo && archivosEquipo.length > 0 ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '14px' }}>
+                      {archivosEquipo.map((a) => (
+                        <div key={a.id} style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.03)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                            <span style={{ backgroundColor: '#EFF6FF', color: '#1D4ED8', fontWeight: '800', fontSize: '0.75rem', padding: '4px 10px', borderRadius: '20px', border: '1px solid #BFDBFE' }}>
+                              🏷️ {a.tipo_documento || 'Soporte'}
+                            </span>
+                            <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '700' }}>
+                              💾 {a.tamano_texto || 'Archivo'}
+                            </span>
+                          </div>
+
+                          <div>
+                            <h5 style={{ margin: '4px 0', fontSize: '0.95rem', fontWeight: '800', color: '#0F172A', wordBreak: 'break-word', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>📎</span> {a.nombre_original}
+                            </h5>
+                            <span style={{ fontSize: '0.72rem', color: '#64748B', display: 'block', marginTop: '2px' }}>
+                              👤 Cargado por: <strong>{a.usuario_nombre || 'Usuario'}</strong> el {new Date(a.created_at).toLocaleString('es-CO')}
+                            </span>
+                          </div>
+
+                          {a.observaciones && (
+                            <div style={{ backgroundColor: '#F8FAFC', padding: '8px 10px', borderRadius: '6px', borderLeft: '3px solid #3B82F6', fontSize: '0.8rem', color: '#334155', fontStyle: 'italic' }}>
+                              💬 "{a.observaciones}"
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', gap: '8px', marginTop: 'auto', paddingTop: '8px', borderTop: '1px solid #F1F5F9' }}>
+                            <a 
+                              href={a.ruta_archivo} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              style={{ flex: 1, textAlign: 'center', padding: '7px 12px', backgroundColor: '#F1F5F9', color: '#0F172A', borderRadius: '6px', fontWeight: '700', fontSize: '0.8rem', textDecoration: 'none', border: '1px solid #CBD5E1' }}
+                            >
+                              👁️ Ver / Abrir
+                            </a>
+                            <a 
+                              href={a.ruta_archivo} 
+                              download={a.nombre_original}
+                              style={{ flex: 1, textAlign: 'center', padding: '7px 12px', backgroundColor: '#10B981', color: '#ffffff', borderRadius: '6px', fontWeight: '700', fontSize: '0.8rem', textDecoration: 'none', border: 'none' }}
+                            >
+                              📥 Descargar
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ padding: '24px', textAlign: 'center', backgroundColor: '#ffffff', borderRadius: '10px', border: '1px dashed #CBD5E1', color: '#64748B' }}>
+                      <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}>📭</span>
+                      <p style={{ margin: 0, fontWeight: '700', fontSize: '0.9rem' }}>No hay archivos ni documentos adjuntos aún para este equipo.</p>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem' }}>Haz clic en <strong>+ Adjuntar Archivo</strong> para subir facturas, garantías, soportes, manuales o fotos.</p>
+                    </div>
+                  )}
+                </div>
+
               </div>
             </div>
           )}
@@ -1132,6 +1291,128 @@ export default function EquiposPage() {
                 </button>
               </div>
 
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Attach File Modal for Equipment History ===== */}
+      {showAttachModal && equipo && (
+        <div className="maint-modal-overlay">
+          <div className="maint-modal-content card shadow-lg animate-fade-in" style={{ maxWidth: '560px', width: '95%', borderRadius: '16px', overflow: 'hidden' }}>
+            <div className="card-header" style={{ backgroundColor: '#1E293B', color: '#ffffff', padding: '18px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '900', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>📎</span> Adjuntar Archivo al Equipo
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#94A3B8' }}>
+                  [{equipo.id}] {equipo.nombre} ({equipo.pdv_nombre})
+                </p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowAttachModal(false)}
+                style={{ border: 'none', background: 'none', color: '#ffffff', fontSize: '1.5rem', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleUploadAttachFile} className="card-body" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              {attachError && <div className="alert alert-danger" style={{ padding: '10px 14px', borderRadius: '8px', backgroundColor: '#FEE2E2', color: '#B91C1C', fontWeight: 'bold', fontSize: '0.85rem' }}>❌ {attachError}</div>}
+              {attachSuccess && <div className="alert alert-success" style={{ padding: '10px 14px', borderRadius: '8px', backgroundColor: '#D1FAE5', color: '#065F46', fontWeight: 'bold', fontSize: '0.85rem' }}>✅ {attachSuccess}</div>}
+
+              <div>
+                <label className="form-label" style={{ fontWeight: '800', color: '#1E293B', fontSize: '0.9rem', marginBottom: '6px', display: 'block' }}>
+                  1. Tipo de Documento *
+                </label>
+                <select 
+                  className="form-select"
+                  value={attachTipoDoc}
+                  onChange={(e) => setAttachTipoDoc(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '2px solid #CBD5E1', fontSize: '0.95rem', fontWeight: '700', color: '#0F172A' }}
+                  required
+                >
+                  <option value="Factura">📄 Factura</option>
+                  <option value="Soporte técnico">🔧 Soporte técnico</option>
+                  <option value="Garantía">🛡️ Garantía</option>
+                  <option value="Evidencia fotográfica">📷 Evidencia fotográfica</option>
+                  <option value="Cotización">💰 Cotización</option>
+                  <option value="Manual">📘 Manual</option>
+                  <option value="Informe técnico">📋 Informe técnico</option>
+                  <option value="Acta de entrega">✍️ Acta de entrega</option>
+                  <option value="Otro">➕ Otro (Escribir personalizado)</option>
+                </select>
+              </div>
+
+              {attachTipoDoc === 'Otro' && (
+                <div className="animate-fade-in">
+                  <label className="form-label" style={{ fontWeight: '800', color: '#2563EB', fontSize: '0.85rem', marginBottom: '6px', display: 'block' }}>
+                    ✍️ Nombre personalizado del documento *
+                  </label>
+                  <input 
+                    type="text"
+                    className="form-control"
+                    placeholder="Ej: Certificado de calibración, Contrato, etc."
+                    value={attachTipoDocCustom}
+                    onChange={(e) => setAttachTipoDocCustom(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '2px solid #3B82F6', fontSize: '0.9rem', fontWeight: '600' }}
+                    required
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="form-label" style={{ fontWeight: '800', color: '#1E293B', fontSize: '0.9rem', marginBottom: '6px', display: 'block' }}>
+                  2. Seleccionar Archivo * (Cualquier formato: PDF, Excel, Word, Foto, Video, Zip, etc.)
+                </label>
+                <input 
+                  type="file" 
+                  className="form-control"
+                  onChange={(e) => setAttachFile(e.target.files[0])}
+                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '2px dashed #94A3B8', backgroundColor: '#F8FAFC', cursor: 'pointer' }}
+                  required
+                />
+                {attachFile && (
+                  <div style={{ marginTop: '6px', fontSize: '0.78rem', color: '#10B981', fontWeight: '700' }}>
+                    📎 Listo para subir: {attachFile.name} ({(attachFile.size / (1024 * 1024)).toFixed(2)} MB)
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontWeight: '800', color: '#1E293B', fontSize: '0.9rem', marginBottom: '6px', display: 'block' }}>
+                  3. Descripción u Observaciones
+                </label>
+                <textarea 
+                  className="form-control"
+                  placeholder="Indica qué contiene el archivo, el motivo de la carga o cualquier información relevante para el historial..."
+                  rows={3}
+                  value={attachObservaciones}
+                  onChange={(e) => setAttachObservaciones(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '2px solid #CBD5E1', fontSize: '0.9rem', fontFamily: 'inherit' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '10px', borderTop: '1px solid #E2E8F0', paddingTop: '16px' }}>
+                <button 
+                  type="button" 
+                  onClick={() => setShowAttachModal(false)}
+                  className="btn btn-secondary"
+                  style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #CBD5E1', fontWeight: '700', cursor: 'pointer' }}
+                  disabled={attachLoading}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary shadow-sm"
+                  style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', backgroundColor: '#2563EB', color: '#ffffff', fontWeight: '800', cursor: 'pointer' }}
+                  disabled={attachLoading || !attachFile}
+                >
+                  {attachLoading ? 'Subiendo archivo...' : '💾 Guardar en Historial del Equipo'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
