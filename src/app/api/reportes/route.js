@@ -11,12 +11,12 @@ export async function GET(request) {
     const user = getUserFromRequest(request);
     if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-    const rolInt = parseInt(user.rol_id);
-    if (!REPORT_ALLOWED_ROLES.includes(rolInt)) {
+    const db = getDb();
+    const { hasPermission } = require('@/lib/auth');
+    if (!hasPermission(user, 'reportes', db)) {
       return NextResponse.json({ error: 'Sin permisos para acceder a reportes' }, { status: 403 });
     }
-
-    const db = getDb();
+    const rolInt = parseInt(user.rol_id);
     const { searchParams } = new URL(request.url);
     const area_id = searchParams.get('area_id');
     const categoria_id = searchParams.get('categoria_id');

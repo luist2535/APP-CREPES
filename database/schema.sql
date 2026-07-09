@@ -13,6 +13,18 @@ CREATE TABLE IF NOT EXISTS roles (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabla de Permisos Adicionales y Personalizados por Rol
+CREATE TABLE IF NOT EXISTS roles_permisos_adicionales (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rol_id INTEGER NOT NULL,
+  modulo TEXT NOT NULL,
+  permitido INTEGER NOT NULL DEFAULT 1,
+  otorgado_por TEXT,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(rol_id, modulo),
+  FOREIGN KEY (rol_id) REFERENCES roles(id)
+);
+
 -- Tabla de Ciudades
 CREATE TABLE IF NOT EXISTS ciudades (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

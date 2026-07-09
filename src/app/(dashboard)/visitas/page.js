@@ -1198,7 +1198,7 @@ const MatrixChecklistForm = ({
               opacity: savingProgress ? 0.7 : 1
             }}
           >
-            <span>💾</span> {savingProgress ? 'Guardando...' : 'Guardar progreso'}
+            <span>💾</span> {savingProgress ? 'Guardando...' : 'Guardar en Celular / Servidor'}
           </button>
         </div>
       </div>
@@ -1615,10 +1615,13 @@ export default function VisitasPage() {
       const remainingQueue = [];
       for (const item of q) {
         try {
+          const isCreation = Boolean(item.is_creation_direct);
+          const method = isCreation ? 'POST' : 'PUT';
+          const { is_creation_direct, ...cleanPayload } = item;
           const res = await fetch('/api/visitas', {
-            method: 'PUT',
+            method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(item),
+            body: JSON.stringify(cleanPayload),
           });
           if (res.ok) {
             syncedCount++;
@@ -2364,7 +2367,21 @@ export default function VisitasPage() {
       setSubmitSuccess('Progreso guardado exitosamente.');
       setTimeout(() => setSubmitSuccess(''), 3000);
     } catch (err) {
-      setSubmitError(err.message);
+      if (!navigator.onLine || err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+        const draftKey = `crepes_offline_draft_${activeExecutionVisit.id}`;
+        try {
+          localStorage.setItem(draftKey, JSON.stringify({
+            formAnswers, formObservaciones, formRepuestos, formHallazgos, formAccionesCorrectivas,
+            solicitanteNombre, solicitanteDocumento, solicitanteTelefono, timestamp: new Date().toISOString()
+          }));
+          setSubmitSuccess('📶 Sin conexión: Tu progreso ha sido guardado de manera segura en la memoria interna de tu celular.');
+          setTimeout(() => setSubmitSuccess(''), 4000);
+        } catch (e) {
+          setSubmitError('No fue posible guardar en la memoria local del celular.');
+        }
+      } else {
+        setSubmitError(err.message);
+      }
     } finally {
       setSavingProgress(false);
     }
@@ -2601,6 +2618,14 @@ export default function VisitasPage() {
         categoria_id: selectedCategoriaId ? parseInt(selectedCategoriaId) : null
       };
 
+      if (!navigator.onLine) {
+        saveToOfflineQueue({ ...payload, is_creation_direct: true });
+        setAntesFile(null); setSelectedCategoriaId(''); setAntesUrl('');
+        setDespuesFile(null); setDespuesUrl(''); setSoporteFile(null); setSoporteUrl(''); setFormObservaciones('');
+        setSubmitLoading(false);
+        return;
+      }
+
       const res = await fetch('/api/visitas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2629,7 +2654,13 @@ export default function VisitasPage() {
         setSubmitSuccess('');
       }, 1500);
     } catch (err) {
-      setSubmitError(err.message);
+      if (!navigator.onLine || err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+        saveToOfflineQueue({ ...payload, is_creation_direct: true });
+        setAntesFile(null); setSelectedCategoriaId(''); setAntesUrl('');
+        setDespuesFile(null); setDespuesUrl(''); setSoporteFile(null); setSoporteUrl(''); setFormObservaciones('');
+      } else {
+        setSubmitError(err.message);
+      }
     } finally {
       setSubmitLoading(false);
     }
@@ -2845,7 +2876,7 @@ export default function VisitasPage() {
           <span className="mobile-only-inline">📋 Historial</span>
         </button>
 
-        {(userRole === 1 || userRole === 2) && (
+        {(userRole === 1 || userRole === 2 || isUserJefe(userRole)) && (
           <button 
             className={`tab-btn ${activeTab === 'new' ? 'active' : ''}`}
             onClick={() => { setActiveTab('new'); setActiveExecutionVisit(null); }}
@@ -3341,13 +3372,25 @@ export default function VisitasPage() {
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  className="btn btn-primary btn-block btn-lg"
-                  disabled={submitLoading || antesUploading || despuesUploading || soporteUploading}
-                >
-                  {submitLoading ? 'Procesando...' : 'Finalizar y Guardar Visita'}
-                </button>
+                <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginTop: '20px' }}>
+                  <button
+                    type="button"
+                    onClick={handleSaveProgress}
+                    disabled={savingProgress || submitLoading}
+                    className="btn btn-secondary btn-lg"
+                    style={{ flex: '1 1 220px', background: '#F3EFEA', color: '#6B3A2A', border: '2px solid #D6C7B8', fontWeight: 'bold' }}
+                  >
+                    <span>💾</span> {savingProgress ? 'Guardando en celular...' : 'Guardar Borrador en Celular / Servidor'}
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-lg"
+                    style={{ flex: '2 1 300px' }}
+                    disabled={submitLoading || antesUploading || despuesUploading || soporteUploading}
+                  >
+                    {submitLoading ? 'Procesando...' : 'Finalizar y Guardar Visita'}
+                  </button>
+                </div>
               </form>
             </div>
           </div>
@@ -3759,8 +3802,26 @@ export default function VisitasPage() {
       {(!activeExecutionVisit && activeTab === 'list') && (
         <div className="visitas-list-tab animate-fade-in no-print">
           <div className="visitas-table-card card shadow-md">
-            <div className="card-header" style={{ borderBottom: 'none' }}>
-              <h3>📋 Historial de Visitas Registradas</h3>
+            <div className="card-header" style={{ borderBottom: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <h3 style={{ margin: 0 }}>📋 Historial de Visitas Registradas</h3>
+              <a
+                href={`/api/visitas/export-general?area_id=${selectedAreaFilter}&pdv_id=all`}
+                className="btn btn-sm"
+                style={{
+                  backgroundColor: '#15803D',
+                  color: '#ffffff',
+                  fontWeight: 'bold',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 6px rgba(21, 128, 61, 0.2)'
+                }}
+              >
+                📊 Exportar Todo a Excel
+              </a>
             </div>
             
             {visitas.length > 0 ? (
@@ -3891,7 +3952,17 @@ export default function VisitasPage() {
                                 >
                                   Ver Respuestas 👁️
                                 </button>
-                                {(parseInt(user?.rol_id) === 1 || parseInt(user?.rol_id) > 9 || parseInt(v.user_id) === parseInt(user?.id)) && (
+                                {['completada', 'cerrada', 'finalizada'].includes(v.estado) && v.plantilla_id && (
+                                  <a 
+                                    href={`/api/visitas/export?id=${v.id}`}
+                                    className="btn btn-sm"
+                                    style={{ backgroundColor: '#15803D', color: '#ffffff', border: '1px solid #14532D', padding: '4px 8px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                    title="Exportar esta visita a Excel"
+                                  >
+                                    📥 Excel
+                                  </a>
+                                )}
+                                {(parseInt(currentUser?.rol_id) === 1 || parseInt(currentUser?.rol_id) > 9 || parseInt(v.user_id) === parseInt(currentUser?.id)) && (
                                   <button 
                                     className="btn btn-sm"
                                     style={{ backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', padding: '4px 8px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
@@ -4508,7 +4579,7 @@ export default function VisitasPage() {
             <div className="card-header no-print">
               <h3>Auditoría Operativa de Punto de Venta</h3>
               <div className="modal-header-actions">
-                {(parseInt(user?.rol_id) === 1 || parseInt(user?.rol_id) > 9 || parseInt(selectedVisit.user_id) === parseInt(user?.id)) && (
+                {(parseInt(currentUser?.rol_id) === 1 || parseInt(currentUser?.rol_id) > 9 || parseInt(selectedVisit.user_id) === parseInt(currentUser?.id)) && (
                   <button 
                     className="btn btn-sm"
                     style={{ backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}

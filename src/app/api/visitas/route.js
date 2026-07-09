@@ -230,7 +230,7 @@ export async function PUT(request) {
       } = data;
       
       const nowTime = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false });
-      const isJefeExecuting = [1, 3, 4, 5, 6, 7, 9].includes(parseInt(user.rol_id));
+      const isJefeExecuting = [1, 2, 3, 4, 5, 6, 7, 9].includes(parseInt(user.rol_id));
       const targetEstado = isJefeExecuting ? 'cerrada' : 'finalizada';
       
       db.prepare(`

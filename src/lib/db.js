@@ -20,6 +20,19 @@ function getDb() {
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
 
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS roles_permisos_adicionales (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rol_id INTEGER NOT NULL,
+        modulo TEXT NOT NULL,
+        permitido INTEGER NOT NULL DEFAULT 1,
+        otorgado_por TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(rol_id, modulo),
+        FOREIGN KEY (rol_id) REFERENCES roles(id)
+      )
+    `);
+
     if (isNew) {
       console.log('🗄️ Inicializando base de datos...');
       const schema = fs.readFileSync(SCHEMA_PATH, 'utf-8');

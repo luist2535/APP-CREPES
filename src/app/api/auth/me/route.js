@@ -24,6 +24,9 @@ export async function GET(request) {
       return NextResponse.json({ user: null }, { status: 401 });
     }
     
+    const { getUserCustomPermissions } = require('@/lib/auth');
+    user.permisos_adicionales = getUserCustomPermissions(user.rol_id, db);
+    
     return NextResponse.json({ user });
   } catch (error) {
     return NextResponse.json({ user: null }, { status: 401 });

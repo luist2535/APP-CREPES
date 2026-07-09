@@ -112,8 +112,8 @@ export async function POST(request) {
     
     // Case 1: Register/Create new equipment
     if (body.is_creation) {
-      const allowedRoles = [1, 4, 9, 12, 16];
-      if (!allowedRoles.includes(parseInt(user.rol_id))) {
+      const { hasPermission } = require('@/lib/auth');
+      if (!hasPermission(user, 'equipos', db)) {
         return NextResponse.json({ error: 'No tienes permisos para registrar equipos' }, { status: 403 });
       }
       
@@ -224,12 +224,11 @@ export async function PUT(request) {
     if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     
     // Auth check
-    const allowedRoles = [1, 4, 9, 12, 16];
-    if (!allowedRoles.includes(parseInt(user.rol_id))) {
+    const db = getDb();
+    const { hasPermission } = require('@/lib/auth');
+    if (!hasPermission(user, 'equipos', db)) {
       return NextResponse.json({ error: 'No tienes permisos para modificar equipos' }, { status: 403 });
     }
-    
-    const db = getDb();
     const { id, nombre, pdv_id, marca, modelo, serie, datos_tecnicos, activo } = await request.json();
     
     if (!id || !nombre || !pdv_id) {

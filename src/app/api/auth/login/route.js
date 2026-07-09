@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
+const { getDb } = require('@/lib/db');
+const { generateToken, comparePassword, getUserCustomPermissions } = require('@/lib/auth');
 
 export async function POST(request) {
   try {
-    const { getDb } = require('@/lib/db');
-    const { comparePassword, generateToken } = require('@/lib/auth');
-    
     const { email, password } = await request.json();
     
     if (!email || !password) {
@@ -31,6 +30,7 @@ export async function POST(request) {
     }
     
     const token = generateToken(user);
+    const customPerms = getUserCustomPermissions(user.rol_id, db);
     
     // Actualizar último login
     db.prepare('UPDATE users SET ultimo_login = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
@@ -44,6 +44,7 @@ export async function POST(request) {
         rol_nombre: user.rol_nombre,
         ciudad_id: user.ciudad_id,
         ciudad_nombre: user.ciudad_nombre,
+        permisos_adicionales: customPerms
       }
     });
     

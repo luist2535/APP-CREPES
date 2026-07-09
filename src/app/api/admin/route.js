@@ -7,12 +7,14 @@ export async function POST(request) {
     const bcrypt = require('bcryptjs');
     
     const user = getUserFromRequest(request);
-    // Only administrators (rol_id = 1) can access admin endpoints
-    if (!user || parseInt(user.rol_id) !== 1) {
-      return NextResponse.json({ error: 'No autorizado. Se requieren permisos de Administrador' }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
-    
     const db = getDb();
+    const { hasPermission } = require('@/lib/auth');
+    if (!hasPermission(user, 'admin', db)) {
+      return NextResponse.json({ error: 'No autorizado. Se requieren permisos de Administración' }, { status: 403 });
+    }
     const { entity, data } = await request.json();
     
     if (!entity || !data) {
@@ -104,11 +106,14 @@ export async function PUT(request) {
     const { getDb } = require('@/lib/db');
     
     const user = getUserFromRequest(request);
-    if (!user || parseInt(user.rol_id) !== 1) {
-      return NextResponse.json({ error: 'No autorizado. Se requieren permisos de Administrador' }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
-    
     const db = getDb();
+    const { hasPermission } = require('@/lib/auth');
+    if (!hasPermission(user, 'admin', db)) {
+      return NextResponse.json({ error: 'No autorizado. Se requieren permisos de Administración' }, { status: 403 });
+    }
     const { entity, id, data } = await request.json();
     
     if (!entity || !id || !data) {
@@ -188,11 +193,14 @@ export async function DELETE(request) {
     const { getDb } = require('@/lib/db');
     
     const user = getUserFromRequest(request);
-    if (!user || parseInt(user.rol_id) !== 1) {
-      return NextResponse.json({ error: 'No autorizado. Se requieren permisos de Administrador' }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
-    
     const db = getDb();
+    const { hasPermission } = require('@/lib/auth');
+    if (!hasPermission(user, 'admin', db)) {
+      return NextResponse.json({ error: 'No autorizado. Se requieren permisos de Administración' }, { status: 403 });
+    }
     const { searchParams } = new URL(request.url);
     const entity = searchParams.get('entity');
     const id = searchParams.get('id');

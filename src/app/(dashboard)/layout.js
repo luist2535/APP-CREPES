@@ -87,6 +87,23 @@ export default function DashboardLayout({ children }) {
     const rol = parseInt(user.rol_id);
     if (rol === 1) return true; // Admin has access to all
     
+    const moduleMap = {
+      '/dashboard': 'dashboard',
+      '/territorial': 'territorial',
+      '/calendario': 'calendario',
+      '/visitas': 'visitas',
+      '/bloqueos': 'bloqueos',
+      '/equipos': 'equipos',
+      '/solicitudes': 'solicitudes',
+      '/reportes': 'reportes',
+      '/archivos': 'archivos',
+      '/admin': 'admin'
+    };
+    const modKey = moduleMap[path];
+    if (modKey && user.permisos_adicionales && user.permisos_adicionales[modKey] !== undefined) {
+      return Boolean(user.permisos_adicionales[modKey].permitido);
+    }
+    
     // Roles list groupings
     const jefesYCoordinador = [2, 3, 4, 5, 6, 7, 9];
     const auxiliares = [10, 11, 12, 13, 14, 15, 16];
@@ -273,7 +290,7 @@ export default function DashboardLayout({ children }) {
         },
         {
           name: 'Roles y Permisos',
-          path: '/admin?tab=areas',
+          path: '/admin?tab=roles',
           accessPath: '/admin',
           icon: (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -40,6 +40,15 @@ function AdminContent() {
   const [searchTermUser, setSearchTermUser] = useState('');
   const [selectedRoleFilter, setSelectedRoleFilter] = useState('all');
   
+  // Custom Role Permissions States
+  const [rolesPermisosData, setRolesPermisosData] = useState({
+    defaultPermissions: {},
+    customPermissions: [],
+    modules: []
+  });
+  const [selectedRoleForPermissions, setSelectedRoleForPermissions] = useState(null);
+  const [savingPermissionKey, setSavingPermissionKey] = useState(null);
+  
   // Custom Confirm & Alert Modal States
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
@@ -151,12 +160,68 @@ function AdminContent() {
         const dataVisitas = await resVisitas.json();
         setAreas(dataVisitas.areas);
       }
+
+      // Load Roles & Permisos Adicionales
+      const resRolesPerm = await fetch('/api/roles-permisos');
+      if (resRolesPerm.ok) {
+        const dataRP = await resRolesPerm.json();
+        setRolesPermisosData({
+          defaultPermissions: dataRP.defaultPermissions || {},
+          customPermissions: dataRP.customPermissions || [],
+          modules: dataRP.modules || []
+        });
+        if (dataUsers.roles && dataUsers.roles.length > 0 && !selectedRoleForPermissions) {
+          const defaultRole = dataUsers.roles.find(r => r.id !== 1) || dataUsers.roles[0];
+          setSelectedRoleForPermissions(defaultRole.id);
+        }
+      }
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleToggleCustomPermission = async (rolId, moduloKey, newStatus) => {
+    try {
+      setSavingPermissionKey(`${rolId}-${moduloKey}`);
+      const res = await fetch('/api/roles-permisos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rol_id: rolId, modulo: moduloKey, permitido: newStatus })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error al guardar permiso');
+      }
+      // Refresh custom permissions
+      const resRolesPerm = await fetch('/api/roles-permisos');
+      if (resRolesPerm.ok) {
+        const dataRP = await resRolesPerm.json();
+        setRolesPermisosData({
+          defaultPermissions: dataRP.defaultPermissions || {},
+          customPermissions: dataRP.customPermissions || [],
+          modules: dataRP.modules || []
+        });
+      }
+      setAlertModal({
+        isOpen: true,
+        title: '✅ Permiso actualizado',
+        message: `El permiso ha sido ${newStatus ? 'habilitado' : 'desactivado'} para este rol.`,
+        type: 'success'
+      });
+    } catch (err) {
+      setAlertModal({
+        isOpen: true,
+        title: '❌ Error',
+        message: err.message,
+        type: 'error'
+      });
+    } finally {
+      setSavingPermissionKey(null);
+    }
+  };
+
 
   const fetchSmtpSettings = async () => {
     try {
@@ -444,6 +509,9 @@ function AdminContent() {
         <button className={`tab-btn ${activeTab === 'usuarios' ? 'active' : ''}`} onClick={() => { setActiveTab('usuarios'); handleCloseForm(); }}>
           👤 Gestión Usuarios
         </button>
+        <button className={`tab-btn ${activeTab === 'roles' ? 'active' : ''}`} onClick={() => { setActiveTab('roles'); handleCloseForm(); }}>
+          🛡️ Roles y Permisos
+        </button>
         <button className={`tab-btn ${activeTab === 'pdvs' ? 'active' : ''}`} onClick={() => { setActiveTab('pdvs'); handleCloseForm(); }}>
           🏪 Gestión PDVs
         </button>
@@ -451,7 +519,7 @@ function AdminContent() {
           📍 Ciudades
         </button>
         <button className={`tab-btn ${activeTab === 'areas' ? 'active' : ''}`} onClick={() => { setActiveTab('areas'); handleCloseForm(); }}>
-          🛡️ Áreas de Inspección
+          📂 Áreas de Inspección
         </button>
         <button className={`tab-btn ${activeTab === 'correo' ? 'active' : ''}`} onClick={() => { setActiveTab('correo'); handleCloseForm(); }}>
           📧 Configuración de Correo
@@ -461,12 +529,13 @@ function AdminContent() {
       <div className="admin-actions-row">
         <h3>
           {activeTab === 'usuarios' && 'Lista de Usuarios'}
+          {activeTab === 'roles' && 'Asignación Granular y Personalizada de Permisos por Rol'}
           {activeTab === 'pdvs' && 'Lista de Puntos de Venta (PDVs)'}
           {activeTab === 'ciudades' && 'Lista de Ciudades'}
           {activeTab === 'areas' && 'Áreas Funcionales'}
           {activeTab === 'correo' && 'Configuración de Servidor de Correo (SMTP)'}
         </h3>
-        {!showAddForm && activeTab !== 'correo' && (
+        {!showAddForm && activeTab !== 'correo' && activeTab !== 'roles' && (
           <button className="btn btn-primary btn-sm" onClick={() => { setEditingUser(null); setEditingPdv(null); setShowAddForm(true); }}>
             + Agregar Nuevo
           </button>
@@ -1268,6 +1337,220 @@ function AdminContent() {
                 {smtpLoading ? 'Guardando...' : 'Guardar Configuración 💾'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Roles & Custom Permissions Management Section */}
+      {activeTab === 'roles' && (
+        <div className="roles-permissions-section animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="card" style={{ background: 'linear-gradient(135deg, #FAF6F0 0%, #F5EDE4 100%)', border: '1px solid #E8DDD4', borderRadius: '14px', padding: '18px 22px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+              <div style={{ fontSize: '1.8rem' }}>🛡️</div>
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', color: '#4A2518', fontSize: '1.1rem', fontWeight: 'bold' }}>
+                  Roles y Permisos Personalizados
+                </h4>
+                <p style={{ margin: 0, color: '#555', fontSize: '0.9rem', lineHeight: '1.45' }}>
+                  Selecciona un rol del sistema para administrar de manera granular y flexible sus funciones. Además de los <strong>permisos predefinidos</strong> de cada cargo, puedes usar los interruptores o casillas para <strong>habilitar o retirar accesos específicos</strong> sin necesidad de crear roles nuevos. Toda modificación queda registrada con fecha, hora y el administrador responsable.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 320px) 1fr', gap: '24px', alignItems: 'start' }}>
+            {/* Left Column: Roles Selector */}
+            <div className="card" style={{ borderRadius: '14px', border: '1px solid #E8DDD4', overflow: 'hidden' }}>
+              <div className="card-header" style={{ background: '#F8F4EE', padding: '14px 18px', borderBottom: '1px solid #E8DDD4' }}>
+                <h5 style={{ margin: 0, color: '#4A2518', fontWeight: 'bold', fontSize: '0.95rem' }}>👥 Seleccionar Rol</h5>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '650px', overflowY: 'auto' }}>
+                {roles.map((r) => {
+                  const isSelected = selectedRoleForPermissions === r.id;
+                  const isAdmin = r.id === 1;
+                  const activeCustomCount = rolesPermisosData.customPermissions.filter(cp => cp.rol_id === r.id && cp.permitido).length;
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => setSelectedRoleForPermissions(r.id)}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        padding: '12px 16px',
+                        background: isSelected ? '#F2ECE6' : 'transparent',
+                        border: 'none',
+                        borderBottom: '1px solid #F0EAE1',
+                        borderLeft: isSelected ? '4px solid #6B3A2A' : '4px solid transparent',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                        <span style={{ fontWeight: isSelected ? 'bold' : '600', color: isSelected ? '#4A2518' : '#333', fontSize: '0.92rem' }}>
+                          {r.nombre}
+                        </span>
+                        {isAdmin ? (
+                          <span style={{ fontSize: '0.68rem', background: '#FEF3C7', color: '#92400E', padding: '2px 6px', borderRadius: '10px', fontWeight: 'bold' }}>Master</span>
+                        ) : activeCustomCount > 0 ? (
+                          <span style={{ fontSize: '0.68rem', background: '#DCFCE7', color: '#15803D', padding: '2px 6px', borderRadius: '10px', fontWeight: 'bold' }}>
+                            +{activeCustomCount} extra
+                          </span>
+                        ) : null}
+                      </div>
+                      <span style={{ fontSize: '0.78rem', color: '#777', marginTop: '2px', display: '-webkit-box', WebkitLineClamp: '1', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {r.descripcion || 'Sin descripción'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Right Column: Permission Modules List */}
+            <div className="card" style={{ borderRadius: '14px', border: '1px solid #E8DDD4', overflow: 'hidden' }}>
+              {(() => {
+                const currentRole = roles.find(r => r.id === selectedRoleForPermissions) || roles[0];
+                if (!currentRole) return <div style={{ padding: '30px', textAlign: 'center', color: '#888' }}>Selecciona un rol para ver sus permisos</div>;
+                const isAdmin = currentRole.id === 1;
+                const defaultModules = rolesPermisosData.defaultPermissions[currentRole.id] || [];
+
+                return (
+                  <>
+                    <div className="card-header" style={{ background: '#F8F4EE', padding: '16px 20px', borderBottom: '1px solid #E8DDD4', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                      <div>
+                        <h4 style={{ margin: 0, color: '#4A2518', fontSize: '1.1rem', fontWeight: 'bold' }}>
+                          Permisos del Rol: <span style={{ color: '#8B6914' }}>{currentRole.nombre}</span>
+                        </h4>
+                        <span style={{ fontSize: '0.82rem', color: '#666' }}>{currentRole.descripcion}</span>
+                      </div>
+                      {isAdmin && (
+                        <span style={{ background: '#FEE2E2', color: '#991B1B', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                          👑 Acceso Total del Sistema
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {rolesPermisosData.modules.map((mod) => {
+                        const isDefault = defaultModules.includes(mod.key);
+                        const customEntry = rolesPermisosData.customPermissions.find(cp => cp.rol_id === currentRole.id && cp.modulo === mod.key);
+                        const isCustomAllowed = customEntry ? Boolean(customEntry.permitido) : null;
+                        
+                        // Effective permission: if custom override exists, use it. Otherwise use default.
+                        const isEffectiveAllowed = isAdmin ? true : (isCustomAllowed !== null ? isCustomAllowed : isDefault);
+                        const isSavingThis = savingPermissionKey === `${currentRole.id}-${mod.key}`;
+
+                        return (
+                          <div
+                            key={mod.key}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '16px 18px',
+                              borderRadius: '12px',
+                              border: isEffectiveAllowed ? '1px solid #86EFAC' : '1px solid #E5E7EB',
+                              background: isEffectiveAllowed ? (isDefault && isCustomAllowed === null ? '#F9FAFBF6' : '#F0FDF4') : '#FAFAFA',
+                              transition: 'all 0.2s ease',
+                              gap: '16px',
+                              flexWrap: 'wrap'
+                            }}
+                          >
+                            {/* Module Info */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: '1 1 240px' }}>
+                              <div style={{ fontSize: '1.6rem', background: '#FFF', width: '46px', height: '46px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #E8DDD4', flexShrink: 0 }}>
+                                {mod.icon}
+                              </div>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontWeight: 'bold', color: '#333', fontSize: '0.98rem' }}>{mod.nombre}</span>
+                                  {isDefault && (
+                                    <span style={{ fontSize: '0.7rem', background: '#E0F2FE', color: '#0369A1', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
+                                      🛡️ Predefinido
+                                    </span>
+                                  )}
+                                  {isCustomAllowed === true && !isDefault && (
+                                    <span style={{ fontSize: '0.7rem', background: '#DCFCE7', color: '#15803D', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
+                                      ➕ Concedido adicional
+                                    </span>
+                                  )}
+                                  {isCustomAllowed === false && isDefault && (
+                                    <span style={{ fontSize: '0.7rem', background: '#FEE2E2', color: '#991B1B', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
+                                      🚫 Retirado
+                                    </span>
+                                  )}
+                                </div>
+                                <span style={{ fontSize: '0.8rem', color: '#666', display: 'block', marginTop: '3px' }}>{mod.desc}</span>
+                              </div>
+                            </div>
+
+                            {/* Audit & Switch Actions */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                              {/* Audit info */}
+                              <div style={{ textAlign: 'right', fontSize: '0.75rem', color: '#777', minWidth: '160px' }}>
+                                {customEntry ? (
+                                  <>
+                                    <div style={{ color: '#4A2518', fontWeight: '600' }}>👤 {customEntry.otorgado_por}</div>
+                                    <div>🕒 {new Date(customEntry.updated_at).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}</div>
+                                  </>
+                                ) : isDefault ? (
+                                  <span style={{ fontStyle: 'italic' }}>Nativo del cargo</span>
+                                ) : (
+                                  <span style={{ color: '#AAA' }}>Sin acceso</span>
+                                )}
+                              </div>
+
+                              {/* Toggle Switch / Checkbox */}
+                              {!isAdmin ? (
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: isSavingThis ? 'not-allowed' : 'pointer', userSelect: 'none' }}>
+                                  <div style={{ position: 'relative', width: '48px', height: '26px' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={isEffectiveAllowed}
+                                      disabled={isSavingThis}
+                                      onChange={(e) => handleToggleCustomPermission(currentRole.id, mod.key, e.target.checked)}
+                                      style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                                    />
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: 0, left: 0, right: 0, bottom: 0,
+                                      background: isEffectiveAllowed ? '#15803D' : '#D1D5DB',
+                                      borderRadius: '26px',
+                                      transition: 'background 0.2s ease'
+                                    }}>
+                                      <div style={{
+                                        position: 'absolute',
+                                        top: '3px',
+                                        left: isEffectiveAllowed ? '25px' : '3px',
+                                        width: '20px',
+                                        height: '20px',
+                                        background: '#FFF',
+                                        borderRadius: '50%',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                                        transition: 'left 0.2s ease'
+                                      }} />
+                                    </div>
+                                  </div>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: isEffectiveAllowed ? '#15803D' : '#6B7280', minWidth: '76px' }}>
+                                    {isSavingThis ? '⏳...' : (isEffectiveAllowed ? 'Habilitado' : 'Desactivado')}
+                                  </span>
+                                </label>
+                              ) : (
+                                <span style={{ fontSize: '0.82rem', color: '#92400E', fontWeight: 'bold', background: '#FEF3C7', padding: '4px 12px', borderRadius: '8px' }}>
+                                  Siempre activo
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
           </div>
         </div>
       )}
