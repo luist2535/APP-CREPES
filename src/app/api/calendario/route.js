@@ -7,7 +7,7 @@ const getAreaIdFromRol = (rolId) => {
   if (rol === 3 || rol === 11) return 2; // SST / Auxiliar SST -> SST
   if (rol === 4 || rol === 12) return 3; // Mantenimiento / Auxiliar Mantenimiento -> Mantenimiento
   if (rol === 5 || rol === 13) return 4; // Calidad / Auxiliar Calidad -> Calidad
-  if (rol === 6 || rol === 14) return 5; // VRH / Auxiliar VRH -> VRH
+  if (rol === 6 || rol === 14) return 5; // DRH / Auxiliar DRH -> DRH
   if (rol === 7 || rol === 15) return 6; // Formación / Auxiliar Formación -> Formación
   if (rol === 9 || rol === 16) return 7; // Jefe Sistemas / Auxiliar Sistemas -> Sistemas
   return null;
@@ -172,7 +172,7 @@ export async function POST(request) {
       if (area === 2) return 11; // SST -> Auxiliar SST
       if (area === 3) return 12; // Mantenimiento -> Auxiliar de Mantenimiento
       if (area === 4) return 13; // Calidad -> Auxiliar de Calidad
-      if (area === 5) return 14; // VRH -> Auxiliar VRH
+      if (area === 5) return 14; // DRH -> Auxiliar DRH
       if (area === 6) return 15; // Formación -> Auxiliar Formación
       if (area === 7) return 16; // Sistemas -> Auxiliar de Sistemas
       return null;

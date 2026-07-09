@@ -44,10 +44,21 @@ function AdminContent() {
   const [rolesPermisosData, setRolesPermisosData] = useState({
     defaultPermissions: {},
     customPermissions: [],
-    modules: []
+    modules: [],
+    granularActions: {}
   });
   const [selectedRoleForPermissions, setSelectedRoleForPermissions] = useState(null);
   const [savingPermissionKey, setSavingPermissionKey] = useState(null);
+
+  // Cargos CRUD States
+  const [cargosList, setCargosList] = useState([]);
+  const [showCargoForm, setShowCargoForm] = useState(false);
+  const [cargoFormMode, setCargoFormMode] = useState('create'); // 'create' | 'duplicate' | 'edit'
+  const [cargoFormId, setCargoFormId] = useState(null);
+  const [cargoFormName, setCargoFormName] = useState('');
+  const [cargoFormDesc, setCargoFormDesc] = useState('');
+  const [cargoFormSourceId, setCargoFormSourceId] = useState('');
+  const [cargoFormActivo, setCargoFormActivo] = useState(1);
   
   // Custom Confirm & Alert Modal States
   const [confirmModal, setConfirmModal] = useState({
@@ -161,6 +172,17 @@ function AdminContent() {
         setAreas(dataVisitas.areas);
       }
 
+      // Load Cargos list
+      const resCargos = await fetch('/api/cargos');
+      if (resCargos.ok) {
+        const dataCargos = await resCargos.json();
+        setCargosList(dataCargos.cargos || []);
+        if (dataCargos.cargos && dataCargos.cargos.length > 0 && !selectedRoleForPermissions) {
+          const defaultRole = dataCargos.cargos.find(r => r.id !== 1) || dataCargos.cargos[0];
+          setSelectedRoleForPermissions(defaultRole.id);
+        }
+      }
+
       // Load Roles & Permisos Adicionales
       const resRolesPerm = await fetch('/api/roles-permisos');
       if (resRolesPerm.ok) {
@@ -168,12 +190,9 @@ function AdminContent() {
         setRolesPermisosData({
           defaultPermissions: dataRP.defaultPermissions || {},
           customPermissions: dataRP.customPermissions || [],
-          modules: dataRP.modules || []
+          modules: dataRP.modules || [],
+          granularActions: dataRP.granularActions || {}
         });
-        if (dataUsers.roles && dataUsers.roles.length > 0 && !selectedRoleForPermissions) {
-          const defaultRole = dataUsers.roles.find(r => r.id !== 1) || dataUsers.roles[0];
-          setSelectedRoleForPermissions(defaultRole.id);
-        }
       }
     } catch (err) {
       setError(err.message);
@@ -201,7 +220,8 @@ function AdminContent() {
         setRolesPermisosData({
           defaultPermissions: dataRP.defaultPermissions || {},
           customPermissions: dataRP.customPermissions || [],
-          modules: dataRP.modules || []
+          modules: dataRP.modules || [],
+          granularActions: dataRP.granularActions || {}
         });
       }
       setAlertModal({
@@ -221,6 +241,109 @@ function AdminContent() {
       setSavingPermissionKey(null);
     }
   };
+
+  const loadCargosOnly = async () => {
+    try {
+      const res = await fetch('/api/cargos');
+      if (res.ok) {
+        const data = await res.json();
+        setCargosList(data.cargos || []);
+      }
+      const resUsers = await fetch('/api/users');
+      if (resUsers.ok) {
+        const dataUsers = await resUsers.json();
+        setRoles(dataUsers.roles || []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleOpenCargoForm = (mode = 'create', cargo = null) => {
+    setFormError('');
+    setFormSuccess('');
+    setCargoFormMode(mode);
+    if (cargo) {
+      setCargoFormId(cargo.id);
+      setCargoFormName(mode === 'duplicate' ? `${cargo.nombre} (Copia)` : cargo.nombre);
+      setCargoFormDesc(mode === 'duplicate' ? `Copia de ${cargo.nombre}` : (cargo.descripcion || ''));
+      setCargoFormSourceId(cargo.id);
+      setCargoFormActivo(cargo.activo !== undefined ? cargo.activo : 1);
+    } else {
+      setCargoFormId(null);
+      setCargoFormName('');
+      setCargoFormDesc('');
+      setCargoFormSourceId('');
+      setCargoFormActivo(1);
+    }
+    setShowCargoForm(true);
+  };
+
+  const handleSaveCargo = async (e) => {
+    e.preventDefault();
+    setFormLoading(true);
+    setFormError('');
+    setFormSuccess('');
+    try {
+      if (cargoFormMode === 'create' || cargoFormMode === 'duplicate') {
+        const res = await fetch('/api/cargos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: cargoFormMode,
+            nombre: cargoFormName,
+            descripcion: cargoFormDesc,
+            sourceRolId: cargoFormSourceId
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al guardar el cargo');
+        setFormSuccess(data.message || 'Cargo creado/duplicado con éxito');
+      } else if (cargoFormMode === 'edit') {
+        const res = await fetch('/api/cargos', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: cargoFormId,
+            nombre: cargoFormName,
+            descripcion: cargoFormDesc,
+            activo: cargoFormActivo
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al modificar el cargo');
+        setFormSuccess(data.message || 'Cargo actualizado con éxito');
+      }
+      await loadCargosOnly();
+      setTimeout(() => {
+        setShowCargoForm(false);
+        setFormSuccess('');
+      }, 1200);
+    } catch (err) {
+      setFormError(err.message);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleDeleteCargo = (cargo) => {
+    triggerConfirm(
+      '¿Deshabilitar / Eliminar Cargo?',
+      `¿Estás seguro de que deseas eliminar o deshabilitar el cargo "${cargo.nombre}"? Si tiene usuarios asignados, no se podrá borrar.`,
+      async () => {
+        try {
+          const res = await fetch(`/api/cargos?id=${cargo.id}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Error al eliminar');
+          triggerAlert('Éxito', data.message || 'Cargo eliminado', 'success');
+          await loadCargosOnly();
+        } catch (err) {
+          triggerAlert('No se pudo eliminar', err.message, 'error');
+        }
+      }
+    );
+  };
+
 
 
   const fetchSmtpSettings = async () => {
@@ -506,22 +629,25 @@ function AdminContent() {
 
       {/* Tabs */}
       <div className="tabs-header">
-        <button className={`tab-btn ${activeTab === 'usuarios' ? 'active' : ''}`} onClick={() => { setActiveTab('usuarios'); handleCloseForm(); }}>
+        <button className={`tab-btn ${activeTab === 'usuarios' ? 'active' : ''}`} onClick={() => { setActiveTab('usuarios'); handleCloseForm(); setShowCargoForm(false); }}>
           👤 Gestión Usuarios
         </button>
-        <button className={`tab-btn ${activeTab === 'roles' ? 'active' : ''}`} onClick={() => { setActiveTab('roles'); handleCloseForm(); }}>
-          🛡️ Roles y Permisos
+        <button className={`tab-btn ${activeTab === 'cargos' ? 'active' : ''}`} onClick={() => { setActiveTab('cargos'); handleCloseForm(); setShowCargoForm(false); }}>
+          🏢 Gestión de Cargos
         </button>
-        <button className={`tab-btn ${activeTab === 'pdvs' ? 'active' : ''}`} onClick={() => { setActiveTab('pdvs'); handleCloseForm(); }}>
+        <button className={`tab-btn ${activeTab === 'roles' ? 'active' : ''}`} onClick={() => { setActiveTab('roles'); handleCloseForm(); setShowCargoForm(false); }}>
+          🛡️ Matriz de Permisos
+        </button>
+        <button className={`tab-btn ${activeTab === 'pdvs' ? 'active' : ''}`} onClick={() => { setActiveTab('pdvs'); handleCloseForm(); setShowCargoForm(false); }}>
           🏪 Gestión PDVs
         </button>
-        <button className={`tab-btn ${activeTab === 'ciudades' ? 'active' : ''}`} onClick={() => { setActiveTab('ciudades'); handleCloseForm(); }}>
+        <button className={`tab-btn ${activeTab === 'ciudades' ? 'active' : ''}`} onClick={() => { setActiveTab('ciudades'); handleCloseForm(); setShowCargoForm(false); }}>
           📍 Ciudades
         </button>
-        <button className={`tab-btn ${activeTab === 'areas' ? 'active' : ''}`} onClick={() => { setActiveTab('areas'); handleCloseForm(); }}>
+        <button className={`tab-btn ${activeTab === 'areas' ? 'active' : ''}`} onClick={() => { setActiveTab('areas'); handleCloseForm(); setShowCargoForm(false); }}>
           📂 Áreas de Inspección
         </button>
-        <button className={`tab-btn ${activeTab === 'correo' ? 'active' : ''}`} onClick={() => { setActiveTab('correo'); handleCloseForm(); }}>
+        <button className={`tab-btn ${activeTab === 'correo' ? 'active' : ''}`} onClick={() => { setActiveTab('correo'); handleCloseForm(); setShowCargoForm(false); }}>
           📧 Configuración de Correo
         </button>
       </div>
@@ -529,14 +655,23 @@ function AdminContent() {
       <div className="admin-actions-row">
         <h3>
           {activeTab === 'usuarios' && 'Lista de Usuarios'}
-          {activeTab === 'roles' && 'Asignación Granular y Personalizada de Permisos por Rol'}
+          {activeTab === 'cargos' && 'Lista y Administración de Cargos de la Empresa'}
+          {activeTab === 'roles' && 'Asignación Granular de Módulos y Acciones por Cargo'}
           {activeTab === 'pdvs' && 'Lista de Puntos de Venta (PDVs)'}
           {activeTab === 'ciudades' && 'Lista de Ciudades'}
           {activeTab === 'areas' && 'Áreas Funcionales'}
           {activeTab === 'correo' && 'Configuración de Servidor de Correo (SMTP)'}
         </h3>
-        {!showAddForm && activeTab !== 'correo' && activeTab !== 'roles' && (
-          <button className="btn btn-primary btn-sm" onClick={() => { setEditingUser(null); setEditingPdv(null); setShowAddForm(true); }}>
+        {!showAddForm && !showCargoForm && activeTab !== 'correo' && activeTab !== 'roles' && (
+          <button className="btn btn-primary btn-sm" onClick={() => {
+            if (activeTab === 'cargos') {
+              handleOpenCargoForm('create');
+            } else {
+              setEditingUser(null);
+              setEditingPdv(null);
+              setShowAddForm(true);
+            }
+          }}>
             + Agregar Nuevo
           </button>
         )}
@@ -1341,6 +1476,174 @@ function AdminContent() {
         </div>
       )}
 
+      {/* Gestión de Cargos CRUD Section */}
+      {activeTab === 'cargos' && (
+        <div className="cargos-management-section animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Modal / Inline Form for Create / Duplicate / Edit */}
+          {showCargoForm && (
+            <div className="card" style={{ border: '2px solid #8B6914', borderRadius: '14px', background: '#FFF9F0', padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h4 style={{ margin: 0, color: '#4A2518', fontSize: '1.15rem' }}>
+                  {cargoFormMode === 'create' && '➕ Crear Nuevo Cargo'}
+                  {cargoFormMode === 'duplicate' && '📄 Duplicar Cargo Existente'}
+                  {cargoFormMode === 'edit' && '✏️ Editar Cargo'}
+                </h4>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowCargoForm(false)}>
+                  ✕ Cerrar
+                </button>
+              </div>
+              <form onSubmit={handleSaveCargo} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div className="form-group">
+                  <label className="form-label">Nombre del Cargo *</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={cargoFormName}
+                    onChange={(e) => setCargoFormName(e.target.value)}
+                    placeholder="Ej: Supervisor Logístico, Auxiliar de Archivo..."
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Descripción o Misión del Cargo</label>
+                  <textarea
+                    className="form-input"
+                    rows="2"
+                    value={cargoFormDesc}
+                    onChange={(e) => setCargoFormDesc(e.target.value)}
+                    placeholder="Describe las funciones principales y alcance del cargo..."
+                  />
+                </div>
+                {cargoFormMode === 'edit' && cargoFormId !== 1 && (
+                  <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <input
+                      type="checkbox"
+                      id="cargo-activo"
+                      checked={cargoFormActivo === 1}
+                      onChange={(e) => setCargoFormActivo(e.target.checked ? 1 : 0)}
+                      style={{ width: '18px', height: '18px' }}
+                    />
+                    <label htmlFor="cargo-activo" style={{ fontWeight: 'bold', cursor: 'pointer' }}>
+                      Cargo Activo en el Sistema (Visible en formularios de usuarios y registros)
+                    </label>
+                  </div>
+                )}
+                {formError && <div style={{ color: '#DC2626', fontSize: '0.9rem', fontWeight: 'bold' }}>❌ {formError}</div>}
+                {formSuccess && <div style={{ color: '#16A34A', fontSize: '0.9rem', fontWeight: 'bold' }}>✅ {formSuccess}</div>}
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '6px' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowCargoForm(false)}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={formLoading}>
+                    {formLoading ? 'Guardando...' : (cargoFormMode === 'edit' ? 'Actualizar Cargo' : 'Guardar Cargo')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Table of Cargos */}
+          <div className="table-responsive card">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Nombre del Cargo</th>
+                  <th>Descripción</th>
+                  <th style={{ textAlign: 'center' }}>Usuarios Asignados</th>
+                  <th style={{ textAlign: 'center' }}>Estado</th>
+                  <th style={{ textAlign: 'right' }}>Acciones de Gestión</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(cargosList.length > 0 ? cargosList : roles).map((cargo) => {
+                  const usersCount = cargo.total_usuarios !== undefined ? cargo.total_usuarios : users.filter(u => u.rol_id === cargo.id).length;
+                  const isMaster = cargo.id === 1;
+                  const isActive = cargo.activo !== 0;
+
+                  return (
+                    <tr key={cargo.id} style={{ opacity: isActive ? 1 : 0.6, background: !isActive ? '#F9FAFB' : 'inherit' }}>
+                      <td><strong>#{cargo.id}</strong></td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: '600', color: '#1E293B' }}>{cargo.nombre}</span>
+                          {isMaster && <span style={{ background: '#FEF3C7', color: '#92400E', padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 'bold' }}>👑 Maestro</span>}
+                        </div>
+                      </td>
+                      <td style={{ color: '#64748B', fontSize: '0.88rem' }}>{cargo.descripcion || 'Sin descripción'}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span style={{ background: '#F1F5F9', color: '#334155', padding: '4px 10px', borderRadius: '14px', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                          👥 {usersCount}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span style={{
+                          background: isActive ? '#DCFCE7' : '#FEE2E2',
+                          color: isActive ? '#15803D' : '#991B1B',
+                          padding: '4px 10px',
+                          borderRadius: '14px',
+                          fontSize: '0.78rem',
+                          fontWeight: 'bold'
+                        }}>
+                          {isActive ? '🟢 Activo' : '🔴 Deshabilitado'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            title="Ver y configurar matriz de permisos para este cargo"
+                            onClick={() => {
+                              setSelectedRoleForPermissions(cargo.id);
+                              setActiveTab('roles');
+                            }}
+                            style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}
+                          >
+                            🛡️ Permisos
+                          </button>
+
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            title="Duplicar este cargo con todos sus permisos"
+                            onClick={() => handleOpenCargoForm('duplicate', cargo)}
+                          >
+                            📄 Duplicar
+                          </button>
+
+                          {!isMaster && (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                title="Editar nombre o descripción"
+                                onClick={() => handleOpenCargoForm('edit', cargo)}
+                              >
+                                ✏️ Editar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                title={isActive ? 'Deshabilitar cargo' : 'Eliminar cargo'}
+                                onClick={() => handleDeleteCargo(cargo)}
+                                style={{ color: '#DC2626' }}
+                              >
+                                🗑️ {isActive ? 'Desactivar' : 'Eliminar'}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Roles & Custom Permissions Management Section */}
       {activeTab === 'roles' && (
         <div className="roles-permissions-section animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -1349,10 +1652,10 @@ function AdminContent() {
               <div style={{ fontSize: '1.8rem' }}>🛡️</div>
               <div>
                 <h4 style={{ margin: '0 0 6px 0', color: '#4A2518', fontSize: '1.1rem', fontWeight: 'bold' }}>
-                  Roles y Permisos Personalizados
+                  Matriz de Permisos por Cargo
                 </h4>
                 <p style={{ margin: 0, color: '#555', fontSize: '0.9rem', lineHeight: '1.45' }}>
-                  Selecciona un rol del sistema para administrar de manera granular y flexible sus funciones. Además de los <strong>permisos predefinidos</strong> de cada cargo, puedes usar los interruptores o casillas para <strong>habilitar o retirar accesos específicos</strong> sin necesidad de crear roles nuevos. Toda modificación queda registrada con fecha, hora y el administrador responsable.
+                  Selecciona un cargo del sistema para administrar de manera granular y flexible sus funciones. Además de los <strong>módulos predefinidos</strong> de cada cargo, puedes usar las casillas y botones para <strong>habilitar o retirar accesos a acciones específicas</strong> (subir fotos, eliminar documentos, ver reportes, etc.) sin necesidad de duplicar o programar nuevos roles.
                 </p>
               </div>
             </div>
@@ -1362,7 +1665,7 @@ function AdminContent() {
             {/* Left Column: Roles Selector */}
             <div className="card" style={{ borderRadius: '14px', border: '1px solid #E8DDD4', overflow: 'hidden' }}>
               <div className="card-header" style={{ background: '#F8F4EE', padding: '14px 18px', borderBottom: '1px solid #E8DDD4' }}>
-                <h5 style={{ margin: 0, color: '#4A2518', fontWeight: 'bold', fontSize: '0.95rem' }}>👥 Seleccionar Rol</h5>
+                <h5 style={{ margin: 0, color: '#4A2518', fontWeight: 'bold', fontSize: '0.95rem' }}>👥 Seleccionar Cargo</h5>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '650px', overflowY: 'auto' }}>
                 {roles.map((r) => {
@@ -1543,6 +1846,40 @@ function AdminContent() {
                                 </span>
                               )}
                             </div>
+
+                            {/* Granular Action Checkboxes List */}
+                            {isEffectiveAllowed && rolesPermisosData.granularActions && rolesPermisosData.granularActions[mod.key] && (
+                              <div style={{ width: '100%', marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed #CBD5E1', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div style={{ fontSize: '0.82rem', fontWeight: 'bold', color: '#4A2518', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span>🔧 Permisos Granulares de Acción ({mod.nombre}):</span>
+                                  {isAdmin && <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 'normal' }}>(El Administrador maestro tiene acceso total por defecto)</span>}
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '8px', background: '#FFF', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                                  {rolesPermisosData.granularActions[mod.key].map(action => {
+                                    const actionKey = `${mod.key}.${action.key}`;
+                                    const customActionEntry = rolesPermisosData.customPermissions.find(cp => cp.rol_id === currentRole.id && cp.modulo === actionKey);
+                                    const sensitiveActions = ['eliminar', 'eliminar_documentos', 'admin_carpetas', 'firmar_jefe'];
+                                    const isDefaultActionAllowed = sensitiveActions.includes(action.key) ? [1, 2, 3, 4, 5, 6, 7, 8, 9].includes(currentRole.id) : true;
+                                    const isActionAllowed = isAdmin ? true : (customActionEntry !== undefined ? Boolean(customActionEntry.permitido) : isDefaultActionAllowed);
+
+                                    return (
+                                      <label key={action.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: isActionAllowed ? '#1E293B' : '#94A3B8', cursor: isAdmin ? 'default' : 'pointer' }}>
+                                        <input
+                                          type="checkbox"
+                                          checked={isActionAllowed}
+                                          disabled={isAdmin || savingPermissionKey === `${currentRole.id}-${actionKey}`}
+                                          onChange={(e) => handleToggleCustomPermission(currentRole.id, actionKey, e.target.checked)}
+                                          style={{ accentColor: '#16A34A', width: '15px', height: '15px', cursor: isAdmin ? 'default' : 'pointer' }}
+                                        />
+                                        <span style={{ textDecoration: !isActionAllowed && !isAdmin ? 'line-through' : 'none', fontWeight: isActionAllowed ? '600' : 'normal' }}>
+                                          {action.label}
+                                        </span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}

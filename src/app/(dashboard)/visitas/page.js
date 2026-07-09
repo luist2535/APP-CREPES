@@ -1790,15 +1790,14 @@ export default function VisitasPage() {
   // Auto-open visit details if redirected from Reports or another module
   useEffect(() => {
     const targetId = localStorage.getItem('target_visita_id');
-    if (targetId && visitas.length > 0) {
+    if (targetId && visitas.length > 0 && plantillas.length > 0) {
       const found = visitas.find(v => String(v.id) === String(targetId));
       if (found) {
-        setSelectedVisit(found);
-        setModalTab('general');
+        handleOpenVisitDetails(found);
         localStorage.removeItem('target_visita_id');
       }
     }
-  }, [visitas]);
+  }, [visitas, plantillas]);
 
   // Dynamically load the CDN html5-qrcode scanner library
   useEffect(() => {
@@ -3662,7 +3661,7 @@ export default function VisitasPage() {
                         if (rol === 10) return 'Auxiliar de Operaciones';
                         if (rol === 11) return 'Auxiliar SST';
                         if (rol === 13) return 'Auxiliar de Calidad';
-                        if (rol === 14) return 'Auxiliar de VRH';
+                        if (rol === 14) return 'Auxiliar DRH';
                         if (rol === 15) return 'Auxiliar de Formación';
                         return `Auxiliar ${areaName || ''}`;
                       };
@@ -4609,7 +4608,7 @@ export default function VisitasPage() {
                     🗑️ Eliminar Visita
                   </button>
                 )}
-                {selectedVisit.fields && selectedVisit.fields[0] && selectedVisit.fields[0].code && (
+                {Array.isArray(selectedVisit.fields) && selectedVisit.fields[0] && selectedVisit.fields[0].code && (
                   <a 
                     href={`/api/visitas/export?id=${selectedVisit.id}`} 
                     className="btn btn-success btn-sm"
@@ -4900,7 +4899,7 @@ export default function VisitasPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {selectedVisit.fields && selectedVisit.fields.map((field, idx) => {
+                              {Array.isArray(selectedVisit.fields) && selectedVisit.fields.map((field, idx) => {
                                 const val = selectedVisit.data[field.nombre];
                                 return (
                                   <tr key={idx} style={{ borderBottom: '1px solid #f4f4f4' }}>
@@ -4911,7 +4910,7 @@ export default function VisitasPage() {
                                   </tr>
                                 );
                               })}
-                              {(!selectedVisit.fields || selectedVisit.fields.length === 0) && (
+                              {(!Array.isArray(selectedVisit.fields) || selectedVisit.fields.length === 0) && (
                                 <tr>
                                   <td colSpan="2" style={{ padding: '10px', textAlign: 'center', color: '#aaa', fontStyle: 'italic' }}>No hay tareas registradas en esta visita.</td>
                                 </tr>
@@ -5152,7 +5151,7 @@ export default function VisitasPage() {
                   <h4>📋 Checklist Respuestas de Evaluación</h4>
                   <div className="responses-grid">
                     {(() => {
-                      const firstField = selectedVisit.fields && selectedVisit.fields[0];
+                      const firstField = Array.isArray(selectedVisit.fields) && selectedVisit.fields[0];
                       if (firstField && (firstField.tipo === 'matrix' || firstField.tipo === 'simple_checklist')) {
                         const hasSubTabs = firstField.columnas && firstField.columnas.length > 0 && !firstField.columnas.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
                         
@@ -5239,7 +5238,7 @@ export default function VisitasPage() {
                       } else {
                         return (
                           <div className="responses-grid">
-                            {selectedVisit.fields.map((f, idx) => {
+                            {Array.isArray(selectedVisit.fields) && selectedVisit.fields.map((f, idx) => {
                               const answer = selectedVisit.data[f.nombre];
                               let displayAnswer = String(answer !== undefined && answer !== null ? answer : 'No responde');
                               if (f.tipo === 'checkbox') {

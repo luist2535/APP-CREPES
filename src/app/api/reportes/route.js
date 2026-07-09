@@ -37,7 +37,7 @@ export async function GET(request) {
         3: 2, 11: 2,      // SST
         4: 3, 12: 3,      // Mantenimiento
         5: 4, 13: 4,      // Calidad
-        6: 5, 14: 5,      // VRH
+        6: 5, 14: 5,      // DRH
         7: 6, 15: 6,      // Formación
         9: 7, 16: 7,      // Sistemas
         10: 1             // Aux Operaciones

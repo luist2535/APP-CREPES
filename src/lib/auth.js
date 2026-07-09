@@ -111,6 +111,47 @@ const MODULE_DEFINITIONS = [
   { key: 'admin', nombre: 'Configuración del Sistema', icon: '⚙️', desc: 'Administración de usuarios, PDVs y áreas funcionales' }
 ];
 
+const GRANULAR_MODULE_ACTIONS = {
+  archivos: [
+    { key: 'ver_fotos', label: 'Ver fotografías' },
+    { key: 'subir_fotos', label: 'Subir fotografías' },
+    { key: 'ver_documentos', label: 'Ver documentos' },
+    { key: 'subir_documentos', label: 'Subir documentos' },
+    { key: 'descargar_documentos', label: 'Descargar documentos' },
+    { key: 'eliminar_documentos', label: 'Eliminar documentos' },
+    { key: 'ver_evidencias_pdv', label: 'Visualizar evidencias por punto de venta' },
+    { key: 'admin_carpetas', label: 'Administrar carpetas' },
+    { key: 'editar_archivos', label: 'Editar archivos' },
+    { key: 'compartir_archivos', label: 'Compartir archivos' }
+  ],
+  visitas: [
+    { key: 'crear', label: 'Crear / Programar inspecciones' },
+    { key: 'evaluar', label: 'Realizar y responder checklists' },
+    { key: 'editar', label: 'Editar visitas existentes' },
+    { key: 'eliminar', label: 'Eliminar visitas' },
+    { key: 'firmar_tecnico', label: 'Firmar como Técnico / Auxiliar' },
+    { key: 'firmar_jefe', label: 'Autorizar / Firmar como Jefe' },
+    { key: 'exportar', label: 'Exportar checklist a Excel/PDF' }
+  ],
+  reportes: [
+    { key: 'ver_kpis', label: 'Ver indicadores gerenciales (KPIs)' },
+    { key: 'ver_detalle', label: 'Ver detalle individual por visita' },
+    { key: 'exportar_excel', label: 'Exportar reportes a Excel' },
+    { key: 'exportar_pdf', label: 'Exportar reportes a PDF' },
+    { key: 'calidad_avanzado', label: 'Acceder a Analítica Avanzada y Comportamiento de Calidad' }
+  ],
+  solicitudes: [
+    { key: 'crear', label: 'Crear nuevas solicitudes / tickets' },
+    { key: 'gestionar', label: 'Atender y cambiar estado de solicitudes' },
+    { key: 'eliminar', label: 'Eliminar solicitudes' }
+  ],
+  equipos: [
+    { key: 'escanear', label: 'Escanear códigos QR' },
+    { key: 'editar_hoja_vida', label: 'Editar hoja de vida y especificaciones de equipos' },
+    { key: 'eliminar', label: 'Eliminar equipos del catálogo' }
+  ]
+};
+
 function getUserCustomPermissions(rolId, db) {
   if (!rolId || !db) return {};
   try {
@@ -149,6 +190,35 @@ function hasPermission(user, modulo, db) {
   return defaults.includes(modulo);
 }
 
+function hasActionPermission(user, modulo, accion, db) {
+  if (!user || !user.rol_id) return false;
+  const rolInt = parseInt(user.rol_id);
+  if (rolInt === 1) return true; // Administrador maestro tiene acceso total
+
+  // First verify general module access
+  if (!hasPermission(user, modulo, db)) return false;
+
+  // Check if there's a specific action override in roles_permisos_adicionales (key: `${modulo}.${accion}`)
+  if (db) {
+    try {
+      const actionKey = `${modulo}.${accion}`;
+      const customAction = db.prepare('SELECT permitido FROM roles_permisos_adicionales WHERE rol_id = ? AND modulo = ?').get(rolInt, actionKey);
+      if (customAction !== undefined && customAction !== null) {
+        return Boolean(customAction.permitido);
+      }
+    } catch (e) {}
+  }
+
+  // By default, if the user has general access to the module and no specific action denial exists,
+  // we grant standard read/create/export actions unless it's a sensitive action (eliminar, admin_carpetas, firmar_jefe)
+  const sensitiveActions = ['eliminar', 'eliminar_documentos', 'admin_carpetas', 'firmar_jefe'];
+  if (sensitiveActions.includes(accion)) {
+    return [1, 2, 3, 4, 5, 6, 7, 8, 9].includes(rolInt);
+  }
+
+  return true;
+}
+
 module.exports = { 
   generateToken, 
   verifyToken, 
@@ -158,6 +228,8 @@ module.exports = {
   getUserAssignedCityId,
   DEFAULT_ROLE_PERMISSIONS,
   MODULE_DEFINITIONS,
+  GRANULAR_MODULE_ACTIONS,
   getUserCustomPermissions,
-  hasPermission
+  hasPermission,
+  hasActionPermission
 };

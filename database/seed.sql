@@ -9,7 +9,7 @@ INSERT INTO roles (nombre, descripcion, permisos) VALUES
   ('Supervisor SST', 'Inspecciones de seguridad y salud', '{"visitas": true, "dashboard_area": true}'),
   ('Supervisor Mantenimiento', 'Mantenimiento preventivo y correctivo', '{"visitas": true, "dashboard_area": true}'),
   ('Supervisor Calidad', 'Calidad y aseo general', '{"visitas": true, "dashboard_area": true}'),
-  ('VRH', 'Recursos Humanos - Acompañamiento', '{"visitas": true, "dashboard_area": true}'),
+  ('DRH', 'Dirección de Recursos Humanos - Acompañamiento', '{"visitas": true, "dashboard_area": true}'),
   ('Formación', 'Entrenamiento y seguimiento', '{"visitas": true, "dashboard_area": true}'),
   ('Visualizador', 'Solo lectura de dashboard y reportes', '{"dashboard": true}'),
   ('Jefe de Sistemas', 'Jefe de la división de sistemas y soporte', '{"visitas": true, "dashboard_area": true}'),
@@ -17,7 +17,7 @@ INSERT INTO roles (nombre, descripcion, permisos) VALUES
   ('Auxiliar SST', 'Auxiliar de seguridad y salud en el trabajo', '{"visitas": true}'),
   ('Auxiliar de Mantenimiento', 'Auxiliar de mantenimiento físico', '{"visitas": true}'),
   ('Auxiliar de Calidad', 'Auxiliar de calidad y aseo', '{"visitas": true}'),
-  ('Auxiliar VRH', 'Auxiliar de recursos humanos', '{"visitas": true}'),
+  ('Auxiliar DRH', 'Auxiliar de Dirección de Recursos Humanos', '{"visitas": true}'),
   ('Auxiliar Formación', 'Auxiliar de capacitación', '{"visitas": true}'),
   ('Auxiliar de Sistemas', 'Auxiliar técnico de sistemas', '{"visitas": true}');
 
@@ -70,7 +70,7 @@ INSERT INTO areas (nombre, descripcion, color, tipo_flujo) VALUES
   ('SST', 'Seguridad y Salud en el Trabajo', '#D4760A', 'administrativo'),
   ('Mantenimiento', 'Mantenimiento preventivo y correctivo', '#6B4226', 'tecnico'),
   ('Calidad', 'Control de calidad y aseo', '#A0522D', 'administrativo'),
-  ('VRH', 'Vicepresidencia de Recursos Humanos', '#CD853F', 'administrativo'),
+  ('Dirección de Recursos Humanos', 'Área de Dirección de Recursos Humanos (DRH)', '#CD853F', 'administrativo'),
   ('Formación', 'Capacitación y entrenamiento', '#DEB887', 'administrativo'),
   ('Sistemas', 'Área de sistemas y soporte técnico', '#4B0082', 'tecnico');
 

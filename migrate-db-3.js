@@ -66,7 +66,7 @@ try {
     { id: 11, nombre: 'Auxiliar SST', descripcion: 'Auxiliar de seguridad y salud en el trabajo', permisos: '{"visitas": true}' },
     { id: 12, nombre: 'Auxiliar de Mantenimiento', descripcion: 'Auxiliar de mantenimiento físico', permisos: '{"visitas": true}' },
     { id: 13, nombre: 'Auxiliar de Calidad', descripcion: 'Auxiliar de calidad y aseo', permisos: '{"visitas": true}' },
-    { id: 14, nombre: 'Auxiliar VRH', descripcion: 'Auxiliar de recursos humanos', permisos: '{"visitas": true}' },
+    { id: 14, nombre: 'Auxiliar DRH', descripcion: 'Auxiliar de Dirección de Recursos Humanos', permisos: '{"visitas": true}' },
     { id: 15, nombre: 'Auxiliar Formación', descripcion: 'Auxiliar de capacitación', permisos: '{"visitas": true}' },
     { id: 16, nombre: 'Auxiliar de Sistemas', descripcion: 'Auxiliar técnico de sistemas', permisos: '{"visitas": true}' }
   ];

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 const { getDb } = require('@/lib/db');
-const { getUserFromRequest, hasPermission, DEFAULT_ROLE_PERMISSIONS, MODULE_DEFINITIONS } = require('@/lib/auth');
+const { getUserFromRequest, hasPermission, DEFAULT_ROLE_PERMISSIONS, MODULE_DEFINITIONS, GRANULAR_MODULE_ACTIONS } = require('@/lib/auth');
 
 export async function GET(request) {
   try {
@@ -10,7 +10,7 @@ export async function GET(request) {
     }
 
     const db = getDb();
-    const roles = db.prepare('SELECT id, nombre, descripcion, activo FROM roles WHERE activo = 1 ORDER BY id').all();
+    const roles = db.prepare('SELECT id, nombre, descripcion, activo FROM roles ORDER BY id').all();
     const customPermissionsRows = db.prepare(`
       SELECT id, rol_id, modulo, permitido, otorgado_por, updated_at 
       FROM roles_permisos_adicionales
@@ -20,7 +20,8 @@ export async function GET(request) {
       roles,
       customPermissions: customPermissionsRows,
       defaultPermissions: DEFAULT_ROLE_PERMISSIONS,
-      modules: MODULE_DEFINITIONS
+      modules: MODULE_DEFINITIONS,
+      granularActions: GRANULAR_MODULE_ACTIONS || {}
     });
   } catch (error) {
     console.error('Error in GET /api/roles-permisos:', error);

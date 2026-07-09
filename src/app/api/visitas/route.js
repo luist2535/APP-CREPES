@@ -7,7 +7,7 @@ const getAreaIdFromRol = (rolId) => {
   if (rol === 3 || rol === 11) return 2; // SST / Auxiliar SST -> SST
   if (rol === 4 || rol === 12) return 3; // Mantenimiento / Auxiliar Mantenimiento -> Mantenimiento
   if (rol === 5 || rol === 13) return 4; // Calidad / Auxiliar Calidad -> Calidad
-  if (rol === 6 || rol === 14) return 5; // VRH / Auxiliar VRH -> VRH
+  if (rol === 6 || rol === 14) return 5; // DRH / Auxiliar DRH -> DRH
   if (rol === 7 || rol === 15) return 6; // Formación / Auxiliar Formación -> Formación
   if (rol === 9 || rol === 16) return 7; // Jefe Sistemas / Auxiliar Sistemas -> Sistemas
   return null;

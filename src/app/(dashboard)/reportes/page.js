@@ -29,6 +29,18 @@ export default function ReportesPage() {
   const [exportLoading, setExportLoading] = useState(false);
   const [mappedArea, setMappedArea] = useState('');
 
+  // Analítica Calidad por Sub-Área (Módulo 6) States
+  const [reporteTab, setReporteTab] = useState('general'); // 'general' | 'calidad'
+  const [calidadData, setCalidadData] = useState(null);
+  const [calidadLoading, setCalidadLoading] = useState(false);
+  const [calidadPeriodo, setCalidadPeriodo] = useState('trimestral');
+  const [calidadPdv, setCalidadPdv] = useState('all');
+  const [calidadCiudad, setCalidadCiudad] = useState('all');
+  const [calidadSeccion, setCalidadSeccion] = useState('all');
+  const [calidadSubTab, setCalidadSubTab] = useState('evolucion'); // 'evolucion' | 'ranking' | 'historial'
+  const [modoPresentacion, setModoPresentacion] = useState(false);
+  const [slideIndex, setSlideIndex] = useState(0);
+
   // Detalle Operación / Visita Modal
   const [selectedVisitaDetalle, setSelectedVisitaDetalle] = useState(null);
   const [evidenciasDetalle, setEvidenciasDetalle] = useState([]);
@@ -98,7 +110,7 @@ export default function ReportesPage() {
           3: '2', // SST
           4: '3', // Mantenimiento
           5: '4', // Calidad
-          6: '5', // VRH
+          6: '5', // DRH
           7: '6', // Formación
           9: '7', // Sistemas
         };
@@ -169,6 +181,106 @@ export default function ReportesPage() {
     }
   };
 
+  const fetchCalidadComportamiento = useCallback(async () => {
+    try {
+      setCalidadLoading(true);
+      const params = new URLSearchParams();
+      if (calidadPdv !== 'all') params.set('pdv_id', calidadPdv);
+      if (calidadCiudad !== 'all') params.set('ciudad_id', calidadCiudad);
+      params.set('periodo', calidadPeriodo);
+      if (calidadSeccion !== 'all') params.set('seccion', calidadSeccion);
+
+      const res = await fetch(`/api/reportes/calidad-comportamiento?${params.toString()}`);
+      if (res.ok) {
+        const result = await res.json();
+        setCalidadData(result);
+      }
+    } catch (err) {
+      console.error('Error al cargar analítica de calidad:', err);
+    } finally {
+      setCalidadLoading(false);
+    }
+  }, [calidadPdv, calidadCiudad, calidadPeriodo, calidadSeccion]);
+
+  useEffect(() => {
+    if (reporteTab === 'calidad') {
+      fetchCalidadComportamiento();
+    }
+  }, [reporteTab, fetchCalidadComportamiento]);
+
+  useEffect(() => {
+    if (!modoPresentacion) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'Space') setSlideIndex(prev => Math.min(prev + 1, 3));
+      else if (e.key === 'ArrowLeft') setSlideIndex(prev => Math.max(prev - 1, 0));
+      else if (e.key === 'Escape') setModoPresentacion(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [modoPresentacion]);
+
+  const exportCalidadToExcel = async () => {
+    if (!calidadData) return;
+    setExportLoading(true);
+    try {
+      const XLSX = await import('xlsx');
+      const wb = XLSX.utils.book_new();
+
+      // 1. Sheet: Evolución por Sección
+      const rowsEvolucion = (calidadData.evolucion_por_seccion || []).map(s => ({
+        'Sección / Sub-Área': s.seccion_nombre,
+        'Puntaje Promedio (%)': s.puntaje_promedio,
+        'Visitas Evaluadas': s.visitas_evaluadas,
+        'Alertas de Disminución Recientes': s.caidas_recientes,
+        'Mejor PDV en la Sección': `${s.mejor_pdv?.nombre || '-'} (${s.mejor_pdv?.puntaje || 0} pts)`,
+        'Peor PDV en la Sección': `${s.peor_pdv?.nombre || '-'} (${s.peor_pdv?.puntaje || 0} pts)`,
+      }));
+      const wsEvol = XLSX.utils.json_to_sheet(rowsEvolucion);
+      XLSX.utils.book_append_sheet(wb, wsEvol, 'Comportamiento por Sección');
+
+      // 2. Sheet: Ranking Gerencial por PDV
+      const rowsRanking = (calidadData.ranking_pdv || []).map((p, i) => ({
+        'Ranking #': i + 1,
+        'Punto de Venta (PDV)': p.pdv_nombre,
+        'Ciudad': p.ciudad_nombre,
+        'Puntaje Promedio General (%)': p.puntaje_promedio,
+        'Total Evaluaciones / Inspecciones': p.total_evaluaciones,
+        'Secciones con Alerta de Caída': p.secciones_en_alerta,
+        'Estado Desempeño': p.puntaje_promedio >= 90 ? 'Excelente' : (p.puntaje_promedio >= 75 ? 'Regular' : 'Crítico - Requiere Atención')
+      }));
+      const wsRanking = XLSX.utils.json_to_sheet(rowsRanking);
+      XLSX.utils.book_append_sheet(wb, wsRanking, 'Ranking Puntos de Venta');
+
+      // 3. Sheet: Historial Longitudinal y Alertas
+      const rowsHist = (calidadData.historial || []).map(h => ({
+        'ID Visita': h.visita_id,
+        'Fecha Inspección': h.fecha,
+        'Punto de Venta': h.pdv_nombre,
+        'Ciudad': h.ciudad_nombre,
+        'Plantilla / Formato': h.plantilla_nombre,
+        'Sección Evaluada': h.seccion_nombre,
+        'Puntaje Actual (%)': h.puntaje,
+        'Puntaje Visita Anterior (%)': h.puntaje_anterior !== null ? h.puntaje_anterior : 'Primera Visita',
+        'Variación (pts)': h.diferencia,
+        'Estado Alerta': h.alerta_disminucion ? '🔻 CAÍDA DETECTADA' : '🟢 Estable / Mejora',
+        'Preguntas Cumple (SI)': h.preguntas_si,
+        'Preguntas No Cumple (NO)': h.preguntas_no,
+        'No Aplica (NA)': h.preguntas_na,
+      }));
+      const wsHist = XLSX.utils.json_to_sheet(rowsHist);
+      XLSX.utils.book_append_sheet(wb, wsHist, 'Historial y Alertas');
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(wb, `Analisis_Comportamiento_Calidad_${dateStr}.xlsx`);
+    } catch (err) {
+      console.error('Export Calidad error:', err);
+      alert('Error al exportar analítica de Calidad: ' + err.message);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+
   const clearFilters = () => {
     setFiltroArea(mappedArea || '');
     setFiltroCategoria('');
@@ -216,9 +328,58 @@ export default function ReportesPage() {
         </button>
       </div>
 
-      {/* ===== KPI Cards ===== */}
-      {data && (
-        <div className="kpi-grid">
+      {/* Master View / Tab Switcher */}
+      <div className="rep-master-tabs" style={{ display: 'flex', gap: '12px', margin: '16px 0 24px 0', borderBottom: '2px solid #E8DDD4', paddingBottom: '12px', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => setReporteTab('general')}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '10px',
+            fontWeight: 'bold',
+            fontSize: '0.95rem',
+            border: 'none',
+            cursor: 'pointer',
+            background: reporteTab === 'general' ? '#8B6914' : '#F3EFEA',
+            color: reporteTab === 'general' ? '#FFF' : '#4A2518',
+            boxShadow: reporteTab === 'general' ? '0 4px 10px rgba(139, 105, 20, 0.25)' : 'none',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          📋 Reporte General y Operaciones ({filteredVisitas.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setReporteTab('calidad')}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '10px',
+            fontWeight: 'bold',
+            fontSize: '0.95rem',
+            border: 'none',
+            cursor: 'pointer',
+            background: reporteTab === 'calidad' ? 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)' : '#F0FDF4',
+            color: reporteTab === 'calidad' ? '#FFF' : '#166534',
+            boxShadow: reporteTab === 'calidad' ? '0 4px 12px rgba(22, 163, 74, 0.3)' : 'none',
+            border: reporteTab === 'calidad' ? 'none' : '1px solid #BBF7D0',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          🔬 Analítica de Comportamiento e Histórico por Sub-Área (Calidad)
+        </button>
+      </div>
+
+      {reporteTab === 'general' && (
+        <>
+          {/* ===== KPI Cards ===== */}
+          {data && (
+            <div className="kpi-grid">
           {data.resumenPorArea
             .filter(area => !mappedArea || String(area.area_id) === String(mappedArea))
             .map((area, idx) => {
@@ -499,9 +660,532 @@ export default function ReportesPage() {
           )}
         </>
       )}
+    </>
+  )}
 
-      {/* ===== Modal Detalle Operación / Visita ===== */}
-      {selectedVisitaDetalle && (
+  {/* ===== MÓDULO 6: ANALÍTICA GERENCIAL DE CALIDAD E HISTÓRICO POR SECCIÓN ===== */}
+  {reporteTab === 'calidad' && (
+    <div className="calidad-analytics-section animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Top Actions & Presentation Trigger */}
+      <div className="card" style={{ background: 'linear-gradient(135deg, #14532D 0%, #166534 100%)', color: '#FFF', borderRadius: '16px', padding: '22px 26px', boxShadow: '0 8px 24px rgba(22, 101, 52, 0.25)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <span style={{ background: '#22C55E', color: '#052E16', fontWeight: 'bold', fontSize: '0.75rem', padding: '4px 10px', borderRadius: '20px', textTransform: 'uppercase' }}>
+              📈 Módulo de Calidad & L&D
+            </span>
+            <h2 style={{ margin: '8px 0 6px 0', fontSize: '1.5rem', fontWeight: '800' }}>
+              Analítica de Comportamiento y Evolución por Sub-Área
+            </h2>
+            <p style={{ margin: 0, fontSize: '0.92rem', color: '#DCFCE7', maxWidth: '750px', lineHeight: '1.4' }}>
+              Evalúa el desempeño individual de cada sección del punto de venta (Almacén, Cocina, Cuartos Fríos, Manipuladores, etc.) frente a visitas históricas. Detecta caídas al instante con alertas visuales y exporta reportes gerenciales para toma de decisiones.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setModoPresentacion(true)}
+              style={{ background: '#F59E0B', color: '#451A03', fontWeight: 'bold', border: 'none', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)' }}
+            >
+              🖥️ Modo Presentación Gerencial (PPT)
+            </button>
+            <button
+              type="button"
+              onClick={exportCalidadToExcel}
+              disabled={exportLoading || !calidadData}
+              style={{ background: '#FFF', color: '#166534', fontWeight: 'bold', border: 'none', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              {exportLoading ? '⏳ Exportando...' : '📥 Exportar Excel Gerencial'}
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              style={{ background: 'rgba(255,255,255,0.15)', color: '#FFF', fontWeight: 'bold', border: '1px solid rgba(255,255,255,0.3)', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer' }}
+            >
+              📄 Imprimir PDF Ejecutivo
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters Bar */}
+      <div className="card" style={{ background: '#F8FAF6', border: '1px solid #DCFCE7', borderRadius: '14px', padding: '16px 20px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 180px' }}>
+          <label style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#166534', textTransform: 'uppercase' }}>📅 Periodo de Análisis</label>
+          <select
+            className="form-select"
+            value={calidadPeriodo}
+            onChange={(e) => setCalidadPeriodo(e.target.value)}
+            style={{ border: '1px solid #86EFAC', borderRadius: '8px', padding: '8px 12px', fontWeight: '600' }}
+          >
+            <option value="mensual">Último Mes (Mensual)</option>
+            <option value="trimestral">Último Trimestre (3 meses)</option>
+            <option value="semestral">Último Semestre (6 meses)</option>
+            <option value="anual">Último Año (12 meses)</option>
+            <option value="todos">Histórico Total</option>
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 200px' }}>
+          <label style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#166534', textTransform: 'uppercase' }}>🏪 Punto de Venta (PDV)</label>
+          <select
+            className="form-select"
+            value={calidadPdv}
+            onChange={(e) => setCalidadPdv(e.target.value)}
+            style={{ border: '1px solid #86EFAC', borderRadius: '8px', padding: '8px 12px' }}
+          >
+            <option value="all">📍 Todos los Puntos de Venta</option>
+            {(data?.visitas || []).map(v => ({ id: v.pdv_id, nombre: v.pdv_nombre })).filter((v, i, a) => a.findIndex(t => t.id === v.id) === i).map(pdv => (
+              <option key={pdv.id} value={pdv.id}>{pdv.nombre}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 200px' }}>
+          <label style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#166534', textTransform: 'uppercase' }}>🔬 Sección / Sub-Área</label>
+          <select
+            className="form-select"
+            value={calidadSeccion}
+            onChange={(e) => setCalidadSeccion(e.target.value)}
+            style={{ border: '1px solid #86EFAC', borderRadius: '8px', padding: '8px 12px' }}
+          >
+            <option value="all">📑 Todas las Secciones y Sub-Áreas</option>
+            {(calidadData?.secciones_disponibles || []).map((sec, idx) => (
+              <option key={idx} value={sec}>{sec}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'flex-end', paddingTop: '18px' }}>
+          <button
+            type="button"
+            onClick={fetchCalidadComportamiento}
+            style={{ background: '#16A34A', color: '#FFF', fontWeight: 'bold', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer' }}
+          >
+            🔄 Actualizar Datos
+          </button>
+        </div>
+      </div>
+
+      {calidadLoading ? (
+        <div className="loading-wrap" style={{ padding: '40px' }}><div className="spinner"></div><p>Calculando analítica y puntajes por sección...</p></div>
+      ) : !calidadData ? (
+        <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#666' }}>No hay datos disponibles. Verifica que existan inspecciones del área de Calidad.</div>
+      ) : (
+        <>
+          {/* KPI Summary Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+            <div className="card" style={{ padding: '18px', borderRadius: '14px', borderLeft: '6px solid #16A34A', background: '#FFF' }}>
+              <div style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: 'bold' }}>PUNTAJE PROMEDIO GLOBAL</div>
+              <div style={{ fontSize: '2.2rem', fontWeight: '800', color: calidadData.summary.promedio_general >= 90 ? '#15803D' : calidadData.summary.promedio_general >= 75 ? '#B45309' : '#DC2626', margin: '4px 0' }}>
+                {calidadData.summary.promedio_general}%
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#666' }}>Promedio del periodo seleccionado</div>
+            </div>
+
+            <div className="card" style={{ padding: '18px', borderRadius: '14px', borderLeft: '6px solid #3B82F6', background: '#FFF' }}>
+              <div style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: 'bold' }}>SUB-ÁREAS EVALUADAS</div>
+              <div style={{ fontSize: '2.2rem', fontWeight: '800', color: '#1E293B', margin: '4px 0' }}>
+                {calidadData.summary.secciones_evaluadas}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#666' }}>Secciones monitoreadas en PDVs</div>
+            </div>
+
+            <div className="card" style={{ padding: '18px', borderRadius: '14px', borderLeft: '6px solid #8B5CF6', background: '#FFF' }}>
+              <div style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: 'bold' }}>TOTAL VISITAS ANALIZADAS</div>
+              <div style={{ fontSize: '2.2rem', fontWeight: '800', color: '#1E293B', margin: '4px 0' }}>
+                {calidadData.summary.total_visitas}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#666' }}>Inspecciones y check lists procesados</div>
+            </div>
+
+            <div className="card" style={{ padding: '18px', borderRadius: '14px', borderLeft: '6px solid #EF4444', background: '#FFF' }}>
+              <div style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: 'bold' }}>🔴 ALERTAS DE DISMINUCIÓN</div>
+              <div style={{ fontSize: '2.2rem', fontWeight: '800', color: '#EF4444', margin: '4px 0' }}>
+                {calidadData.summary.alertas_activas}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#666' }}>Secciones con caída frente a visita anterior</div>
+            </div>
+          </div>
+
+          {/* Sub-Tabs Selector */}
+          <div style={{ display: 'flex', gap: '10px', borderBottom: '2px solid #E2E8F0', paddingBottom: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setCalidadSubTab('evolucion')}
+              style={{ padding: '10px 18px', borderRadius: '10px', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: calidadSubTab === 'evolucion' ? '#16A34A' : '#F1F5F9', color: calidadSubTab === 'evolucion' ? '#FFF' : '#334155' }}
+            >
+              📈 Desempeño por Sub-Área / Sección
+            </button>
+            <button
+              type="button"
+              onClick={() => setCalidadSubTab('ranking')}
+              style={{ padding: '10px 18px', borderRadius: '10px', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: calidadSubTab === 'ranking' ? '#16A34A' : '#F1F5F9', color: calidadSubTab === 'ranking' ? '#FFF' : '#334155' }}
+            >
+              🏆 Ranking Gerencial por PDV
+            </button>
+            <button
+              type="button"
+              onClick={() => setCalidadSubTab('historial')}
+              style={{ padding: '10px 18px', borderRadius: '10px', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: calidadSubTab === 'historial' ? '#16A34A' : '#F1F5F9', color: calidadSubTab === 'historial' ? '#FFF' : '#334155' }}
+            >
+              📜 Trazabilidad Longitudinal y Alertas ({calidadData.historial.length})
+            </button>
+          </div>
+
+          {/* Sub-Tab 1: Evolución por Sub-Área / Sección */}
+          {calidadSubTab === 'evolucion' && (
+            <div className="card" style={{ padding: '22px', borderRadius: '14px', background: '#FFF' }}>
+              <h3 style={{ margin: '0 0 16px 0', color: '#166534', fontSize: '1.2rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                📊 Comportamiento y Evolución de cada Sección Evaluada
+              </h3>
+              <div className="table-responsive">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Sección / Sub-Área</th>
+                      <th style={{ width: '280px' }}>Desempeño Promedio</th>
+                      <th style={{ textAlign: 'center' }}>Visitas Evaluadas</th>
+                      <th style={{ textAlign: 'center' }}>Caídas Recientes</th>
+                      <th>🏆 Mejor Desempeño (PDV)</th>
+                      <th>⚠️ Atención Crítica (Peor PDV)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(calidadData.evolucion_por_seccion || []).map((sec, idx) => {
+                      const pct = sec.puntaje_promedio || 0;
+                      const color = pct >= 90 ? '#16A34A' : pct >= 75 ? '#F59E0B' : '#EF4444';
+                      return (
+                        <tr key={idx}>
+                          <td>
+                            <strong style={{ color: '#1E293B', fontSize: '0.95rem' }}>{sec.seccion_nombre}</strong>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{ flex: 1, background: '#F1F5F9', height: '14px', borderRadius: '10px', overflow: 'hidden' }}>
+                                <div style={{ width: `${Math.min(pct, 100)}%`, background: color, height: '100%', borderRadius: '10px', transition: 'width 0.4s ease' }} />
+                              </div>
+                              <span style={{ fontWeight: '800', color: color, minWidth: '45px' }}>{pct}%</span>
+                            </div>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span style={{ background: '#F1F5F9', padding: '4px 10px', borderRadius: '12px', fontWeight: '600' }}>{sec.visitas_evaluadas}</span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            {sec.caidas_recientes > 0 ? (
+                              <span style={{ background: '#FEE2E2', color: '#991B1B', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold' }}>
+                                🔻 {sec.caidas_recientes} alerta(s)
+                              </span>
+                            ) : (
+                              <span style={{ color: '#10B981', fontWeight: '600' }}>🟢 Sin caídas</span>
+                            )}
+                          </td>
+                          <td>
+                            <span style={{ fontWeight: '600', color: '#15803D' }}>{sec.mejor_pdv?.nombre}</span> ({sec.mejor_pdv?.puntaje}%)
+                          </td>
+                          <td>
+                            <span style={{ fontWeight: '600', color: sec.peor_pdv?.puntaje < 75 ? '#DC2626' : '#64748B' }}>{sec.peor_pdv?.nombre}</span> ({sec.peor_pdv?.puntaje}%)
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Sub-Tab 2: Ranking Gerencial por PDV */}
+          {calidadSubTab === 'ranking' && (
+            <div className="card" style={{ padding: '22px', borderRadius: '14px', background: '#FFF' }}>
+              <h3 style={{ margin: '0 0 16px 0', color: '#166534', fontSize: '1.2rem', fontWeight: 'bold' }}>
+                🏆 Ranking de Puntos de Venta (Promedio Calidad)
+              </h3>
+              <div className="table-responsive">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'center', width: '60px' }}>Puesto</th>
+                      <th>Punto de Venta (PDV)</th>
+                      <th>Ciudad</th>
+                      <th>Puntaje Promedio</th>
+                      <th style={{ textAlign: 'center' }}>Inspecciones Evaluadas</th>
+                      <th style={{ textAlign: 'center' }}>Secciones en Alerta</th>
+                      <th style={{ textAlign: 'center' }}>Calificación</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(calidadData.ranking_pdv || []).map((p, idx) => {
+                      const pct = p.puntaje_promedio;
+                      return (
+                        <tr key={idx} style={{ background: idx === 0 ? '#FEFCE8' : 'inherit' }}>
+                          <td style={{ textAlign: 'center', fontSize: '1.1rem', fontWeight: 'bold' }}>
+                            {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                          </td>
+                          <td><strong style={{ color: '#1E293B' }}>{p.pdv_nombre}</strong></td>
+                          <td>{p.ciudad_nombre}</td>
+                          <td>
+                            <span style={{
+                              fontSize: '1rem',
+                              fontWeight: '800',
+                              color: pct >= 90 ? '#15803D' : pct >= 75 ? '#D97706' : '#DC2626'
+                            }}>
+                              {pct}%
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>{p.total_evaluaciones}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            {p.secciones_en_alerta > 0 ? (
+                              <span style={{ background: '#FEE2E2', color: '#B91C1C', padding: '3px 8px', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                                🔴 {p.secciones_en_alerta} caídas
+                              </span>
+                            ) : (
+                              <span style={{ color: '#10B981', fontWeight: 'bold' }}>✓ 0</span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span style={{
+                              padding: '4px 12px',
+                              borderRadius: '14px',
+                              fontWeight: 'bold',
+                              fontSize: '0.8rem',
+                              background: pct >= 90 ? '#DCFCE7' : pct >= 75 ? '#FEF3C7' : '#FEE2E2',
+                              color: pct >= 90 ? '#166534' : pct >= 75 ? '#92400E' : '#991B1B'
+                            }}>
+                              {pct >= 90 ? '🟢 Excelente' : pct >= 75 ? '🟡 Regular' : '🔴 Crítico'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Sub-Tab 3: Historial Longitudinal y Alertas */}
+          {calidadSubTab === 'historial' && (
+            <div className="card" style={{ padding: '22px', borderRadius: '14px', background: '#FFF' }}>
+              <h3 style={{ margin: '0 0 16px 0', color: '#166534', fontSize: '1.2rem', fontWeight: 'bold' }}>
+                📜 Trazabilidad Longitudinal de Secciones Evaluadas (Orden Cronológico)
+              </h3>
+              <div className="table-responsive">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Visita #</th>
+                      <th>Fecha</th>
+                      <th>Punto de Venta</th>
+                      <th>Formato / Plantilla</th>
+                      <th>Sección Evaluada</th>
+                      <th style={{ textAlign: 'center' }}>SÍ</th>
+                      <th style={{ textAlign: 'center' }}>NO</th>
+                      <th style={{ textAlign: 'center' }}>N/A</th>
+                      <th style={{ textAlign: 'center' }}>Puntaje</th>
+                      <th style={{ textAlign: 'center' }}>Evolución vs. Anterior</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(calidadData.historial || []).map((h, idx) => (
+                      <tr key={idx} style={{ background: h.alerta_disminucion ? '#FFF5F5' : 'inherit' }}>
+                        <td><strong style={{ color: '#8B6914' }}>#{h.visita_id}</strong></td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{h.fecha}</td>
+                        <td><strong>{h.pdv_nombre}</strong> <br /><span style={{ fontSize: '0.75rem', color: '#666' }}>{h.ciudad_nombre}</span></td>
+                        <td style={{ fontSize: '0.85rem', color: '#475569' }}>{h.plantilla_nombre}</td>
+                        <td><strong style={{ color: '#1D4ED8', background: '#EFF6FF', padding: '3px 8px', borderRadius: '8px', fontSize: '0.85rem' }}>{h.seccion_nombre}</strong></td>
+                        <td style={{ textAlign: 'center', color: '#15803D', fontWeight: 'bold' }}>{h.preguntas_si}</td>
+                        <td style={{ textAlign: 'center', color: '#DC2626', fontWeight: 'bold' }}>{h.preguntas_no}</td>
+                        <td style={{ textAlign: 'center', color: '#64748B' }}>{h.preguntas_na}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span style={{
+                            fontWeight: '800',
+                            fontSize: '0.95rem',
+                            color: h.puntaje >= 90 ? '#15803D' : h.puntaje >= 75 ? '#D97706' : '#DC2626'
+                          }}>
+                            {h.puntaje}%
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          {h.puntaje_anterior === null ? (
+                            <span style={{ color: '#94A3B8', fontSize: '0.8rem', fontStyle: 'italic' }}>Primera toma</span>
+                          ) : h.alerta_disminucion ? (
+                            <span style={{ background: '#FEE2E2', color: '#B91C1C', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              🔻 Caída ({h.diferencia} pts vs {h.puntaje_anterior}%)
+                            </span>
+                          ) : (
+                            <span style={{ color: '#10B981', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                              📈 {h.diferencia > 0 ? `+${h.diferencia}` : '0'} pts (vs {h.puntaje_anterior}%)
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ===== MODAL PRESENTACIÓN GERENCIAL A PANTALLA COMPLETA (SLIDES) ===== */}
+      {modoPresentacion && calidadData && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99999,
+          background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: '#FFF',
+          display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '36px'
+        }}>
+          {/* Header Presentación */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.15)', paddingBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <span style={{ fontSize: '2rem' }}>📊</span>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.4rem', color: '#22C55E' }}>Presentación Ejecutiva de Calidad & Inspecciones</h2>
+                <span style={{ fontSize: '0.85rem', color: '#94A3B8' }}>Crepes & Waffles • Informe de Comportamiento por Sub-Área</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <span style={{ background: 'rgba(255,255,255,0.1)', padding: '6px 14px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                Diapositiva {slideIndex + 1} / 4
+              </span>
+              <button
+                type="button"
+                onClick={() => setModoPresentacion(false)}
+                style={{ background: '#EF4444', color: '#FFF', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                ✕ Salir (Esc)
+              </button>
+            </div>
+          </div>
+
+          {/* Slide Body */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '20px 40px', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+            {slideIndex === 0 && (
+              <div className="animate-fade-in" style={{ textAlign: 'center' }}>
+                <span style={{ color: '#4ADE80', fontSize: '1.1rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '2px' }}>
+                  Resumen Ejecutivo • {calidadPeriodo === 'todos' ? 'Histórico Total' : `Periodo ${calidadPeriodo}`}
+                </span>
+                <h1 style={{ fontSize: '2.8rem', fontWeight: '800', margin: '16px 0 32px 0', color: '#FFF' }}>
+                  Estado del Sistema de Calidad y BPM en Puntos de Venta
+                </h1>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px', margin: '20px 0' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.07)', padding: '28px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <div style={{ fontSize: '1rem', color: '#94A3B8', marginBottom: '8px' }}>PUNTAJE GLOBAL</div>
+                    <div style={{ fontSize: '3.5rem', fontWeight: '800', color: '#4ADE80' }}>{calidadData.summary.promedio_general}%</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.07)', padding: '28px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <div style={{ fontSize: '1rem', color: '#94A3B8', marginBottom: '8px' }}>SECCIONES EVALUADAS</div>
+                    <div style={{ fontSize: '3.5rem', fontWeight: '800', color: '#38BDF8' }}>{calidadData.summary.secciones_evaluadas}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.07)', padding: '28px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <div style={{ fontSize: '1rem', color: '#94A3B8', marginBottom: '8px' }}>INSPECCIONES TOTALES</div>
+                    <div style={{ fontSize: '3.5rem', fontWeight: '800', color: '#A855F7' }}>{calidadData.summary.total_visitas}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.07)', padding: '28px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <div style={{ fontSize: '1rem', color: '#94A3B8', marginBottom: '8px' }}>ALERTAS DE CAÍDA</div>
+                    <div style={{ fontSize: '3.5rem', fontWeight: '800', color: '#F87171' }}>{calidadData.summary.alertas_activas}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {slideIndex === 1 && (
+              <div className="animate-fade-in">
+                <h2 style={{ fontSize: '2rem', color: '#38BDF8', marginBottom: '24px' }}>🔬 Desempeño Operativo por Sub-Área / Sección</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', maxHeight: '520px', overflowY: 'auto', paddingRight: '12px' }}>
+                  {(calidadData.evolucion_por_seccion || []).map((sec, idx) => (
+                    <div key={idx} style={{ background: 'rgba(255,255,255,0.06)', padding: '16px 20px', borderRadius: '14px', borderLeft: `6px solid ${sec.puntaje_promedio >= 90 ? '#22C55E' : sec.puntaje_promedio >= 75 ? '#F59E0B' : '#EF4444'}` }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{sec.seccion_nombre}</span>
+                        <span style={{ fontSize: '1.4rem', fontWeight: '800', color: sec.puntaje_promedio >= 90 ? '#4ADE80' : sec.puntaje_promedio >= 75 ? '#FBBF24' : '#F87171' }}>{sec.puntaje_promedio}%</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#94A3B8' }}>
+                        <span>🏆 Mejor: {sec.mejor_pdv?.nombre} ({sec.mejor_pdv?.puntaje}%)</span>
+                        <span>⚠️ Peor: {sec.peor_pdv?.nombre} ({sec.peor_pdv?.puntaje}%)</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {slideIndex === 2 && (
+              <div className="animate-fade-in">
+                <h2 style={{ fontSize: '2rem', color: '#FBBF24', marginBottom: '24px' }}>🏆 Top Puntos de Venta según Promedio de Calidad</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+                  {(calidadData.ranking_pdv || []).slice(0, 6).map((p, idx) => (
+                    <div key={idx} style={{ background: idx === 0 ? 'rgba(250, 204, 21, 0.12)' : 'rgba(255,255,255,0.06)', padding: '22px', borderRadius: '16px', border: idx === 0 ? '2px solid #FBBF24' : '1px solid rgba(255,255,255,0.1)' }}>
+                      <div style={{ fontSize: '1.5rem', fontWeight: '800', marginBottom: '6px' }}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`} {p.pdv_nombre}</div>
+                      <div style={{ fontSize: '0.9rem', color: '#94A3B8', marginBottom: '14px' }}>{p.ciudad_nombre} • {p.total_evaluaciones} inspecciones</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                        <span style={{ fontSize: '2.5rem', fontWeight: '800', color: p.puntaje_promedio >= 90 ? '#4ADE80' : p.puntaje_promedio >= 75 ? '#FBBF24' : '#F87171' }}>{p.puntaje_promedio}%</span>
+                        {p.secciones_en_alerta > 0 && <span style={{ background: '#EF4444', color: '#FFF', padding: '4px 10px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 'bold' }}>🔴 {p.secciones_en_alerta} caídas</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {slideIndex === 3 && (
+              <div className="animate-fade-in">
+                <h2 style={{ fontSize: '2rem', color: '#F87171', marginBottom: '24px' }}>⚠️ Atención Prioritaria: Últimas Alertas de Disminución</h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '500px', overflowY: 'auto' }}>
+                  {(calidadData.historial || []).filter(h => h.alerta_disminucion).slice(0, 8).map((alerta, idx) => (
+                    <div key={idx} style={{ background: 'rgba(239, 68, 68, 0.12)', borderLeft: '6px solid #EF4444', padding: '16px 22px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{alerta.pdv_nombre} ({alerta.ciudad_nombre})</span>
+                        <div style={{ fontSize: '0.9rem', color: '#FCA5A5', marginTop: '4px' }}>
+                          Sección: <strong>{alerta.seccion_nombre}</strong> • Visita #{alerta.visita_id} el {alerta.fecha}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: '800', color: '#F87171' }}>{alerta.puntaje}%</span>
+                        <div style={{ fontSize: '0.85rem', color: '#FCA5A5', fontWeight: 'bold' }}>🔻 Caída de {alerta.diferencia} pts (Anterior: {alerta.puntaje_anterior}%)</div>
+                      </div>
+                    </div>
+                  ))}
+                  {(calidadData.historial || []).filter(h => h.alerta_disminucion).length === 0 && (
+                    <div style={{ padding: '40px', textAlign: 'center', background: 'rgba(34, 197, 94, 0.1)', borderRadius: '14px', color: '#4ADE80', fontSize: '1.3rem', fontWeight: 'bold' }}>
+                      🎉 ¡Excelente! No se detectaron disminuciones en el puntaje de ninguna sección frente a visitas anteriores en este periodo.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer Presentación */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: '16px' }}>
+            <div style={{ fontSize: '0.85rem', color: '#64748B' }}>
+              💡 Usa las flechas del teclado (← / →) o el botón para navegar entre diapositivas
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                type="button"
+                disabled={slideIndex === 0}
+                onClick={() => setSlideIndex(prev => Math.max(prev - 1, 0))}
+                style={{ background: slideIndex === 0 ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.2)', color: '#FFF', border: 'none', padding: '10px 22px', borderRadius: '10px', fontWeight: 'bold', cursor: slideIndex === 0 ? 'not-allowed' : 'pointer' }}
+              >
+                ← Anterior
+              </button>
+              <button
+                type="button"
+                disabled={slideIndex === 3}
+                onClick={() => setSlideIndex(prev => Math.min(prev + 1, 3))}
+                style={{ background: slideIndex === 3 ? 'rgba(255,255,255,0.05)' : '#22C55E', color: '#FFF', border: 'none', padding: '10px 22px', borderRadius: '10px', fontWeight: 'bold', cursor: slideIndex === 3 ? 'not-allowed' : 'pointer' }}
+              >
+                Siguiente →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )}
+
+  {/* ===== Modal Detalle Operación / Visita ===== */}
+  {selectedVisitaDetalle && (
         <div className="det-modal-overlay" onClick={() => setSelectedVisitaDetalle(null)}>
           <div className="det-modal-container" onClick={e => e.stopPropagation()}>
             <div className="det-modal-header">

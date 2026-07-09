@@ -11,6 +11,7 @@ const migrations = [
   'migrate-db-6.js',
   'migrate-db-7.js',
   'migrate-db-8.js',
+  'migrate-db-9.js',
   'add-bpm-checklist.js'
 ];
 
