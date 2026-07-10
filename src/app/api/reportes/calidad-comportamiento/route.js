@@ -345,6 +345,11 @@ export async function GET(request) {
       return result;
     }).sort((a, b) => a.mes.localeCompare(b.mes));
 
+    const totalAlertas = rawHistorial.filter(h => h.alerta_disminucion).length;
+    const promedioGeneral = rawHistorial.length > 0
+      ? Math.round((rawHistorial.reduce((acc, curr) => acc + curr.puntaje, 0) / rawHistorial.length) * 10) / 10
+      : 0;
+
     // Global Mes Actual vs Mes Anterior para los 3 Cuadros de la Cabecera
     const allMonthsMap = {};
     rawHistorial.forEach(h => {
@@ -404,11 +409,6 @@ export async function GET(request) {
         desglose_subareas: desglose
       };
     }).sort((a,b) => b.periodo.localeCompare(a.periodo));
-
-    const totalAlertas = rawHistorial.filter(h => h.alerta_disminucion).length;
-    const promedioGeneral = rawHistorial.length > 0
-      ? Math.round((rawHistorial.reduce((acc, curr) => acc + curr.puntaje, 0) / rawHistorial.length) * 10) / 10
-      : 0;
 
     return NextResponse.json({
       success: true,
