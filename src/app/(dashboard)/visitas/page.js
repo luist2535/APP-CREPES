@@ -29,7 +29,7 @@ function SignaturePad({ onSave, onClear, label, value }) {
   // Handle canvas sizing and touch listeners when modal opens
   useEffect(() => {
     if (!isOpen) return;
-    
+
     // Tiny delay to ensure DOM is rendered before getting dimensions
     const timer = setTimeout(() => {
       const canvas = canvasRef.current;
@@ -97,7 +97,7 @@ function SignaturePad({ onSave, onClear, label, value }) {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-    
+
     if (e.touches && e.touches.length > 0) {
       return {
         x: e.touches[0].clientX - rect.left,
@@ -148,7 +148,7 @@ function SignaturePad({ onSave, onClear, label, value }) {
   const saveSignature = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
     const dataUrl = canvas.toDataURL();
     setSignatureData(dataUrl);
     onSave(dataUrl);
@@ -163,7 +163,7 @@ function SignaturePad({ onSave, onClear, label, value }) {
   return (
     <div className="signature-pad-wrapper">
       <span className="form-label">{label}</span>
-      
+
       {signatureData ? (
         <div className="signature-preview-box">
           <div className="signature-preview-img-wrap">
@@ -192,10 +192,10 @@ function SignaturePad({ onSave, onClear, label, value }) {
               <h3>✍️ Dibujar Firma Digital</h3>
               <button type="button" className="sig-modal-close" onClick={() => setIsOpen(false)}>×</button>
             </div>
-            
+
             <div className="sig-modal-body">
               <p className="sig-instruction">Por favor dibuje su firma dentro del recuadro:</p>
-              
+
               <div className="sig-canvas-frame">
                 <canvas
                   ref={canvasRef}
@@ -396,11 +396,11 @@ const calculateVisitScore = (visit, plantillas) => {
     let template = null;
     let fields = null;
     if (visit.campos_personalizados) {
-      try { fields = JSON.parse(visit.campos_personalizados); } catch(e) {}
+      try { fields = JSON.parse(visit.campos_personalizados); } catch (e) { }
     } else if (visit.plantilla_id && plantillas) {
       template = plantillas.find(p => p.id === visit.plantilla_id);
       if (template) {
-        try { fields = JSON.parse(template.campos); } catch(e) {}
+        try { fields = JSON.parse(template.campos); } catch (e) { }
       }
     }
 
@@ -493,37 +493,37 @@ const calculateVisitScore = (visit, plantillas) => {
       }
     }
 
-  if (totalAspectos === 0) return null;
-  const evaluados = satisfactorios + noSatisfactorios + noAplica;
-  const denominador = totalAspectos - noAplica;
-  const porcentaje = denominador > 0 ? Math.round((satisfactorios / denominador) * 100) : (evaluados > 0 ? 100 : 0);
+    if (totalAspectos === 0) return null;
+    const evaluados = satisfactorios + noSatisfactorios + noAplica;
+    const denominador = totalAspectos - noAplica;
+    const porcentaje = denominador > 0 ? Math.round((satisfactorios / denominador) * 100) : (evaluados > 0 ? 100 : 0);
 
-  let badgeColor = '#15803D'; // Green
-  let badgeBg = '#DCFCE7';
-  let stars = '⭐⭐⭐⭐⭐';
-  if (porcentaje < 70) {
-    badgeColor = '#991B1B'; // Red
-    badgeBg = '#FEE2E2';
-    stars = '⭐⭐';
-  } else if (porcentaje < 90) {
-    badgeColor = '#92400E'; // Yellow/Orange
-    badgeBg = '#FEF3C7';
-    stars = '⭐⭐⭐⭐';
-  }
+    let badgeColor = '#15803D'; // Green
+    let badgeBg = '#DCFCE7';
+    let stars = '⭐⭐⭐⭐⭐';
+    if (porcentaje < 70) {
+      badgeColor = '#991B1B'; // Red
+      badgeBg = '#FEE2E2';
+      stars = '⭐⭐';
+    } else if (porcentaje < 90) {
+      badgeColor = '#92400E'; // Yellow/Orange
+      badgeBg = '#FEF3C7';
+      stars = '⭐⭐⭐⭐';
+    }
 
-  return {
-    totalAspectos,
-    satisfactorios,
-    noSatisfactorios,
-    noAplica,
-    evaluados,
-    porcentaje,
-    badgeColor,
-    badgeBg,
-    stars,
-    seccionesScores,
-    isChecklist: true
-  };
+    return {
+      totalAspectos,
+      satisfactorios,
+      noSatisfactorios,
+      noAplica,
+      evaluados,
+      porcentaje,
+      badgeColor,
+      badgeBg,
+      stars,
+      seccionesScores,
+      isChecklist: true
+    };
   } catch (err) {
     console.error('Error calculating visit score:', err);
     return null;
@@ -534,7 +534,7 @@ const calculateVisitScore = (visit, plantillas) => {
 const renderMatrixIcon = (colName, isActive) => {
   const name = (colName || '').toUpperCase();
   const color = isActive ? '#6B3A2A' : '#64748b';
-  
+
   if (name.includes('CONO')) {
     return (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -720,11 +720,11 @@ const renderMatrixIcon = (colName, isActive) => {
   );
 };
 
-const MatrixChecklistForm = ({ 
-  template, 
-  answers, 
-  onChange, 
-  activeTab, 
+const MatrixChecklistForm = ({
+  template,
+  answers,
+  onChange,
+  activeTab,
   onTabChange,
   observaciones,
   onObservacionesChange,
@@ -737,8 +737,8 @@ const MatrixChecklistForm = ({
     setCollapsedSections(prev => ({ ...prev, [sIdx]: !prev[sIdx] }));
   };
 
-  const hasSubareaTabs = template.columnas && 
-    template.columnas.length > 0 && 
+  const hasSubareaTabs = template.columnas &&
+    template.columnas.length > 0 &&
     !template.columnas.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
 
   const getAnswerKey = (fila) => {
@@ -821,7 +821,7 @@ const MatrixChecklistForm = ({
           const isCollapsed = !!collapsedSections[sIdx];
           return (
             <div key={sIdx} className="section-block shadow-sm" style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-              
+
               {/* Accordion Header */}
               <div
                 className="section-header-bar"
@@ -851,7 +851,7 @@ const MatrixChecklistForm = ({
               {/* Column Headers + Rows (when not collapsed) */}
               {!isCollapsed && (
                 <div className="section-content animate-fade-in">
-                  
+
                   {/* Column Headers Badge Row */}
                   <div className="section-column-headers" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 18px 8px', backgroundColor: '#ffffff', borderBottom: '1px solid #f1f5f9' }}>
                     <div style={{ flex: 1 }}></div>
@@ -867,14 +867,14 @@ const MatrixChecklistForm = ({
                     {sec.filas.map((fila, fIdx) => {
                       const answerKey = getAnswerKey(fila);
                       const currentValue = answers[answerKey] || answers[fila] || '';
-                      
+
                       return (
                         <div key={fIdx} className="checklist-row-item" style={{ display: 'flex', flexDirection: 'column', padding: '12px 18px', borderBottom: fIdx === sec.filas.length - 1 ? 'none' : '1px solid #f1f5f9', transition: 'background-color 0.15s' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                             <span style={{ fontSize: '0.85rem', fontWeight: '500', color: '#334155', flex: '1', lineHeight: '1.3', paddingRight: '15px' }}>{fila}</span>
-                            
+
                             <div className="radio-buttons-group" style={{ display: 'flex', width: '150px', justifyContent: 'space-between', flexShrink: 0, paddingRight: '4px' }}>
-                              
+
                               {/* SÍ Radio Button */}
                               <div style={{ width: '42px', display: 'flex', justifyContent: 'center' }}>
                                 <button
@@ -1303,8 +1303,8 @@ function SearchableCategorySelect({ categories, selectedId, onChange, areaId }) 
 
   return (
     <div className="searchable-select-container" ref={containerRef} style={{ position: 'relative' }}>
-      <div 
-        className="searchable-select-trigger" 
+      <div
+        className="searchable-select-trigger"
         onClick={() => {
           setIsOpen(!isOpen);
           if (!isOpen) {
@@ -1337,7 +1337,7 @@ function SearchableCategorySelect({ categories, selectedId, onChange, areaId }) 
       </div>
 
       {isOpen && (
-        <div 
+        <div
           className="searchable-select-dropdown"
           style={{
             position: 'absolute',
@@ -1377,7 +1377,7 @@ function SearchableCategorySelect({ categories, selectedId, onChange, areaId }) 
 
           {/* Breadcrumbs for easy drill-down navigation */}
           {!searchTerm && (
-            <div 
+            <div
               className="maint-breadcrumbs"
               style={{
                 padding: '8px 12px',
@@ -1392,7 +1392,7 @@ function SearchableCategorySelect({ categories, selectedId, onChange, areaId }) 
                 textAlign: 'left'
               }}
             >
-              <span 
+              <span
                 style={{ cursor: 'pointer', color: 'var(--color-primary)', fontWeight: !activeParentId ? 'bold' : 'normal' }}
                 onClick={() => setActiveParentId(null)}
               >
@@ -1401,9 +1401,9 @@ function SearchableCategorySelect({ categories, selectedId, onChange, areaId }) 
               {crumbs.map((c, idx) => (
                 <span key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span>›</span>
-                  <span 
-                    style={{ 
-                      cursor: 'pointer', 
+                  <span
+                    style={{
+                      cursor: 'pointer',
                       color: idx === crumbs.length - 1 ? '#333' : 'var(--color-primary)',
                       fontWeight: idx === crumbs.length - 1 ? 'bold' : 'normal'
                     }}
@@ -1484,7 +1484,7 @@ export default function VisitasPage() {
   const [selectedCategoriaId, setSelectedCategoriaId] = useState('');
   const [searchTermVisita, setSearchTermVisita] = useState('');
   const [selectedAreaFilter, setSelectedAreaFilter] = useState('all');
-  
+
   // Custom Confirm & Alert Modal States
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
@@ -1520,7 +1520,36 @@ export default function VisitasPage() {
       type
     });
   };
-  
+
+  const safeParseCampos = (data) => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (typeof data === 'object') return [data];
+    if (typeof data === 'string') {
+      try {
+        const parsed = JSON.parse(data);
+        return Array.isArray(parsed) ? parsed : (typeof parsed === 'object' ? [parsed] : []);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const safeParseAnswers = (data) => {
+    if (!data) return {};
+    if (typeof data === 'object' && !Array.isArray(data)) return data;
+    if (typeof data === 'string') {
+      try {
+        const parsed = JSON.parse(data);
+        return typeof parsed === 'object' && parsed !== null ? parsed : {};
+      } catch (e) {
+        return {};
+      }
+    }
+    return {};
+  };
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
@@ -1537,7 +1566,7 @@ export default function VisitasPage() {
   const [selectedTipoId, setSelectedTipoId] = useState('');
   const [activePlantilla, setActivePlantilla] = useState(null);
   const [activeMatrixTab, setActiveMatrixTab] = useState('');
-  
+
   // Execution states
   const [activeExecutionVisit, setActiveExecutionVisit] = useState(null);
   const [formAnswers, setFormAnswers] = useState({});
@@ -1547,13 +1576,13 @@ export default function VisitasPage() {
   const [formAccionesCorrectivas, setFormAccionesCorrectivas] = useState('');
   const [auxiliarSignature, setAuxiliarSignature] = useState('');
   const [savingProgress, setSavingProgress] = useState(false);
-  
+
   // Applicant details and PDV signature states
   const [solicitanteNombre, setSolicitanteNombre] = useState('');
   const [solicitanteDocumento, setSolicitanteDocumento] = useState('');
   const [solicitanteTelefono, setSolicitanteTelefono] = useState('');
   const [firmaPdv, setFirmaPdv] = useState('');
-  
+
   // Jefe Approval states
   const [jefeComments, setJefeComments] = useState('');
   const [jefeSignature, setJefeSignature] = useState('');
@@ -1705,11 +1734,11 @@ export default function VisitasPage() {
     try {
       setLoading(true);
       setError('');
-      
+
       const resVisitas = await fetch('/api/visitas');
       if (!resVisitas.ok) throw new Error('Error al cargar visitas');
       const dataVisitas = await resVisitas.json();
-      
+
       setVisitas(dataVisitas.visitas);
       setAreas(dataVisitas.areas);
       setTiposVisita(dataVisitas.tiposVisita);
@@ -1747,7 +1776,7 @@ export default function VisitasPage() {
         const u = JSON.parse(storedUser);
         setCurrentUser(u);
         setUserRole(parseInt(u.rol_id));
-        
+
         // Determinate active tab based on role
         if (isUserAuxiliar(u.rol_id)) {
           setActiveTab('pending_tasks');
@@ -1762,7 +1791,7 @@ export default function VisitasPage() {
         if (mappedArea && mappedArea !== 'admin') {
           setSelectedAreaId(String(mappedArea));
         }
-      } catch (e) {}
+      } catch (e) { }
     }
   }, []);
 
@@ -1791,7 +1820,7 @@ export default function VisitasPage() {
           solicitanteTelefono,
           timestamp: new Date().toISOString()
         }));
-      } catch (e) {}
+      } catch (e) { }
     }
   }, [activeExecutionVisit, formAnswers, formObservaciones, formRepuestos, formHallazgos, formAccionesCorrectivas, solicitanteNombre, solicitanteDocumento, solicitanteTelefono]);
 
@@ -1813,7 +1842,7 @@ export default function VisitasPage() {
       setScannerLoaded(true);
       return;
     }
-    
+
     const script = document.createElement('script');
     script.src = 'https://unpkg.com/html5-qrcode';
     script.async = true;
@@ -1895,7 +1924,7 @@ export default function VisitasPage() {
       triggerAlert('Campo Requerido', 'Debe ingresar una etiqueta para el nuevo elemento.', 'warning');
       return;
     }
-    
+
     const isComplex = templateFields.length > 0 && (templateFields[0].tipo === 'matrix' || templateFields[0].tipo === 'simple_checklist');
     if (isComplex) {
       triggerAlert('Acción no permitida', 'No se pueden añadir campos individuales a plantillas de tipo matriz.', 'warning');
@@ -1934,7 +1963,7 @@ export default function VisitasPage() {
   const handleMoveField = (index, direction) => {
     if (direction === 'up' && index === 0) return;
     if (direction === 'down' && index === templateFields.length - 1) return;
-    
+
     const updated = [...templateFields];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     const temp = updated[index];
@@ -1981,6 +2010,47 @@ export default function VisitasPage() {
   };
 
   const handleRestoreTemplateVersion = async (targetVer) => {
+    const targetVisit = activeExecutionVisit || selectedVisit;
+    if (targetVisit && !editingTemplateId) {
+      if (!confirm(`¿Está seguro de restaurar el checklist de esta visita a la versión v${targetVer}?`)) return;
+      setIsSavingTemplate(true);
+      try {
+        const hist = safeParseCampos(targetVisit.historial_versiones);
+        const targetEntry = hist.find(h => Number(h.version) === Number(targetVer));
+        if (!targetEntry || !targetEntry.campos) throw new Error('No se encontraron los ítems de la versión seleccionada');
+        const restoredCampos = targetEntry.campos;
+        const res = await fetch('/api/visitas', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: targetVisit.id,
+            action: 'editar_checklist_visita',
+            campos_personalizados: restoredCampos,
+            version_checklist: (targetVisit.version_checklist || 1) + 1,
+            nota_version: `Restaurado a versión v${targetVer}`
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al restaurar');
+        triggerAlert('Éxito', `Checklist de la visita restaurado al estado v${targetVer} como versión v${data.version}.`, 'success');
+        setShowVersionModal(false);
+        const updatedVisit = {
+          ...targetVisit,
+          campos_personalizados: JSON.stringify(restoredCampos),
+          fields: restoredCampos,
+          version_checklist: data.version || (targetVisit.version_checklist || 1) + 1
+        };
+        if (activeExecutionVisit && activeExecutionVisit.id === targetVisit.id) setActiveExecutionVisit(updatedVisit);
+        if (selectedVisit && selectedVisit.id === targetVisit.id) setSelectedVisit(updatedVisit);
+        loadData();
+      } catch (e) {
+        triggerAlert('Error', e.message, 'error');
+      } finally {
+        setIsSavingTemplate(false);
+      }
+      return;
+    }
+
     if (!editingTemplateId) return;
     if (!confirm(`¿Está seguro de restaurar el checklist a la versión v${targetVer}? Se creará una nueva versión activa con los ítems previos.`)) return;
     setIsSavingTemplate(true);
@@ -2007,29 +2077,37 @@ export default function VisitasPage() {
   };
 
   const handleSaveVisitChecklistCustom = async () => {
-    if (!activeExecutionVisit) return;
+    const targetVisit = activeExecutionVisit || selectedVisit;
+    if (!targetVisit) return;
     setIsSavingTemplate(true);
     try {
       const res = await fetch('/api/visitas', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: activeExecutionVisit.id,
+          id: targetVisit.id,
           action: 'editar_checklist_visita',
           campos_personalizados: editingVisitCampos,
-          version_checklist: (activeExecutionVisit.version_checklist || activePlantilla?.version || 1) + 1,
-          nota_version: 'Personalización en ejecución'
+          version_checklist: (targetVisit.version_checklist || activePlantilla?.version || 1) + 1,
+          nota_version: 'Personalización de ítems'
         })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al guardar el checklist personalizado de la visita');
       triggerAlert('Éxito', data.message || 'Checklist personalizado guardado.', 'success');
       setShowVisitChecklistModal(false);
-      setActiveExecutionVisit({
-        ...activeExecutionVisit,
+      const updatedVisit = {
+        ...targetVisit,
         campos_personalizados: JSON.stringify(editingVisitCampos),
-        version_checklist: data.version || (activeExecutionVisit.version_checklist || 1) + 1
-      });
+        fields: editingVisitCampos,
+        version_checklist: data.version || (targetVisit.version_checklist || 1) + 1
+      };
+      if (activeExecutionVisit && activeExecutionVisit.id === targetVisit.id) {
+        setActiveExecutionVisit(updatedVisit);
+      }
+      if (selectedVisit && selectedVisit.id === targetVisit.id) {
+        setSelectedVisit(updatedVisit);
+      }
       loadData();
     } catch (e) {
       triggerAlert('Error', 'Error: ' + e.message, 'error');
@@ -2125,7 +2203,7 @@ export default function VisitasPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al subir archivo');
-      
+
       setUrlState(data.url);
     } catch (err) {
       triggerAlert('Error de Carga', 'Error en la subida: ' + err.message, 'error');
@@ -2165,19 +2243,19 @@ export default function VisitasPage() {
       setEquipoSearchError('La cámara no está lista aún. Por favor espera un momento.');
       return;
     }
-    
+
     setIsScanningEquipo(true);
     setEquipoSearchError('');
 
     // Wait a tick for the container #reader-equipo to render in the DOM
     setTimeout(() => {
       try {
-        const scanner = new window.Html5QrcodeScanner("reader-equipo", { 
-          fps: 10, 
+        const scanner = new window.Html5QrcodeScanner("reader-equipo", {
+          fps: 10,
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1.0
         }, false);
-        
+
         scanner.render(
           (decodedText) => {
             loadEquipmentDetails(decodedText);
@@ -2209,11 +2287,11 @@ export default function VisitasPage() {
   const handleFileChangeEquipo = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     setEquipoSearchLoading(true);
     setEquipoSearchError('');
     setEquipoData(null);
-    
+
     if (!window.Html5Qrcode) {
       setEquipoSearchError('El decodificador de imagen no está listo aún. Por favor intenta de nuevo.');
       setEquipoSearchLoading(false);
@@ -2292,13 +2370,13 @@ export default function VisitasPage() {
 
     if (visit.campos_personalizados) {
       try {
-        const fields = JSON.parse(visit.campos_personalizados);
-        const existingAnswers = JSON.parse(visit.datos_formulario || '{}');
+        const fields = safeParseCampos(visit.campos_personalizados);
+        const existingAnswers = safeParseAnswers(visit.datos_formulario);
         const initialAnswers = {};
         fields.forEach((f) => {
-          if (f.nombre in existingAnswers) {
+          if (f && f.nombre in existingAnswers) {
             initialAnswers[f.nombre] = existingAnswers[f.nombre];
-          } else {
+          } else if (f) {
             if (f.tipo === 'checkbox') initialAnswers[f.nombre] = false;
             else if (f.tipo === 'number') initialAnswers[f.nombre] = 0;
             else initialAnswers[f.nombre] = '';
@@ -2316,7 +2394,7 @@ export default function VisitasPage() {
         console.error("Error parsing campos_personalizados:", e);
       }
     }
-    
+
     // If tipo_visita_id is null (created without template in calendar),
     // default to the first one available for the area
     if (!tipoId && tiposVisita.length > 0) {
@@ -2334,8 +2412,8 @@ export default function VisitasPage() {
         setActivePlantilla(template);
         try {
           // Prefill from existing answers if any, otherwise prefill blank
-          const existingAnswers = JSON.parse(visit.datos_formulario || '{}');
-          const fields = JSON.parse(template.campos);
+          const existingAnswers = safeParseAnswers(visit.datos_formulario);
+          const fields = safeParseCampos(template.campos);
           const initialAnswers = {};
           if (fields[0] && (fields[0].tipo === 'matrix' || fields[0].tipo === 'simple_checklist')) {
             const hasSubTabs = fields[0].columnas && fields[0].columnas.length > 0 && !fields[0].columnas.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
@@ -2402,7 +2480,7 @@ export default function VisitasPage() {
           }, 300);
         }
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleSaveProgress = async () => {
@@ -2410,7 +2488,7 @@ export default function VisitasPage() {
     setSavingProgress(true);
     setSubmitError('');
     setSubmitSuccess('');
-    
+
     // Si el dispositivo está sin internet, guardamos directamente el borrador en memoria local
     if (!navigator.onLine) {
       const draftKey = `crepes_offline_draft_${activeExecutionVisit.id}`;
@@ -2570,7 +2648,7 @@ export default function VisitasPage() {
       setSubmitSuccess('Trabajo finalizado y enviado al Jefe de Área para aprobación.');
       setActiveExecutionVisit(null);
       loadData();
-      
+
       setTimeout(() => {
         setSubmitSuccess('');
         setActiveTab(isUserAuxiliar(userRole) ? 'pending_tasks' : 'list');
@@ -2714,7 +2792,7 @@ export default function VisitasPage() {
       if (!res.ok) throw new Error(data.error || 'Error al guardar la visita');
 
       setSubmitSuccess('Visita operativa registrada correctamente.');
-      
+
       // Reset form
       setAntesFile(null);
       setSelectedCategoriaId('');
@@ -2724,9 +2802,9 @@ export default function VisitasPage() {
       setSoporteFile(null);
       setSoporteUrl('');
       setFormObservaciones('');
-      
+
       loadData();
-      
+
       setTimeout(() => {
         setActiveTab('list');
         setSubmitSuccess('');
@@ -2750,7 +2828,7 @@ export default function VisitasPage() {
 
     if (visit.campos_personalizados) {
       try {
-        parsedFields = JSON.parse(visit.campos_personalizados);
+        parsedFields = safeParseCampos(visit.campos_personalizados);
       } catch (e) {
         console.error("Error parsing campos_personalizados in details:", e);
       }
@@ -2758,14 +2836,14 @@ export default function VisitasPage() {
       const template = plantillas.find((p) => p.id === visit.plantilla_id);
       if (template) {
         try {
-          parsedFields = JSON.parse(template.campos);
-        } catch (e) {}
+          parsedFields = safeParseCampos(template.campos);
+        } catch (e) { }
       }
     }
 
     try {
-      parsedData = JSON.parse(visit.datos_formulario || '{}');
-    } catch (e) {}
+      parsedData = safeParseAnswers(visit.datos_formulario);
+    } catch (e) { }
 
     // Fetch evidences dynamically
     let visitEvidences = [];
@@ -2794,7 +2872,7 @@ export default function VisitasPage() {
     if (selectedVisit) {
       try {
         let formAnswers = {};
-        try { formAnswers = JSON.parse(selectedVisit.datos_formulario || '{}'); } catch (e) {}
+        try { formAnswers = safeParseAnswers(selectedVisit.datos_formulario); } catch (e) { }
         const respuestasStr = Object.entries(formAnswers)
           .map(([k, v]) => `• ${k}: ${typeof v === 'object' && v !== null ? (v.valor || v.respuesta || JSON.stringify(v)) : v}`)
           .join('\n');
@@ -2862,16 +2940,16 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
   );
 
   const filteredVisitas = visitas.filter((v) => {
-    const matchesSearch = 
+    const matchesSearch =
       (v.pdv_nombre || '').toLowerCase().includes(searchTermVisita.toLowerCase()) ||
       (v.ciudad_nombre || '').toLowerCase().includes(searchTermVisita.toLowerCase()) ||
       (v.usuario_nombre || '').toLowerCase().includes(searchTermVisita.toLowerCase()) ||
       (v.responsable_nombre || '').toLowerCase().includes(searchTermVisita.toLowerCase()) ||
       (v.tipo_visita_nombre || '').toLowerCase().includes(searchTermVisita.toLowerCase()) ||
       (v.estado || '').toLowerCase().includes(searchTermVisita.toLowerCase());
-      
+
     const matchesArea = selectedAreaFilter === 'all' || String(v.area_id) === selectedAreaFilter;
-    
+
     return matchesSearch && matchesArea;
   });
 
@@ -2925,11 +3003,11 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
           </button>
         </div>
       )}
-      
+
       {/* Navigation tabs */}
       <div className="tabs-header no-print" style={{ display: 'flex', borderBottom: '2px solid #E8DDD4', marginBottom: '20px', gap: '20px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {(isUserJefe(userRole) || userRole === 1 || userRole === 2) && (
-          <button 
+          <button
             className={`tab-btn ${activeTab === 'awaiting_approval' ? 'active' : ''}`}
             onClick={() => { setActiveTab('awaiting_approval'); setActiveExecutionVisit(null); }}
             style={{
@@ -2952,7 +3030,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
         )}
 
         {(isUserAuxiliar(userRole) || isUserJefe(userRole) || userRole === 1 || userRole === 2) && (
-          <button 
+          <button
             className={`tab-btn ${activeTab === 'pending_tasks' ? 'active' : ''}`}
             onClick={() => { setActiveTab('pending_tasks'); setActiveExecutionVisit(null); }}
             style={{
@@ -2972,8 +3050,8 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
             🛠️ Tareas por Ejecutar ({pendingVisits.length})
           </button>
         )}
-        
-        <button 
+
+        <button
           className={`tab-btn ${activeTab === 'list' ? 'active' : ''}`}
           onClick={() => { setActiveTab('list'); setActiveExecutionVisit(null); }}
           style={{
@@ -2995,7 +3073,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
         </button>
 
         {(userRole === 1 || userRole === 2 || isUserJefe(userRole)) && (
-          <button 
+          <button
             className={`tab-btn ${activeTab === 'new' ? 'active' : ''}`}
             onClick={() => { setActiveTab('new'); setActiveExecutionVisit(null); }}
             style={{
@@ -3017,7 +3095,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
         )}
 
         {(userRole === 1 || userRole === 2 || isUserJefe(userRole)) && (
-          <button 
+          <button
             className={`tab-btn ${activeTab === 'templates' ? 'active' : ''}`}
             onClick={() => { setActiveTab('templates'); setActiveExecutionVisit(null); }}
             style={{
@@ -3057,7 +3135,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
               {submitError && <div className="error-alert">{submitError}</div>}
 
               <form onSubmit={handleFinishWork} className="visita-form">
-                
+
                 {/* 0. Equipment Verification for Technical Flow */}
                 {activeExecutionVisit.area_tipo_flujo === 'tecnico' && (
                   <div className="equipment-association-section card shadow-sm" style={{ marginBottom: '20px', borderLeft: '4px solid #6B3A2A' }}>
@@ -3152,7 +3230,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                   >
                                     <div>
                                       <strong style={{ color: '#1E293B', display: 'block', fontSize: '0.85rem' }}>{eq.nombre}</strong>
-                                      <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Sticker/ID: <strong style={{color:'#C2410C'}}>{eq.id}</strong> | Serie: {eq.serie || 'N/A'}</span>
+                                      <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Sticker/ID: <strong style={{ color: '#C2410C' }}>{eq.id}</strong> | Serie: {eq.serie || 'N/A'}</span>
                                     </div>
                                     <span style={{ background: '#FFEDD5', color: '#C2410C', fontWeight: 'bold', padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', marginLeft: '6px' }}>
                                       📍 {eq.pdv_nombre}
@@ -3171,7 +3249,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                           <div id="reader-equipo" style={{ width: '100%', maxWidth: '350px', margin: '0 auto' }}></div>
                         </div>
                       )}
-                      
+
                       {/* Hidden helper for file scanning */}
                       <div id="reader-equipo-hidden" style={{ display: 'none' }}></div>
 
@@ -3180,19 +3258,19 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                         <div className="equipment-details-box" style={{ marginTop: '15px', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid #c8e6c9', backgroundColor: '#e8f5e9', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           <h5 style={{ margin: 0, color: '#2e7d32', fontWeight: 'bold', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}>🖥️ Equipo Vinculado:</h5>
                           <div style={{ fontSize: '0.8rem', color: '#2e7d32', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', paddingLeft: '4px' }}>
-                            <div><strong>Nombre:</strong> <span style={{color:'#333'}}>{equipoData.nombre}</span></div>
-                            <div><strong>ID/QR:</strong> <span style={{color:'#333'}}>{equipoData.id}</span></div>
-                            <div><strong>Marca:</strong> <span style={{color:'#333'}}>{equipoData.marca || 'N/A'}</span></div>
-                            <div><strong>Modelo:</strong> <span style={{color:'#333'}}>{equipoData.modelo || 'N/A'}</span></div>
-                            <div><strong>Serie:</strong> <span style={{color:'#333'}}>{equipoData.serie || 'N/A'}</span></div>
-                            <div><strong>PDV:</strong> <span style={{color:'#333'}}>{equipoData.pdv_nombre}</span></div>
+                            <div><strong>Nombre:</strong> <span style={{ color: '#333' }}>{equipoData.nombre}</span></div>
+                            <div><strong>ID/QR:</strong> <span style={{ color: '#333' }}>{equipoData.id}</span></div>
+                            <div><strong>Marca:</strong> <span style={{ color: '#333' }}>{equipoData.marca || 'N/A'}</span></div>
+                            <div><strong>Modelo:</strong> <span style={{ color: '#333' }}>{equipoData.modelo || 'N/A'}</span></div>
+                            <div><strong>Serie:</strong> <span style={{ color: '#333' }}>{equipoData.serie || 'N/A'}</span></div>
+                            <div><strong>PDV:</strong> <span style={{ color: '#333' }}>{equipoData.pdv_nombre}</span></div>
                           </div>
                         </div>
                       )}
                     </div>
                   </div>
                 )}
-                
+
                 {/* Check list Renderer (conditional on template existance) */}
                 {(activePlantilla || (activeExecutionVisit && activeExecutionVisit.campos_personalizados)) && (
                   <div className="dynamic-template-section card shadow-sm">
@@ -3209,9 +3287,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                         type="button"
                         onClick={() => {
                           if (!confirm('¿Desea personalizar o editar los ítems del checklist únicamente para esta visita? Podrá añadir/quitar preguntas sin afectar la plantilla general o restaurar el original.')) return;
-                          const currentCampos = activeExecutionVisit.campos_personalizados 
-                            ? JSON.parse(activeExecutionVisit.campos_personalizados) 
-                            : (activePlantilla ? JSON.parse(activePlantilla.campos) : []);
+                          const currentCampos = safeParseCampos(activeExecutionVisit.campos_personalizados || activePlantilla?.campos);
                           setEditingVisitCampos(currentCampos);
                           setShowVisitChecklistModal(true);
                         }}
@@ -3223,9 +3299,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                     </div>
                     <div className="card-body">
                       {(() => {
-                        const parsedCampos = activeExecutionVisit.campos_personalizados 
-                          ? JSON.parse(activeExecutionVisit.campos_personalizados) 
-                          : (activePlantilla ? JSON.parse(activePlantilla.campos) : []);
+                        const parsedCampos = safeParseCampos(activeExecutionVisit.campos_personalizados || activePlantilla?.campos);
                         const firstField = parsedCampos[0];
                         if (firstField && (firstField.tipo === 'matrix' || firstField.tipo === 'simple_checklist')) {
                           return (
@@ -3336,7 +3410,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #E2E8F0', paddingBottom: '16px', marginBottom: '20px' }}>
                         <div>
                           <h3 style={{ margin: 0, color: '#1E293B', fontSize: '1.25rem', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            ✏️ Personalización del Checklist de la Visita ID #{activeExecutionVisit.id}
+                            ✏️ Personalización del Checklist de la Visita ID #{(activeExecutionVisit || selectedVisit)?.id}
                           </h3>
                           <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748B' }}>
                             Modifica o adapta las tareas y preguntas exclusivamente para esta visita. Se creará un registro de versión sin alterar la plantilla global de tu área.
@@ -3351,16 +3425,16 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                         </button>
                       </div>
 
-                      {editingVisitCampos.length > 0 && (editingVisitCampos[0].tipo === 'matrix' || editingVisitCampos[0].tipo === 'simple_checklist') ? (
+                      {Array.isArray(editingVisitCampos) && editingVisitCampos.length > 0 && (editingVisitCampos[0].tipo === 'matrix' || editingVisitCampos[0].tipo === 'simple_checklist') && Array.isArray(editingVisitCampos[0].secciones) ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                           <div className="warning-alert" style={{ backgroundColor: '#FFFBEB', color: '#B45309', borderLeft: '4px solid #F59E0B', padding: '12px', borderRadius: '8px', fontSize: '0.85rem' }}>
                             💡 <strong>Matriz de Calidad / Fija:</strong> Puedes adaptar el texto de cada aspecto o pregunta de evaluación abajo. La estructura de secciones y columnas se conserva para la exportación a Excel/PDF.
                           </div>
                           {editingVisitCampos[0].secciones.map((sec, sIdx) => (
                             <div key={sIdx} style={{ background: '#F8FAFC', padding: '15px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                              <h5 style={{ fontWeight: '800', marginBottom: '10px', color: '#3B82F6', fontSize: '0.9rem' }}>📁 {sec.nombre}</h5>
+                              <h5 style={{ fontWeight: '800', marginBottom: '10px', color: '#3B82F6', fontSize: '0.9rem' }}>📁 {sec?.nombre || `Sección ${sIdx + 1}`}</h5>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                {sec.filas.map((fila, rIdx) => (
+                                {Array.isArray(sec?.filas) && sec.filas.map((fila, rIdx) => (
                                   <div key={rIdx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                     <span style={{ fontSize: '0.75rem', color: '#64748B', minWidth: '25px', fontWeight: 'bold' }}>{rIdx + 1}.</span>
                                     <input
@@ -3369,8 +3443,10 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                       value={fila}
                                       onChange={(e) => {
                                         const updated = JSON.parse(JSON.stringify(editingVisitCampos));
-                                        updated[0].secciones[sIdx].filas[rIdx] = e.target.value;
-                                        setEditingVisitCampos(updated);
+                                        if (updated[0]?.secciones?.[sIdx]?.filas) {
+                                          updated[0].secciones[sIdx].filas[rIdx] = e.target.value;
+                                          setEditingVisitCampos(updated);
+                                        }
                                       }}
                                       style={{ flex: 1, fontWeight: '600' }}
                                     />
@@ -3382,14 +3458,14 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                          {editingVisitCampos.map((field, idx) => (
+                          {Array.isArray(editingVisitCampos) && editingVisitCampos.map((field, idx) => (
                             <div key={idx} className="card shadow-sm" style={{ padding: '15px', background: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span className="badge" style={{ background: '#E2E8F0', color: '#334155', fontSize: '0.72rem', fontWeight: 'bold' }}>
-                                  {field.tipo === 'checkbox' && '☑️ Checkbox / Sí - No'}
-                                  {field.tipo === 'textarea' && '📝 Texto Largo / Observaciones'}
-                                  {field.tipo === 'text' && '✍️ Texto Corto'}
-                                  {field.tipo === 'number' && '🔢 Número'}
+                                  {field?.tipo === 'checkbox' && '☑️ Checkbox / Sí - No'}
+                                  {field?.tipo === 'textarea' && '📝 Texto Largo / Observaciones'}
+                                  {field?.tipo === 'text' && '✍️ Texto Corto'}
+                                  {field?.tipo === 'number' && '🔢 Número'}
                                 </span>
                                 <div style={{ display: 'flex', gap: '6px' }}>
                                   <button
@@ -3430,11 +3506,13 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                 <input
                                   type="text"
                                   className="form-input"
-                                  value={field.label || ''}
+                                  value={field?.label || ''}
                                   onChange={(e) => {
                                     const updated = [...editingVisitCampos];
-                                    updated[idx].label = e.target.value;
-                                    setEditingVisitCampos(updated);
+                                    if (updated[idx]) {
+                                      updated[idx].label = e.target.value;
+                                      setEditingVisitCampos(updated);
+                                    }
                                   }}
                                   style={{ fontWeight: 'bold' }}
                                 />
@@ -3465,7 +3543,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                     tipo: typeEl ? typeEl.value : 'checkbox',
                                     requerido: false
                                   };
-                                  setEditingVisitCampos([...editingVisitCampos, newField]);
+                                  setEditingVisitCampos(Array.isArray(editingVisitCampos) ? [...editingVisitCampos, newField] : [newField]);
                                   labelEl.value = '';
                                 }}
                               >
@@ -3481,7 +3559,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                           type="button"
                           onClick={() => {
                             if (!confirm('¿Está seguro de restaurar los ítems a la plantilla original? Se eliminarán las personalizaciones de esta visita.')) return;
-                            const originalCampos = activePlantilla ? JSON.parse(activePlantilla.campos || '[]') : [];
+                            const originalCampos = safeParseCampos(activePlantilla?.campos);
                             setEditingVisitCampos(originalCampos);
                           }}
                           style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', padding: '10px 18px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}
@@ -3538,22 +3616,22 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                     <h4>📝 Datos Adicionales de la Ejecución</h4>
                   </div>
                   <div className="card-body">
-                    
+
                     {/* General observations */}
                     {(!activePlantilla || !activePlantilla.campos || (() => {
-                      try { return JSON.parse(activePlantilla.campos)[0]?.tipo !== 'matrix'; } catch(e) { return true; }
+                      try { return JSON.parse(activePlantilla.campos)[0]?.tipo !== 'matrix'; } catch (e) { return true; }
                     })()) && (
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="exec-observaciones">Observaciones Generales</label>
-                        <textarea
-                          id="exec-observaciones"
-                          className="form-textarea"
-                          placeholder="Escriba aquí anotaciones del trabajo realizado..."
-                          value={formObservaciones}
-                          onChange={(e) => setFormObservaciones(e.target.value)}
-                        ></textarea>
-                      </div>
-                    )}
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="exec-observaciones">Observaciones Generales</label>
+                          <textarea
+                            id="exec-observaciones"
+                            className="form-textarea"
+                            placeholder="Escriba aquí anotaciones del trabajo realizado..."
+                            value={formObservaciones}
+                            onChange={(e) => setFormObservaciones(e.target.value)}
+                          ></textarea>
+                        </div>
+                      )}
 
                     {/* Specific Fields for Administrative Flow */}
                     {activeExecutionVisit.area_tipo_flujo !== 'tecnico' && (
@@ -3598,9 +3676,9 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                     {/* Evidences (grouped by label) */}
                     <div className="evidencias-upload-section">
                       <h5>📸 Cargar Evidencias ({activeExecutionVisit.area_tipo_flujo === 'tecnico' ? 'Obligatorias' : 'Opcionales'})</h5>
-                      
+
                       <div className="upload-fields-grid">
-                        
+
                         {/* 1. Foto del ANTES */}
                         <div className="upload-card">
                           <label className="form-label">
@@ -3669,7 +3747,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                         <h4 style={{ color: 'var(--color-primary-dark)', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '15px', borderBottom: '1px solid var(--color-border-light)', paddingBottom: '6px' }}>
                           👤 Información del Solicitante (Funcionario PDV)
                         </h4>
-                        
+
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                           <div className="form-group">
                             <label className="form-label" htmlFor="solic-name">Nombre Completo del Solicitante *</label>
@@ -3823,9 +3901,9 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                       const st = statusConfig[v.estado] || statusConfig.pendiente;
 
                       return (
-                        <div 
-                          key={v.id} 
-                          className="visita-pending-card" 
+                        <div
+                          key={v.id}
+                          className="visita-pending-card"
                           style={{
                             backgroundColor: '#fff',
                             border: '1.5px solid #e8ddd4',
@@ -3843,13 +3921,13 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800', color: 'var(--color-primary-dark)', fontSize: '1rem' }}>
                               <span>📍</span> {v.pdv_nombre} ({v.ciudad_nombre})
                             </div>
-                            <span 
-                              style={{ 
-                                backgroundColor: st.bg, 
-                                color: st.color, 
-                                fontWeight: 'bold', 
-                                fontSize: '0.72rem', 
-                                padding: '4px 10px', 
+                            <span
+                              style={{
+                                backgroundColor: st.bg,
+                                color: st.color,
+                                fontWeight: 'bold',
+                                fontSize: '0.72rem',
+                                padding: '4px 10px',
                                 borderRadius: '20px',
                                 whiteSpace: 'nowrap'
                               }}
@@ -3874,7 +3952,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
 
                             {v.observaciones && (
                               <div style={{ flex: '1', minWidth: '150px', backgroundColor: '#FAF6F0', borderRadius: '8px', padding: '10px', fontSize: '0.8rem', color: '#555', fontStyle: 'italic' }}>
-                                <strong style={{ color: '#4A2518', fontStyle: 'normal' }}>Observaciones:</strong><br/>
+                                <strong style={{ color: '#4A2518', fontStyle: 'normal' }}>Observaciones:</strong><br />
                                 "{v.observaciones}"
                               </div>
                             )}
@@ -3893,9 +3971,9 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                               <button
                                 className="btn btn-primary"
                                 onClick={() => handleStartWork(v.id)}
-                                style={{ 
-                                  backgroundColor: '#6B3A2A', 
-                                  color: '#fff', 
+                                style={{
+                                  backgroundColor: '#6B3A2A',
+                                  color: '#fff',
                                   fontWeight: 'bold',
                                   fontSize: '0.82rem',
                                   padding: '10px 20px',
@@ -3910,9 +3988,9 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                               <button
                                 className="btn btn-warning"
                                 onClick={() => handleOpenExecutionForm(v)}
-                                style={{ 
-                                  backgroundColor: '#F59E0B', 
-                                  color: '#fff', 
+                                style={{
+                                  backgroundColor: '#F59E0B',
+                                  color: '#fff',
                                   fontWeight: 'bold',
                                   fontSize: '0.82rem',
                                   padding: '10px 20px',
@@ -3927,9 +4005,9 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                               <button
                                 className="btn btn-success"
                                 onClick={() => handleOpenExecutionForm(v)}
-                                style={{ 
-                                  backgroundColor: '#15803D', 
-                                  color: '#fff', 
+                                style={{
+                                  backgroundColor: '#15803D',
+                                  color: '#fff',
                                   fontWeight: 'bold',
                                   fontSize: '0.82rem',
                                   padding: '10px 20px',
@@ -4016,11 +4094,11 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                         return `Auxiliar ${areaName || ''}`;
                       };
                       const techRole = getTechRoleName(v.responsable_rol_id, v.area_nombre);
-                      
+
                       return (
-                        <div 
-                          key={v.id} 
-                          className="visita-pending-card" 
+                        <div
+                          key={v.id}
+                          className="visita-pending-card"
                           style={{
                             backgroundColor: '#fff',
                             border: '1.5px solid #e8ddd4',
@@ -4062,9 +4140,9 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                 <span style={{ fontSize: '0.72rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Técnico Ejecutor</span>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                   {v.responsable_avatar ? (
-                                    <img 
-                                      src={v.responsable_avatar} 
-                                      alt={v.responsable_nombre} 
+                                    <img
+                                      src={v.responsable_avatar}
+                                      alt={v.responsable_nombre}
                                       style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #ddd' }}
                                     />
                                   ) : (
@@ -4079,14 +4157,14 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                 </div>
                               </div>
 
-                              <span 
-                                className="status-pill finalizada" 
-                                style={{ 
-                                  backgroundColor: '#F3E8FF', 
-                                  color: '#6B21A8', 
-                                  fontWeight: 'bold', 
-                                  fontSize: '0.75rem', 
-                                  padding: '6px 12px', 
+                              <span
+                                className="status-pill finalizada"
+                                style={{
+                                  backgroundColor: '#F3E8FF',
+                                  color: '#6B21A8',
+                                  fontWeight: 'bold',
+                                  fontSize: '0.75rem',
+                                  padding: '6px 12px',
                                   borderRadius: '20px',
                                   display: 'inline-flex',
                                   alignItems: 'center',
@@ -4103,10 +4181,10 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                             <button
                               className="btn btn-secondary"
                               onClick={() => handleOpenVisitDetails(v)}
-                              style={{ 
-                                backgroundColor: '#FAF6F0', 
-                                color: '#6B3A2A', 
-                                border: '1px solid #e8ddd4', 
+                              style={{
+                                backgroundColor: '#FAF6F0',
+                                color: '#6B3A2A',
+                                border: '1px solid #e8ddd4',
                                 fontWeight: 'bold',
                                 fontSize: '0.82rem',
                                 padding: '8px 16px',
@@ -4119,9 +4197,9 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                             <button
                               className="btn btn-primary"
                               onClick={() => handleOpenVisitDetails(v)}
-                              style={{ 
-                                backgroundColor: '#6B3A2A', 
-                                color: '#fff', 
+                              style={{
+                                backgroundColor: '#6B3A2A',
+                                color: '#fff',
                                 fontWeight: 'bold',
                                 fontSize: '0.82rem',
                                 padding: '8px 16px',
@@ -4172,7 +4250,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                 📊 Exportar Todo a Excel
               </a>
             </div>
-            
+
             {visitas.length > 0 ? (
               <div>
                 {/* Search & Filter Bar */}
@@ -4295,14 +4373,14 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                     Diligenciar Formulario 📋
                                   </button>
                                 )}
-                                <button 
+                                <button
                                   className="btn btn-secondary btn-sm"
                                   onClick={() => handleOpenVisitDetails(v)}
                                 >
                                   Ver Respuestas 👁️
                                 </button>
                                 {['completada', 'cerrada', 'finalizada'].includes(v.estado) && v.plantilla_id && (
-                                  <a 
+                                  <a
                                     href={`/api/visitas/export?id=${v.id}`}
                                     className="btn btn-sm"
                                     style={{ backgroundColor: '#15803D', color: '#ffffff', border: '1px solid #14532D', padding: '4px 8px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
@@ -4312,7 +4390,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                   </a>
                                 )}
                                 {(parseInt(currentUser?.rol_id) === 1 || parseInt(currentUser?.rol_id) > 9 || parseInt(v.user_id) === parseInt(currentUser?.id)) && (
-                                  <button 
+                                  <button
                                     className="btn btn-sm"
                                     style={{ backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', padding: '4px 8px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
                                     onClick={() => {
@@ -4359,12 +4437,12 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                 <div className="visitas-cards-grid" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {filteredVisitas.length > 0 ? filteredVisitas.map((v) => {
                     const stateMap = {
-                      pendiente:   { label: '⏳ PENDIENTE',   bg: '#FEF3C7', color: '#92400E' },
+                      pendiente: { label: '⏳ PENDIENTE', bg: '#FEF3C7', color: '#92400E' },
                       en_progreso: { label: '⚙️ EN PROGRESO', bg: '#DBEAFE', color: '#1E40AF' },
-                      finalizada:  { label: '📋 POR APROBAR', bg: '#F3E8FF', color: '#6B21A8' },
-                      devuelta:    { label: '❌ DEVUELTA',     bg: '#FEE2E2', color: '#991B1B' },
-                      completada:  { label: '✔ COMPLETADA',  bg: '#DCFCE7', color: '#15803D' },
-                      cerrada:     { label: '🔒 CERRADA',     bg: '#F1F5F9', color: '#475569' },
+                      finalizada: { label: '📋 POR APROBAR', bg: '#F3E8FF', color: '#6B21A8' },
+                      devuelta: { label: '❌ DEVUELTA', bg: '#FEE2E2', color: '#991B1B' },
+                      completada: { label: '✔ COMPLETADA', bg: '#DCFCE7', color: '#15803D' },
+                      cerrada: { label: '🔒 CERRADA', bg: '#F1F5F9', color: '#475569' },
                     };
                     const st = stateMap[v.estado] || stateMap.pendiente;
                     return (
@@ -4818,7 +4896,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                   {/* List of Fields */}
                   <div className="fields-editor-list" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                     <h4 style={{ borderBottom: '1px solid var(--color-border-light)', paddingBottom: '8px', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>Elementos del Checklist</h4>
-                    
+
                     {/* Matrix Row Editor */}
                     {templateFields.length > 0 && (templateFields[0].tipo === 'matrix' || templateFields[0].tipo === 'simple_checklist') ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -4994,88 +5072,93 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
           </div>
 
           {/* Modal de Historial y Restauración de Versiones del Checklist */}
-          {showVersionModal && (
-            <div className="modal-overlay animate-fade-in" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-              <div className="card shadow-xl" style={{ width: '100%', maxWidth: '800px', maxHeight: '85vh', overflowY: 'auto', background: '#FFF', borderRadius: '18px', padding: '26px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #E2E8F0', paddingBottom: '16px', marginBottom: '20px' }}>
-                  <div>
-                    <h3 style={{ margin: 0, color: '#5B21B6', fontSize: '1.3rem', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      🕒 Historial de Versiones del Checklist
-                    </h3>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748B' }}>
-                      Aquí puedes auditar cada modificación realizada a este checklist y restaurar cualquier versión anterior como la versión activa.
-                    </p>
+          {showVersionModal && (() => {
+            const activeHistList = Array.isArray(templateHistorial) && templateHistorial.length > 0
+              ? templateHistorial
+              : safeParseCampos((activeExecutionVisit || selectedVisit)?.historial_versiones);
+            return (
+              <div className="modal-overlay animate-fade-in" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+                <div className="card shadow-xl" style={{ width: '100%', maxWidth: '800px', maxHeight: '85vh', overflowY: 'auto', background: '#FFF', borderRadius: '18px', padding: '26px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #E2E8F0', paddingBottom: '16px', marginBottom: '20px' }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: '#5B21B6', fontSize: '1.3rem', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        🕒 Historial de Versiones del Checklist
+                      </h3>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748B' }}>
+                        Aquí puedes auditar cada modificación realizada a este checklist y restaurar cualquier versión anterior como la versión activa.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowVersionModal(false)}
+                      style={{ background: '#F1F5F9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', color: '#475569' }}
+                    >
+                      ✕
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowVersionModal(false)}
-                    style={{ background: '#F1F5F9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', color: '#475569' }}
-                  >
-                    ✕
-                  </button>
-                </div>
 
-                {templateHistorial.length === 0 ? (
-                  <div style={{ padding: '30px', textAlign: 'center', color: '#64748B', fontStyle: 'italic', background: '#F8FAFC', borderRadius: '12px' }}>
-                    No hay versiones históricas guardadas aún. Al guardar modificaciones, se irá registrando el historial cronológico v1, v2, etc.
-                  </div>
-                ) : (
-                  <div className="table-responsive">
-                    <table className="table">
-                      <thead>
-                        <tr>
-                          <th style={{ width: '80px', textAlign: 'center' }}>Versión</th>
-                          <th>Fecha / Hora</th>
-                          <th>Modificado por</th>
-                          <th>Nota / Descripción del Cambio</th>
-                          <th style={{ textAlign: 'center' }}>Acción</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {templateHistorial.slice().reverse().map((hist, idx) => (
-                          <tr key={idx} style={{ background: idx === 0 ? '#F5F3FF' : 'inherit' }}>
-                            <td style={{ textAlign: 'center' }}>
-                              <span style={{ background: '#7C3AED', color: '#FFF', padding: '4px 10px', borderRadius: '14px', fontWeight: '900', fontSize: '0.85rem' }}>
-                                v{hist.version}
-                              </span>
-                            </td>
-                            <td style={{ fontSize: '0.85rem', fontWeight: '600', color: '#334155' }}>
-                              {new Date(hist.fecha).toLocaleString('es-ES')}
-                            </td>
-                            <td><strong style={{ color: '#1E293B' }}>{hist.usuario || 'Sistema'}</strong></td>
-                            <td style={{ fontSize: '0.88rem', color: '#475569' }}>
-                              {hist.nota || 'Actualización de versión'}
-                              {hist.nombre && <div style={{ fontSize: '0.78rem', color: '#64748B' }}>Nombre: {hist.nombre}</div>}
-                            </td>
-                            <td style={{ textAlign: 'center' }}>
-                              <button
-                                type="button"
-                                onClick={() => handleRestoreTemplateVersion(hist.version)}
-                                disabled={isSavingTemplate}
-                                style={{ background: '#2563EB', color: '#FFF', border: 'none', padding: '6px 14px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer', boxShadow: '0 2px 4px rgba(37,99,235,0.2)' }}
-                              >
-                                🔄 Restaurar v{hist.version}
-                              </button>
-                            </td>
+                  {activeHistList.length === 0 ? (
+                    <div style={{ padding: '30px', textAlign: 'center', color: '#64748B', fontStyle: 'italic', background: '#F8FAFC', borderRadius: '12px' }}>
+                      No hay versiones históricas guardadas aún. Al guardar modificaciones, se irá registrando el historial cronológico v1, v2, etc.
+                    </div>
+                  ) : (
+                    <div className="table-responsive">
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th style={{ width: '80px', textAlign: 'center' }}>Versión</th>
+                            <th>Fecha / Hora</th>
+                            <th>Modificado por</th>
+                            <th>Nota / Descripción del Cambio</th>
+                            <th style={{ textAlign: 'center' }}>Acción</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                        </thead>
+                        <tbody>
+                          {activeHistList.slice().reverse().map((hist, idx) => (
+                            <tr key={idx} style={{ background: idx === 0 ? '#F5F3FF' : 'inherit' }}>
+                              <td style={{ textAlign: 'center' }}>
+                                <span style={{ background: '#7C3AED', color: '#FFF', padding: '4px 10px', borderRadius: '14px', fontWeight: '900', fontSize: '0.85rem' }}>
+                                  v{hist?.version || 1}
+                                </span>
+                              </td>
+                              <td style={{ fontSize: '0.85rem', fontWeight: '600', color: '#334155' }}>
+                                {hist?.fecha ? new Date(hist.fecha).toLocaleString('es-ES') : 'Fecha reciente'}
+                              </td>
+                              <td><strong style={{ color: '#1E293B' }}>{hist?.usuario || 'Sistema'}</strong></td>
+                              <td style={{ fontSize: '0.88rem', color: '#475569' }}>
+                                {hist?.nota || 'Actualización de versión'}
+                                {hist?.nombre && <div style={{ fontSize: '0.78rem', color: '#64748B' }}>Nombre: {hist.nombre}</div>}
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRestoreTemplateVersion(hist?.version || 1)}
+                                  disabled={isSavingTemplate}
+                                  style={{ background: '#2563EB', color: '#FFF', border: 'none', padding: '6px 14px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer', boxShadow: '0 2px 4px rgba(37,99,235,0.2)' }}
+                                >
+                                  🔄 Restaurar v{hist?.version || 1}
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
 
-                <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #E2E8F0', paddingTop: '16px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowVersionModal(false)}
-                    style={{ background: '#64748B', color: '#FFF', border: 'none', padding: '10px 22px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}
-                  >
-                    Cerrar Historial
-                  </button>
+                  <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #E2E8F0', paddingTop: '16px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowVersionModal(false)}
+                      style={{ background: '#64748B', color: '#FFF', border: 'none', padding: '10px 22px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}
+                    >
+                      Cerrar Historial
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })() || null)}
         </div>
       )}
 
@@ -5083,13 +5166,13 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
       {selectedVisit && (
         <div className="modal-backdrop">
           <div className="modal-content card animate-fade-in printable-modal">
-            
+
             {/* Modal actions (hide on printing) */}
             <div className="card-header no-print">
               <h3>Auditoría Operativa de Punto de Venta</h3>
               <div className="modal-header-actions">
                 {(parseInt(currentUser?.rol_id) === 1 || parseInt(currentUser?.rol_id) > 9 || parseInt(selectedVisit.user_id) === parseInt(currentUser?.id)) && (
-                  <button 
+                  <button
                     className="btn btn-sm"
                     style={{ backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
                     onClick={() => {
@@ -5119,14 +5202,41 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                   </button>
                 )}
                 {Array.isArray(selectedVisit.fields) && selectedVisit.fields[0] && selectedVisit.fields[0].code && (
-                  <a 
-                    href={`/api/visitas/export?id=${selectedVisit.id}`} 
+                  <a
+                    href={`/api/visitas/export?id=${selectedVisit.id}`}
                     className="btn btn-success btn-sm"
                     download
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', textDecoration: 'none' }}
                   >
                     📥 Exportar Excel
                   </a>
+                )}
+                {(userRole === 1 || userRole === 2 || isUserJefe(userRole)) && (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ background: '#F8FAFC', color: '#334155', border: '1px solid #CBD5E1', fontWeight: 'bold' }}
+                      onClick={() => {
+                        const currentCampos = safeParseCampos(selectedVisit.campos_personalizados || selectedVisit.fields);
+                        setEditingVisitCampos(currentCampos);
+                        setShowVisitChecklistModal(true);
+                      }}
+                    >
+                      ✏️ Modificar Ítems (v{selectedVisit.version_checklist || 1})
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ background: '#F5F3FF', color: '#6D28D9', border: '1px solid #DDD6FE', fontWeight: 'bold' }}
+                      onClick={() => {
+                        setEditingTemplateId(null);
+                        setShowVersionModal(true);
+                      }}
+                    >
+                      🕒 Historial v{selectedVisit.version_checklist || 1}
+                    </button>
+                  </>
                 )}
                 <button className="btn btn-primary btn-sm" onClick={handlePrint}>
                   🖨️ Imprimir / PDF
@@ -5137,22 +5247,22 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
 
             {/* Modal Sub-Tabs (hide on printing) */}
             <div className="tabs-header no-print" style={{ display: 'flex', padding: '0 20px', borderBottom: '1px solid var(--color-border-light)', backgroundColor: 'var(--color-bg-secondary)', gap: '10px' }}>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className={`tab-btn ${modalTab === 'general' ? 'active' : ''}`}
                 onClick={() => setModalTab('general')}
               >
                 📋 Resumen y Aprobación
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className={`tab-btn ${modalTab === 'checklist' ? 'active' : ''}`}
                 onClick={() => setModalTab('checklist')}
               >
                 📊 Checklist Respuestas
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className={`tab-btn ${modalTab === 'evidence' ? 'active' : ''}`}
                 onClick={() => setModalTab('evidence')}
               >
@@ -5162,7 +5272,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
 
             {/* Content to display and print */}
             <div className="card-body modal-scrollable-body print-layout">
-              
+
               {/* Logo / Header for print */}
               {selectedVisit.area_tipo_flujo !== 'tecnico' && (
                 <div className="print-only-header">
@@ -5264,7 +5374,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                       }
                       return fallback;
                     };
-                    
+
                     const eqTipo = selectedVisit.equipo_nombre || getVal(['tipo', 'equipo', 'elemento', 'tipo_equipo'], selectedVisit.tipo_visita_nombre || 'N/A');
                     const eqMarca = selectedVisit.equipo_marca || selectedVisit.equipo_modelo ? `${selectedVisit.equipo_marca || ''} ${selectedVisit.equipo_modelo || ''}`.trim() : getVal(['marca', 'modelo', 'marca_equipo']);
                     const eqSerial = selectedVisit.equipo_serie || getVal(['serial', 'serie', 'serie_equipo', 'n/s']);
@@ -5664,7 +5774,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                       const firstField = Array.isArray(selectedVisit.fields) && selectedVisit.fields[0];
                       if (firstField && (firstField.tipo === 'matrix' || firstField.tipo === 'simple_checklist')) {
                         const hasSubTabs = firstField.columnas && firstField.columnas.length > 0 && !firstField.columnas.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
-                        
+
                         if (hasSubTabs) {
                           return (
                             <div className="matrix-results">
@@ -5682,7 +5792,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                       if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
                                       else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
                                       else if (answer === 'NA') { colorClass = 'text-muted'; emoji = '🔘'; }
-                                      
+
                                       return (
                                         <div key={fIdx} className="response-row" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '6px', borderBottom: '1px solid #e2e8f0' }}>
                                           <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
@@ -5722,7 +5832,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                       if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
                                       else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
                                       else if (answer === 'NA') { colorClass = 'text-muted'; emoji = '🔘'; }
-                                      
+
                                       return (
                                         <div key={fIdx} className="response-row" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '6px', borderBottom: '1px solid #e2e8f0' }}>
                                           <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
@@ -5754,7 +5864,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                               if (f.tipo === 'checkbox') {
                                 displayAnswer = answer ? '🟢 CUMPLE / SÍ' : '❌ NO CUMPLE / NO';
                               }
-                              
+
                               return (
                                 <div key={idx} className="response-row">
                                   <span className="response-label">{f.label}:</span>
@@ -5777,7 +5887,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                 {selectedVisit.evidencias && selectedVisit.evidencias.length > 0 ? (
                   <div className="visit-evidence-section">
                     <h4>📸 Evidencias Registradas</h4>
-                    
+
                     {selectedVisit.evidencias.some(e => e.etiqueta === 'antes' || e.etiqueta === 'despues') && (
                       <div className="antes-despues-grid">
                         <div className="evidence-preview-card">
@@ -6527,7 +6637,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
           }}>
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--spacing-md) var(--spacing-lg)' }}>
               <h3 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--color-primary-dark)' }}>{confirmModal.title || '¿Estás seguro?'}</h3>
-              <button 
+              <button
                 type="button"
                 onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
                 style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: 'var(--color-text-muted)', cursor: 'pointer' }}
@@ -6538,15 +6648,15 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                 {confirmModal.message}
               </p>
               <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="btn btn-secondary btn-sm"
                   onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
                 >
                   Cancelar
                 </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="btn btn-danger btn-sm"
                   onClick={confirmModal.onConfirm}
                 >
@@ -6582,7 +6692,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
           }}>
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--spacing-md) var(--spacing-lg)' }}>
               <h3 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--color-primary-dark)' }}>{alertModal.title || 'Aviso'}</h3>
-              <button 
+              <button
                 type="button"
                 onClick={() => setAlertModal(prev => ({ ...prev, isOpen: false }))}
                 style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: 'var(--color-text-muted)', cursor: 'pointer' }}
@@ -6595,8 +6705,8 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                 {alertModal.message}
               </p>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="btn btn-primary btn-sm"
                   onClick={() => setAlertModal(prev => ({ ...prev, isOpen: false }))}
                 >
