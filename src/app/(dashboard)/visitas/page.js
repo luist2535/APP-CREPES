@@ -5158,7 +5158,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                 </div>
               </div>
             );
-          })() || null)}
+          })()}
         </div>
       )}
 
