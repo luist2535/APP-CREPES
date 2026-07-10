@@ -273,10 +273,48 @@ export async function GET(request) {
       timelineMap[mesKey].secciones[item.seccion_nombre].count++;
     });
 
-    const rankingPdv = Object.values(rankingPdvMap).map(p => ({
-      ...p,
-      puntaje_promedio: p.total_evaluaciones > 0 ? Math.round((p.suma_puntajes / p.total_evaluaciones) * 10) / 10 : 0
-    })).sort((a, b) => b.puntaje_promedio - a.puntaje_promedio);
+    const rankingPdv = Object.values(rankingPdvMap).map(p => {
+      const allPdvItems = rawHistorial.filter(h => h.pdv_id === p.pdv_id);
+      const monthsMap = {};
+      allPdvItems.forEach(h => {
+        const m = h.fecha ? h.fecha.substring(0, 7) : 'Sin fecha';
+        if (!monthsMap[m]) monthsMap[m] = [];
+        monthsMap[m].push(h.puntaje);
+      });
+      const sortedMonths = Object.keys(monthsMap).sort().reverse();
+      
+      let puntaje_mes_actual = 0;
+      let puntaje_mes_anterior = 0;
+
+      if (sortedMonths.length > 0) {
+        const currScores = monthsMap[sortedMonths[0]];
+        puntaje_mes_actual = Math.round((currScores.reduce((a,b)=>a+b,0) / currScores.length) * 10) / 10;
+      }
+      if (sortedMonths.length > 1) {
+        const prevScores = monthsMap[sortedMonths[1]];
+        puntaje_mes_anterior = Math.round((prevScores.reduce((a,b)=>a+b,0) / prevScores.length) * 10) / 10;
+      } else {
+        puntaje_mes_anterior = puntaje_mes_actual;
+      }
+
+      const diferencia_puntos = Math.round((puntaje_mes_actual - puntaje_mes_anterior) * 10) / 10;
+      const variacion_porcentual = puntaje_mes_anterior > 0 
+        ? Math.round(((puntaje_mes_actual - puntaje_mes_anterior) / puntaje_mes_anterior) * 100 * 10) / 10 
+        : 0;
+      let tendencia = 'Se mantuvo';
+      if (diferencia_puntos > 0.1) tendencia = 'Mejoró';
+      else if (diferencia_puntos < -0.1) tendencia = 'Disminuyó';
+
+      return {
+        ...p,
+        puntaje_promedio: p.total_evaluaciones > 0 ? Math.round((p.suma_puntajes / p.total_evaluaciones) * 10) / 10 : 0,
+        puntaje_mes_anterior,
+        puntaje_mes_actual,
+        diferencia_puntos,
+        variacion_porcentual,
+        tendencia
+      };
+    }).sort((a, b) => b.puntaje_mes_actual - a.puntaje_mes_actual);
 
     const evolucionPorSeccion = Object.values(seccionEvolMap).map(s => {
       const puntaje_promedio = s.visitas_evaluadas > 0 ? Math.round((s.suma_puntajes / s.visitas_evaluadas) * 10) / 10 : 0;
@@ -297,7 +335,7 @@ export async function GET(request) {
         mejor_pdv,
         peor_pdv
       };
-    }).sort((a, b) => a.puntaje_promedio - b.puntaje_promedio); // Ordenado del más bajo (crítico) al más alto
+    }).sort((a, b) => a.puntaje_promedio - b.puntaje_promedio); // Ordenado del más bajo al más alto
 
     const evolucionTemporal = Object.values(timelineMap).map(t => {
       const result = { mes: t.mes };
@@ -306,6 +344,66 @@ export async function GET(request) {
       });
       return result;
     }).sort((a, b) => a.mes.localeCompare(b.mes));
+
+    // Global Mes Actual vs Mes Anterior para los 3 Cuadros de la Cabecera
+    const allMonthsMap = {};
+    rawHistorial.forEach(h => {
+      const m = h.fecha ? h.fecha.substring(0, 7) : 'Sin fecha';
+      if (!allMonthsMap[m]) allMonthsMap[m] = [];
+      allMonthsMap[m].push(h.puntaje);
+    });
+    const globalSortedMonths = Object.keys(allMonthsMap).sort().reverse();
+    let global_mes_actual = promedioGeneral;
+    let global_mes_anterior = promedioGeneral;
+    let mes_actual_label = 'Mes Actual';
+    let mes_anterior_label = 'Mes Anterior';
+
+    if (globalSortedMonths.length > 0) {
+      mes_actual_label = globalSortedMonths[0];
+      const scores = allMonthsMap[globalSortedMonths[0]];
+      global_mes_actual = Math.round((scores.reduce((a,b)=>a+b,0) / scores.length) * 10) / 10;
+    }
+    if (globalSortedMonths.length > 1) {
+      mes_anterior_label = globalSortedMonths[1];
+      const scores = allMonthsMap[globalSortedMonths[1]];
+      global_mes_anterior = Math.round((scores.reduce((a,b)=>a+b,0) / scores.length) * 10) / 10;
+    }
+    const global_diferencia = Math.round((global_mes_actual - global_mes_anterior) * 10) / 10;
+    const global_variacion = global_mes_anterior > 0 
+      ? Math.round(((global_mes_actual - global_mes_anterior) / global_mes_anterior) * 100 * 10) / 10 
+      : 0;
+    let global_tendencia = 'Se mantuvo';
+    if (global_diferencia > 0.1) global_tendencia = 'Mejoró';
+    else if (global_diferencia < -0.1) global_tendencia = 'Disminuyó';
+
+    // 5. Estructurar comparativa completa por periodos históricos para el comparador libre
+    const periodosMap = {};
+    rawHistorial.forEach(h => {
+      const m = h.fecha ? h.fecha.substring(0, 7) : 'Sin fecha';
+      if (!periodosMap[m]) periodosMap[m] = { periodo: m, total: 0, suma: 0, subareas: {} };
+      periodosMap[m].total++;
+      periodosMap[m].suma += h.puntaje;
+      if (!periodosMap[m].subareas[h.seccion_nombre]) {
+        periodosMap[m].subareas[h.seccion_nombre] = { suma: 0, count: 0 };
+      }
+      periodosMap[m].subareas[h.seccion_nombre].suma += h.puntaje;
+      periodosMap[m].subareas[h.seccion_nombre].count++;
+    });
+
+    const evaluaciones_por_periodo = Object.values(periodosMap).map(p => {
+      const desglose = Object.entries(p.subareas).map(([sec, st]) => ({
+        seccion_nombre: sec,
+        puntaje: Math.round((st.suma / st.count) * 10) / 10,
+        evaluaciones: st.count
+      })).sort((a,b) => a.seccion_nombre.localeCompare(b.seccion_nombre));
+
+      return {
+        periodo: p.periodo,
+        puntaje_promedio: p.total > 0 ? Math.round((p.suma / p.total) * 10) / 10 : 0,
+        total_evaluaciones: p.total,
+        desglose_subareas: desglose
+      };
+    }).sort((a,b) => b.periodo.localeCompare(a.periodo));
 
     const totalAlertas = rawHistorial.filter(h => h.alerta_disminucion).length;
     const promedioGeneral = rawHistorial.length > 0
@@ -319,12 +417,20 @@ export async function GET(request) {
         promedio_general: promedioGeneral,
         alertas_activas: totalAlertas,
         secciones_evaluadas: evolucionPorSeccion.length,
-        pdvs_analizados: rankingPdv.length
+        pdvs_analizados: rankingPdv.length,
+        puntaje_mes_anterior: global_mes_anterior,
+        puntaje_mes_actual: global_mes_actual,
+        diferencia_puntos: global_diferencia,
+        variacion_porcentual: global_variacion,
+        tendencia: global_tendencia,
+        mes_actual_label,
+        mes_anterior_label
       },
       historial: rawHistorial.reverse(), // Más recientes primero para la tabla
       ranking_pdv: rankingPdv,
       evolucion_por_seccion: evolucionPorSeccion,
       evolucion_temporal: evolucionTemporal,
+      evaluaciones_por_periodo: evaluaciones_por_periodo,
       secciones_disponibles: [...new Set(rawHistorial.map(r => r.seccion_nombre))].sort()
     });
 

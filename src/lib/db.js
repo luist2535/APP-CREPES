@@ -50,6 +50,13 @@ function getDb() {
       console.log('👤 Usuario: admin@crepesenpunto.com');
       console.log('🔑 Contraseña: admin123');
     }
+
+    // Migraciones automáticas seguras (si la columna ya existe, SQLite ignorará o capturamos el error)
+    try { db.exec('ALTER TABLE visitas ADD COLUMN version_checklist INTEGER DEFAULT 1'); } catch (e) {}
+    try { db.exec('ALTER TABLE visitas ADD COLUMN campos_personalizados TEXT'); } catch (e) {}
+    try { db.exec('ALTER TABLE visitas ADD COLUMN historial_versiones TEXT DEFAULT "[]"'); } catch (e) {}
+    try { db.exec('ALTER TABLE plantillas ADD COLUMN descripcion TEXT'); } catch (e) {}
+    try { db.exec('ALTER TABLE plantillas ADD COLUMN historial_versiones TEXT DEFAULT "[]"'); } catch (e) {}
   }
   return db;
 }

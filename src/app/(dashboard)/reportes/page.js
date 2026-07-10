@@ -36,8 +36,10 @@ export default function ReportesPage() {
   const [calidadPeriodo, setCalidadPeriodo] = useState('trimestral');
   const [calidadPdv, setCalidadPdv] = useState('all');
   const [calidadCiudad, setCalidadCiudad] = useState('all');
-  const [calidadSeccion, setCalidadSeccion] = useState('all');
-  const [calidadSubTab, setCalidadSubTab] = useState('evolucion'); // 'evolucion' | 'ranking' | 'historial'
+  const [calidadSubTab, setCalidadSubTab] = useState('evolucion'); // 'evolucion' | 'ranking' | 'historial' | 'comparador' | 'longitudinal'
+  const [compPeriodoA, setCompPeriodoA] = useState('');
+  const [compPeriodoB, setCompPeriodoB] = useState('');
+  const [longitudinalSeccionSelected, setLongitudinalSeccionSelected] = useState('Almacén');
   const [modoPresentacion, setModoPresentacion] = useState(false);
   const [slideIndex, setSlideIndex] = useState(0);
 
@@ -172,7 +174,23 @@ export default function ReportesPage() {
       }
 
       const dateStr = new Date().toISOString().split('T')[0];
-      XLSX.writeFile(wb, `Reporte_Visitas_${dateStr}.xlsx`);
+      const fileName = `Reporte_Visitas_${dateStr}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+      // Guardar copia automáticamente en las carpetas y repositorio del servidor
+      try {
+        const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const file = new File([blob], fileName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('categoria', 'reporte_visitas');
+        formData.append('tipo_documento', 'Reporte Visitas Excel');
+        formData.append('observaciones', `Reporte de Visitas exportado desde el módulo de Reportes (${dateStr})`);
+        await fetch('/api/uploads', { method: 'POST', body: formData });
+      } catch (repoErr) {
+        console.warn('Error al almacenar en repositorio de archivos:', repoErr);
+      }
     } catch (err) {
       console.error('Export error:', err);
       alert('Error al exportar a Excel: ' + err.message);
@@ -194,6 +212,15 @@ export default function ReportesPage() {
       if (res.ok) {
         const result = await res.json();
         setCalidadData(result);
+        if (result.evaluaciones_por_periodo && result.evaluaciones_por_periodo.length > 0) {
+          if (!compPeriodoA) setCompPeriodoA(result.evaluaciones_por_periodo[0].periodo);
+          if (!compPeriodoB) {
+            setCompPeriodoB(result.evaluaciones_por_periodo.length > 1 ? result.evaluaciones_por_periodo[1].periodo : result.evaluaciones_por_periodo[0].periodo);
+          }
+        }
+        if (result.secciones_disponibles && result.secciones_disponibles.length > 0 && !longitudinalSeccionSelected) {
+          setLongitudinalSeccionSelected(result.secciones_disponibles[0]);
+        }
       }
     } catch (err) {
       console.error('Error al cargar analítica de calidad:', err);
@@ -238,18 +265,26 @@ export default function ReportesPage() {
       const wsEvol = XLSX.utils.json_to_sheet(rowsEvolucion);
       XLSX.utils.book_append_sheet(wb, wsEvol, 'Comportamiento por Sección');
 
-      // 2. Sheet: Ranking Gerencial por PDV
-      const rowsRanking = (calidadData.ranking_pdv || []).map((p, i) => ({
-        'Ranking #': i + 1,
-        'Punto de Venta (PDV)': p.pdv_nombre,
-        'Ciudad': p.ciudad_nombre,
-        'Puntaje Promedio General (%)': p.puntaje_promedio,
-        'Total Evaluaciones / Inspecciones': p.total_evaluaciones,
-        'Secciones con Alerta de Caída': p.secciones_en_alerta,
-        'Estado Desempeño': p.puntaje_promedio >= 90 ? 'Excelente' : (p.puntaje_promedio >= 75 ? 'Regular' : 'Crítico - Requiere Atención')
-      }));
+      // 2. Sheet: Ranking Gerencial por PDV (Mes Anterior vs Actual)
+      const rowsRanking = (calidadData.ranking_pdv || []).map((p, i) => {
+        const pctActual = p.puntaje_mes_actual !== undefined ? p.puntaje_mes_actual : p.puntaje_promedio;
+        const pctAnterior = p.puntaje_mes_anterior !== undefined ? p.puntaje_mes_anterior : p.puntaje_promedio;
+        return {
+          'Puesto #': i + 1,
+          'Punto de Venta (PDV)': p.pdv_nombre,
+          'Ciudad': p.ciudad_nombre,
+          'Mes Anterior (%)': pctAnterior,
+          'Mes Actual (%)': pctActual,
+          'Diferencia (Pts)': p.diferencia_puntos || 0,
+          'Variación (%)': p.variacion_porcentual || 0,
+          'Tendencia': p.tendencia || 'Se mantuvo',
+          'Total Evaluaciones': p.total_evaluaciones,
+          'Secciones en Alerta': p.secciones_en_alerta,
+          'Estado Actual': pctActual >= 90 ? 'Excelente' : (pctActual >= 75 ? 'Regular' : 'Crítico')
+        };
+      });
       const wsRanking = XLSX.utils.json_to_sheet(rowsRanking);
-      XLSX.utils.book_append_sheet(wb, wsRanking, 'Ranking Puntos de Venta');
+      XLSX.utils.book_append_sheet(wb, wsRanking, 'Ranking Mes Anterior vs Actual');
 
       // 3. Sheet: Historial Longitudinal y Alertas
       const rowsHist = (calidadData.historial || []).map(h => ({
@@ -271,13 +306,62 @@ export default function ReportesPage() {
       XLSX.utils.book_append_sheet(wb, wsHist, 'Historial y Alertas');
 
       const dateStr = new Date().toISOString().split('T')[0];
-      XLSX.writeFile(wb, `Analisis_Comportamiento_Calidad_${dateStr}.xlsx`);
+      const fileName = `Analisis_Comportamiento_Calidad_${dateStr}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+      // Guardar copia automáticamente en las carpetas y repositorio del servidor
+      try {
+        const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const file = new File([blob], fileName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('categoria', 'analisis_calidad');
+        formData.append('tipo_documento', 'Análisis Comportamiento Calidad');
+        formData.append('observaciones', `Análisis de Comportamiento de Calidad exportado desde Reportes (${dateStr})`);
+        await fetch('/api/uploads', { method: 'POST', body: formData });
+      } catch (repoErr) {
+        console.warn('Error al almacenar en repositorio de archivos:', repoErr);
+      }
     } catch (err) {
       console.error('Export Calidad error:', err);
       alert('Error al exportar analítica de Calidad: ' + err.message);
     } finally {
       setExportLoading(false);
     }
+  };
+
+  const handlePrintEjecutivo = async () => {
+    if (calidadData) {
+      try {
+        const dateStr = new Date().toISOString().split('T')[0];
+        const rankingStr = (calidadData.ranking_pdv || []).map((p, i) => `${i + 1}. ${p.pdv_nombre} (${p.ciudad_nombre || ''}) - Promedio: ${p.puntaje_promedio}%`).join('\n');
+        const content = `REPORTE PDF EJECUTIVO - ANALÍTICA DE CALIDAD & L&D
+==================================================
+Periodo de Análisis: ${calidadPeriodo || 'todos'}
+Fecha del Reporte: ${dateStr}
+Total PDVs Evaluados: ${calidadData.ranking_pdv?.length || 0}
+Promedio General: ${calidadData.kpis?.promedio_general || 0}%
+
+RANKING DE PUNTOS DE VENTA:
+${rankingStr || 'Sin registros evaluados en el periodo.'}
+==================================================
+Impreso y registrado en el repositorio el ${new Date().toLocaleString('es-ES')}
+`;
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const fileName = `Reporte_Ejecutivo_Impreso_${dateStr}.txt`;
+        const file = new File([blob], fileName, { type: 'text/plain' });
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('categoria', 'analisis_calidad');
+        formData.append('tipo_documento', 'Reporte PDF Ejecutivo Impreso (Soporte)');
+        formData.append('observaciones', `Copia automática del reporte ejecutivo al imprimir en PDF (${dateStr})`);
+        await fetch('/api/uploads', { method: 'POST', body: formData });
+      } catch (err) {
+        console.warn('Error respaldando reporte ejecutivo en repositorio:', err);
+      }
+    }
+    window.print();
   };
 
 
@@ -698,7 +782,7 @@ export default function ReportesPage() {
             </button>
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={handlePrintEjecutivo}
               style={{ background: 'rgba(255,255,255,0.15)', color: '#FFF', fontWeight: 'bold', border: '1px solid rgba(255,255,255,0.3)', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer' }}
             >
               📄 Imprimir PDF Ejecutivo
@@ -772,63 +856,140 @@ export default function ReportesPage() {
         <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#666' }}>No hay datos disponibles. Verifica que existan inspecciones del área de Calidad.</div>
       ) : (
         <>
-          {/* KPI Summary Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-            <div className="card" style={{ padding: '18px', borderRadius: '14px', borderLeft: '6px solid #16A34A', background: '#FFF' }}>
-              <div style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: 'bold' }}>PUNTAJE PROMEDIO GLOBAL</div>
-              <div style={{ fontSize: '2.2rem', fontWeight: '800', color: calidadData.summary.promedio_general >= 90 ? '#15803D' : calidadData.summary.promedio_general >= 75 ? '#B45309' : '#DC2626', margin: '4px 0' }}>
+          {/* KPI Summary Cards - 3 Cuadros de Evolución y Comparativa (Solicitados) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+            {/* Cuadro 1: Evaluación Mes Anterior */}
+            <div className="card shadow-md" style={{ padding: '20px', borderRadius: '16px', borderTop: '5px solid #64748B', background: '#FFF', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: '800', letterSpacing: '0.5px' }}>
+                  📅 PUNTAJE EVALUACIÓN MES ANTERIOR
+                </div>
+                <div style={{ fontSize: '2.6rem', fontWeight: '900', color: '#334155', margin: '8px 0 4px 0' }}>
+                  {calidadData.summary.puntaje_mes_anterior || 0}%
+                </div>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#64748B', background: '#F8FAFC', padding: '6px 10px', borderRadius: '6px', border: '1px solid #E2E8F0', marginTop: '10px' }}>
+                Periodo base: <strong>{calidadData.summary.mes_anterior_label || 'Mes Anterior'}</strong>
+              </div>
+            </div>
+
+            {/* Cuadro 2: Evaluación Mes Actual */}
+            <div className="card shadow-md" style={{ padding: '20px', borderRadius: '16px', borderTop: '5px solid #3B82F6', background: '#FFF', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: '0.8rem', color: '#2563EB', fontWeight: '800', letterSpacing: '0.5px' }}>
+                  ⭐ PUNTAJE EVALUACIÓN MES ACTUAL
+                </div>
+                <div style={{ fontSize: '2.6rem', fontWeight: '900', color: (calidadData.summary.puntaje_mes_actual >= 90 ? '#15803D' : calidadData.summary.puntaje_mes_actual >= 75 ? '#B45309' : '#DC2626'), margin: '8px 0 4px 0' }}>
+                  {calidadData.summary.puntaje_mes_actual || 0}%
+                </div>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#1E40AF', background: '#EFF6FF', padding: '6px 10px', borderRadius: '6px', border: '1px solid #BFDBFE', marginTop: '10px' }}>
+                Periodo evaluado: <strong>{calidadData.summary.mes_actual_label || 'Mes Actual'}</strong>
+              </div>
+            </div>
+
+            {/* Cuadro 3: Comparativa entre ambos periodos */}
+            <div className="card shadow-md" style={{ padding: '20px', borderRadius: '16px', borderTop: `5px solid ${calidadData.summary.diferencia_puntos > 0.1 ? '#16A34A' : calidadData.summary.diferencia_puntos < -0.1 ? '#DC2626' : '#EAB308'}`, background: '#FFF', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#475569', fontWeight: '800', letterSpacing: '0.5px' }}>
+                    ⚖️ COMPARATIVA ENTRE PERIODOS
+                  </div>
+                  <span style={{ fontSize: '0.78rem', fontWeight: '900', padding: '4px 10px', borderRadius: '20px', background: calidadData.summary.diferencia_puntos > 0.1 ? '#DCFCE7' : calidadData.summary.diferencia_puntos < -0.1 ? '#FEE2E2' : '#FEF9C3', color: calidadData.summary.diferencia_puntos > 0.1 ? '#166534' : calidadData.summary.diferencia_puntos < -0.1 ? '#991B1B' : '#854D0E' }}>
+                    {calidadData.summary.diferencia_puntos > 0.1 ? '🟢 Mejoró 📈' : calidadData.summary.diferencia_puntos < -0.1 ? '🔴 Disminuyó 📉' : '🟡 Se mantuvo ➖'}
+                  </span>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', margin: '14px 0 6px 0' }}>
+                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '10px', border: '1px solid #E2E8F0', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 'bold' }}>DIFERENCIA (PTS)</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: '900', color: calidadData.summary.diferencia_puntos > 0.1 ? '#16A34A' : calidadData.summary.diferencia_puntos < -0.1 ? '#DC2626' : '#64748B' }}>
+                      {calidadData.summary.diferencia_puntos > 0 ? `+${calidadData.summary.diferencia_puntos}` : calidadData.summary.diferencia_puntos} pts
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '10px', border: '1px solid #E2E8F0', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 'bold' }}>VARIACIÓN (%)</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: '900', color: calidadData.summary.variacion_porcentual > 0 ? '#16A34A' : calidadData.summary.variacion_porcentual < 0 ? '#DC2626' : '#64748B' }}>
+                      {calidadData.summary.variacion_porcentual > 0 ? `+${calidadData.summary.variacion_porcentual}%` : `${calidadData.summary.variacion_porcentual}%`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#475569', marginTop: '8px', borderTop: '1px solid #F1F5F9', paddingTop: '8px' }}>
+                <span>Evolución visual del desempeño operacional del punto de venta.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* KPI General Summary Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+            <div className="card" style={{ padding: '16px', borderRadius: '14px', borderLeft: '6px solid #16A34A', background: '#FFF' }}>
+              <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 'bold' }}>PROMEDIO GENERAL PERIODO</div>
+              <div style={{ fontSize: '1.8rem', fontWeight: '800', color: calidadData.summary.promedio_general >= 90 ? '#15803D' : calidadData.summary.promedio_general >= 75 ? '#B45309' : '#DC2626', margin: '4px 0' }}>
                 {calidadData.summary.promedio_general}%
               </div>
-              <div style={{ fontSize: '0.78rem', color: '#666' }}>Promedio del periodo seleccionado</div>
             </div>
 
-            <div className="card" style={{ padding: '18px', borderRadius: '14px', borderLeft: '6px solid #3B82F6', background: '#FFF' }}>
-              <div style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: 'bold' }}>SUB-ÁREAS EVALUADAS</div>
-              <div style={{ fontSize: '2.2rem', fontWeight: '800', color: '#1E293B', margin: '4px 0' }}>
+            <div className="card" style={{ padding: '16px', borderRadius: '14px', borderLeft: '6px solid #3B82F6', background: '#FFF' }}>
+              <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 'bold' }}>SUB-ÁREAS EVALUADAS</div>
+              <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#1E293B', margin: '4px 0' }}>
                 {calidadData.summary.secciones_evaluadas}
               </div>
-              <div style={{ fontSize: '0.78rem', color: '#666' }}>Secciones monitoreadas en PDVs</div>
             </div>
 
-            <div className="card" style={{ padding: '18px', borderRadius: '14px', borderLeft: '6px solid #8B5CF6', background: '#FFF' }}>
-              <div style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: 'bold' }}>TOTAL VISITAS ANALIZADAS</div>
-              <div style={{ fontSize: '2.2rem', fontWeight: '800', color: '#1E293B', margin: '4px 0' }}>
+            <div className="card" style={{ padding: '16px', borderRadius: '14px', borderLeft: '6px solid #8B5CF6', background: '#FFF' }}>
+              <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 'bold' }}>VISITAS ANALIZADAS</div>
+              <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#1E293B', margin: '4px 0' }}>
                 {calidadData.summary.total_visitas}
               </div>
-              <div style={{ fontSize: '0.78rem', color: '#666' }}>Inspecciones y check lists procesados</div>
             </div>
 
-            <div className="card" style={{ padding: '18px', borderRadius: '14px', borderLeft: '6px solid #EF4444', background: '#FFF' }}>
-              <div style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: 'bold' }}>🔴 ALERTAS DE DISMINUCIÓN</div>
-              <div style={{ fontSize: '2.2rem', fontWeight: '800', color: '#EF4444', margin: '4px 0' }}>
+            <div className="card" style={{ padding: '16px', borderRadius: '14px', borderLeft: '6px solid #EF4444', background: '#FFF' }}>
+              <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 'bold' }}>🔴 ALERTAS DE DISMINUCIÓN</div>
+              <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#EF4444', margin: '4px 0' }}>
                 {calidadData.summary.alertas_activas}
               </div>
-              <div style={{ fontSize: '0.78rem', color: '#666' }}>Secciones con caída frente a visita anterior</div>
             </div>
           </div>
 
           {/* Sub-Tabs Selector */}
-          <div style={{ display: 'flex', gap: '10px', borderBottom: '2px solid #E2E8F0', paddingBottom: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid #E2E8F0', paddingBottom: '8px', flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={() => setCalidadSubTab('evolucion')}
-              style={{ padding: '10px 18px', borderRadius: '10px', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: calidadSubTab === 'evolucion' ? '#16A34A' : '#F1F5F9', color: calidadSubTab === 'evolucion' ? '#FFF' : '#334155' }}
+              style={{ padding: '10px 16px', borderRadius: '10px', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: calidadSubTab === 'evolucion' ? '#16A34A' : '#F1F5F9', color: calidadSubTab === 'evolucion' ? '#FFF' : '#334155' }}
             >
-              📈 Desempeño por Sub-Área / Sección
+              📈 Desempeño por Sub-Área
             </button>
             <button
               type="button"
               onClick={() => setCalidadSubTab('ranking')}
-              style={{ padding: '10px 18px', borderRadius: '10px', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: calidadSubTab === 'ranking' ? '#16A34A' : '#F1F5F9', color: calidadSubTab === 'ranking' ? '#FFF' : '#334155' }}
+              style={{ padding: '10px 16px', borderRadius: '10px', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: calidadSubTab === 'ranking' ? '#16A34A' : '#F1F5F9', color: calidadSubTab === 'ranking' ? '#FFF' : '#334155' }}
             >
-              🏆 Ranking Gerencial por PDV
+              🏆 Ranking por PDV (Mes Anterior vs Actual)
+            </button>
+            <button
+              type="button"
+              onClick={() => setCalidadSubTab('comparador')}
+              style={{ padding: '10px 16px', borderRadius: '10px', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: calidadSubTab === 'comparador' ? '#2563EB' : '#EFF6FF', color: calidadSubTab === 'comparador' ? '#FFF' : '#1E40AF', border: '1px solid #BFDBFE' }}
+            >
+              ⚖️ Comparador Libre de Periodos
+            </button>
+            <button
+              type="button"
+              onClick={() => setCalidadSubTab('longitudinal')}
+              style={{ padding: '10px 16px', borderRadius: '10px', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: calidadSubTab === 'longitudinal' ? '#7C3AED' : '#F5F3FF', color: calidadSubTab === 'longitudinal' ? '#FFF' : '#5B21B6', border: '1px solid #DDD6FE' }}
+            >
+              📊 Evolución Longitudinal por Sección
             </button>
             <button
               type="button"
               onClick={() => setCalidadSubTab('historial')}
-              style={{ padding: '10px 18px', borderRadius: '10px', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: calidadSubTab === 'historial' ? '#16A34A' : '#F1F5F9', color: calidadSubTab === 'historial' ? '#FFF' : '#334155' }}
+              style={{ padding: '10px 16px', borderRadius: '10px', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: calidadSubTab === 'historial' ? '#16A34A' : '#F1F5F9', color: calidadSubTab === 'historial' ? '#FFF' : '#334155' }}
             >
-              📜 Trazabilidad Longitudinal y Alertas ({calidadData.historial.length})
+              📜 Trazabilidad y Alertas ({calidadData.historial.length})
             </button>
           </div>
 
@@ -897,9 +1058,16 @@ export default function ReportesPage() {
           {/* Sub-Tab 2: Ranking Gerencial por PDV */}
           {calidadSubTab === 'ranking' && (
             <div className="card" style={{ padding: '22px', borderRadius: '14px', background: '#FFF' }}>
-              <h3 style={{ margin: '0 0 16px 0', color: '#166534', fontSize: '1.2rem', fontWeight: 'bold' }}>
-                🏆 Ranking de Puntos de Venta (Promedio Calidad)
-              </h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 4px 0', color: '#166534', fontSize: '1.2rem', fontWeight: 'bold' }}>
+                    🏆 Ranking y Evolución por Punto de Venta (PDV)
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748B' }}>
+                    Comparativa de puntajes entre la evaluación del mes anterior y la evaluación del mes actual.
+                  </p>
+                </div>
+              </div>
               <div className="table-responsive">
                 <table className="table">
                   <thead>
@@ -907,59 +1075,344 @@ export default function ReportesPage() {
                       <th style={{ textAlign: 'center', width: '60px' }}>Puesto</th>
                       <th>Punto de Venta (PDV)</th>
                       <th>Ciudad</th>
-                      <th>Puntaje Promedio</th>
+                      <th style={{ textAlign: 'center' }}>Mes Anterior</th>
+                      <th style={{ textAlign: 'center' }}>Mes Actual</th>
+                      <th style={{ textAlign: 'center' }}>Diferencia / Variación</th>
+                      <th style={{ textAlign: 'center' }}>Indicador de Tendencia</th>
                       <th style={{ textAlign: 'center' }}>Inspecciones Evaluadas</th>
-                      <th style={{ textAlign: 'center' }}>Secciones en Alerta</th>
-                      <th style={{ textAlign: 'center' }}>Calificación</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(calidadData.ranking_pdv || []).map((p, idx) => {
-                      const pct = p.puntaje_promedio;
+                      const pctActual = p.puntaje_mes_actual !== undefined ? p.puntaje_mes_actual : p.puntaje_promedio;
+                      const pctAnterior = p.puntaje_mes_anterior !== undefined ? p.puntaje_mes_anterior : p.puntaje_promedio;
+                      const diff = p.diferencia_puntos || 0;
+                      const varPct = p.variacion_porcentual || 0;
+
                       return (
                         <tr key={idx} style={{ background: idx === 0 ? '#FEFCE8' : 'inherit' }}>
                           <td style={{ textAlign: 'center', fontSize: '1.1rem', fontWeight: 'bold' }}>
                             {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
                           </td>
-                          <td><strong style={{ color: '#1E293B' }}>{p.pdv_nombre}</strong></td>
+                          <td><strong style={{ color: '#1E293B', fontSize: '0.95rem' }}>{p.pdv_nombre}</strong></td>
                           <td>{p.ciudad_nombre}</td>
-                          <td>
-                            <span style={{
-                              fontSize: '1rem',
-                              fontWeight: '800',
-                              color: pct >= 90 ? '#15803D' : pct >= 75 ? '#D97706' : '#DC2626'
-                            }}>
-                              {pct}%
+                          <td style={{ textAlign: 'center' }}>
+                            <span style={{ fontSize: '0.95rem', fontWeight: '700', color: '#475569' }}>
+                              {pctAnterior}%
                             </span>
                           </td>
-                          <td style={{ textAlign: 'center' }}>{p.total_evaluaciones}</td>
                           <td style={{ textAlign: 'center' }}>
-                            {p.secciones_en_alerta > 0 ? (
-                              <span style={{ background: '#FEE2E2', color: '#B91C1C', padding: '3px 8px', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                                🔴 {p.secciones_en_alerta} caídas
-                              </span>
-                            ) : (
-                              <span style={{ color: '#10B981', fontWeight: 'bold' }}>✓ 0</span>
-                            )}
+                            <span style={{
+                              fontSize: '1.1rem',
+                              fontWeight: '900',
+                              color: pctActual >= 90 ? '#15803D' : pctActual >= 75 ? '#D97706' : '#DC2626'
+                            }}>
+                              {pctActual}%
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <div style={{ fontWeight: '800', color: diff > 0.1 ? '#16A34A' : diff < -0.1 ? '#DC2626' : '#64748B', fontSize: '0.92rem' }}>
+                              {diff > 0 ? `+${diff}` : diff} pts
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: varPct > 0 ? '#15803D' : varPct < 0 ? '#B91C1C' : '#64748B', fontWeight: 'bold' }}>
+                              {varPct > 0 ? `(+${varPct}%)` : `(${varPct}%)`}
+                            </div>
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <span style={{
-                              padding: '4px 12px',
-                              borderRadius: '14px',
+                              padding: '5px 12px',
+                              borderRadius: '16px',
                               fontWeight: 'bold',
-                              fontSize: '0.8rem',
-                              background: pct >= 90 ? '#DCFCE7' : pct >= 75 ? '#FEF3C7' : '#FEE2E2',
-                              color: pct >= 90 ? '#166534' : pct >= 75 ? '#92400E' : '#991B1B'
+                              fontSize: '0.78rem',
+                              background: diff > 0.1 ? '#DCFCE7' : diff < -0.1 ? '#FEE2E2' : '#FEF9C3',
+                              color: diff > 0.1 ? '#166534' : diff < -0.1 ? '#991B1B' : '#854D0E',
+                              display: 'inline-block'
                             }}>
-                              {pct >= 90 ? '🟢 Excelente' : pct >= 75 ? '🟡 Regular' : '🔴 Crítico'}
+                              {diff > 0.1 ? '🟢 Mejoró 📈' : diff < -0.1 ? '🔴 Disminuyó 📉' : '🟡 Se mantuvo ➖'}
                             </span>
                           </td>
+                          <td style={{ textAlign: 'center', fontWeight: '600' }}>{p.total_evaluaciones}</td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* Sub-Tab 3: Comparador Libre de Periodos Históricos */}
+          {calidadSubTab === 'comparador' && (
+            <div className="card shadow-lg animate-fade-in" style={{ padding: '24px', borderRadius: '16px', background: '#FFF' }}>
+              <div style={{ borderBottom: '2px solid #F1F5F9', paddingBottom: '16px', marginBottom: '20px' }}>
+                <h3 style={{ margin: '0 0 6px 0', color: '#1E40AF', fontSize: '1.25rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ⚖️ Comparador Histórico Libre entre Cualquier Periodo
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748B' }}>
+                  Selecciona dos periodos o meses históricos para analizar la diferencia en puntos, variación porcentual y la tendencia por cada sub-área.
+                </p>
+              </div>
+
+              {(!calidadData.evaluaciones_por_periodo || calidadData.evaluaciones_por_periodo.length < 1) ? (
+                <div style={{ padding: '30px', textAlign: 'center', color: '#64748B', fontStyle: 'italic' }}>
+                  No hay suficientes periodos evaluados para realizar una comparación.
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', background: '#F8FAFC', padding: '18px', borderRadius: '14px', border: '1px solid #E2E8F0', marginBottom: '24px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontWeight: 'bold', fontSize: '0.82rem', color: '#334155', marginBottom: '6px' }}>
+                        📅 PERIODO ACTUAL / RECIENTE (Periodo A):
+                      </label>
+                      <select
+                        className="form-select"
+                        value={compPeriodoA || (calidadData.evaluaciones_por_periodo[0]?.periodo || '')}
+                        onChange={(e) => setCompPeriodoA(e.target.value)}
+                        style={{ fontWeight: 'bold', border: '2px solid #BFDBFE', background: '#EFF6FF', color: '#1E40AF' }}
+                      >
+                        {calidadData.evaluaciones_por_periodo.map((p, i) => (
+                          <option key={i} value={p.periodo}>
+                            {p.periodo} ({p.total_evaluaciones} visitas - Prom: {p.puntaje_promedio}%)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontWeight: 'bold', fontSize: '0.82rem', color: '#334155', marginBottom: '6px' }}>
+                        🕒 PERIODO ANTERIOR / BASE (Periodo B):
+                      </label>
+                      <select
+                        className="form-select"
+                        value={compPeriodoB || (calidadData.evaluaciones_por_periodo[1]?.periodo || calidadData.evaluaciones_por_periodo[0]?.periodo || '')}
+                        onChange={(e) => setCompPeriodoB(e.target.value)}
+                        style={{ fontWeight: 'bold', border: '2px solid #CBD5E1', background: '#FFF', color: '#334155' }}
+                      >
+                        {calidadData.evaluaciones_por_periodo.map((p, i) => (
+                          <option key={i} value={p.periodo}>
+                            {p.periodo} ({p.total_evaluaciones} visitas - Prom: {p.puntaje_promedio}%)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Tabla comparativa de las 2 selecciones */}
+                  {(() => {
+                    const objA = calidadData.evaluaciones_por_periodo.find(p => p.periodo === compPeriodoA) || calidadData.evaluaciones_por_periodo[0];
+                    const objB = calidadData.evaluaciones_por_periodo.find(p => p.periodo === compPeriodoB) || calidadData.evaluaciones_por_periodo[1] || calidadData.evaluaciones_por_periodo[0];
+
+                    if (!objA || !objB) return null;
+
+                    return (
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', background: '#EFF6FF', padding: '12px 18px', borderRadius: '10px', borderLeft: '5px solid #2563EB' }}>
+                          <span style={{ fontWeight: 'bold', color: '#1E40AF', fontSize: '0.92rem' }}>
+                            Comparando: <strong>{objA.periodo} ({objA.puntaje_promedio}%)</strong> vs <strong>{objB.periodo} ({objB.puntaje_promedio}%)</strong>
+                          </span>
+                          <span style={{ fontSize: '0.82rem', background: '#FFF', padding: '4px 12px', borderRadius: '20px', fontWeight: 'bold', color: objA.puntaje_promedio >= objB.puntaje_promedio ? '#16A34A' : '#DC2626', border: '1px solid #BFDBFE' }}>
+                            Diferencia global: {Math.round((objA.puntaje_promedio - objB.puntaje_promedio)*10)/10 > 0 ? `+${Math.round((objA.puntaje_promedio - objB.puntaje_promedio)*10)/10}` : Math.round((objA.puntaje_promedio - objB.puntaje_promedio)*10)/10} pts
+                          </span>
+                        </div>
+
+                        <div className="table-responsive">
+                          <table className="table">
+                            <thead>
+                              <tr>
+                                <th>Sub-Área / Sección Evaluada</th>
+                                <th style={{ textAlign: 'center' }}>Puntaje Periodo A ({objA.periodo})</th>
+                                <th style={{ textAlign: 'center' }}>Puntaje Periodo B ({objB.periodo})</th>
+                                <th style={{ textAlign: 'center' }}>Diferencia (Pts)</th>
+                                <th style={{ textAlign: 'center' }}>Variación (%)</th>
+                                <th style={{ textAlign: 'center' }}>Indicador Visual</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(calidadData.secciones_disponibles || []).map((sec, idx) => {
+                                const stA = objA.desglose_subareas?.find(s => s.seccion_nombre === sec);
+                                const stB = objB.desglose_subareas?.find(s => s.seccion_nombre === sec);
+                                const scoreA = stA ? stA.puntaje : null;
+                                const scoreB = stB ? stB.puntaje : null;
+
+                                const diff = (scoreA !== null && scoreB !== null) ? Math.round((scoreA - scoreB) * 10) / 10 : null;
+                                const varPct = (scoreB !== null && scoreB > 0 && diff !== null) ? Math.round((diff / scoreB) * 100 * 10) / 10 : null;
+
+                                return (
+                                  <tr key={idx}>
+                                    <td><strong style={{ color: '#1E293B' }}>{sec}</strong></td>
+                                    <td style={{ textAlign: 'center' }}>
+                                      {scoreA !== null ? (
+                                        <span style={{ fontWeight: '800', color: scoreA >= 90 ? '#15803D' : scoreA >= 75 ? '#D97706' : '#DC2626', fontSize: '1rem' }}>
+                                          {scoreA}%
+                                        </span>
+                                      ) : <span style={{ color: '#94A3B8' }}>N/A</span>}
+                                    </td>
+                                    <td style={{ textAlign: 'center' }}>
+                                      {scoreB !== null ? (
+                                        <span style={{ fontWeight: '700', color: '#475569', fontSize: '0.95rem' }}>
+                                          {scoreB}%
+                                        </span>
+                                      ) : <span style={{ color: '#94A3B8' }}>N/A</span>}
+                                    </td>
+                                    <td style={{ textAlign: 'center' }}>
+                                      {diff !== null ? (
+                                        <span style={{ fontWeight: '800', color: diff > 0.1 ? '#16A34A' : diff < -0.1 ? '#DC2626' : '#64748B' }}>
+                                          {diff > 0 ? `+${diff}` : diff} pts
+                                        </span>
+                                      ) : <span style={{ color: '#94A3B8' }}>-</span>}
+                                    </td>
+                                    <td style={{ textAlign: 'center' }}>
+                                      {varPct !== null ? (
+                                        <span style={{ fontWeight: 'bold', color: varPct > 0 ? '#15803D' : varPct < 0 ? '#B91C1C' : '#64748B' }}>
+                                          {varPct > 0 ? `+${varPct}%` : `${varPct}%`}
+                                        </span>
+                                      ) : <span style={{ color: '#94A3B8' }}>-</span>}
+                                    </td>
+                                    <td style={{ textAlign: 'center' }}>
+                                      {diff !== null ? (
+                                        <span style={{
+                                          padding: '4px 12px',
+                                          borderRadius: '14px',
+                                          fontWeight: 'bold',
+                                          fontSize: '0.78rem',
+                                          background: diff > 0.1 ? '#DCFCE7' : diff < -0.1 ? '#FEE2E2' : '#FEF9C3',
+                                          color: diff > 0.1 ? '#166534' : diff < -0.1 ? '#991B1B' : '#854D0E'
+                                        }}>
+                                          {diff > 0.1 ? '🟢 Mejoró 📈' : diff < -0.1 ? '🔴 Disminuyó 📉' : '🟡 Se mantuvo ➖'}
+                                        </span>
+                                      ) : <span style={{ color: '#94A3B8' }}>Sin datos</span>}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Sub-Tab 4: Evolución Longitudinal por Sección Específica */}
+          {calidadSubTab === 'longitudinal' && (
+            <div className="card shadow-lg animate-fade-in" style={{ padding: '24px', borderRadius: '16px', background: '#FFF' }}>
+              <div style={{ borderBottom: '2px solid #F1F5F9', paddingBottom: '16px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 4px 0', color: '#5B21B6', fontSize: '1.25rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    📊 Evolución e Histórico Específico por Sub-Área
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748B' }}>
+                    Selecciona una sección o sub-área para ver su comportamiento longitudinal detallado en cada inspección.
+                  </p>
+                </div>
+                <div>
+                  <label style={{ fontWeight: 'bold', fontSize: '0.8rem', color: '#4C1D95', marginRight: '8px' }}>
+                    Seleccionar Sección:
+                  </label>
+                  <select
+                    className="form-select"
+                    value={longitudinalSeccionSelected || (calidadData.secciones_disponibles?.[0] || '')}
+                    onChange={(e) => setLongitudinalSeccionSelected(e.target.value)}
+                    style={{ fontWeight: 'bold', border: '2px solid #DDD6FE', background: '#F5F3FF', color: '#5B21B6', padding: '8px 14px', borderRadius: '8px' }}
+                  >
+                    {(calidadData.secciones_disponibles || []).map((s, idx) => (
+                      <option key={idx} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {(() => {
+                const filteredHist = (calidadData.historial || []).filter(h => h.seccion_nombre === (longitudinalSeccionSelected || calidadData.secciones_disponibles?.[0]));
+
+                if (filteredHist.length === 0) {
+                  return (
+                    <div style={{ padding: '30px', textAlign: 'center', color: '#64748B', fontStyle: 'italic' }}>
+                      No se encontraron registros históricos para la sección "{longitudinalSeccionSelected}".
+                    </div>
+                  );
+                }
+
+                const avgSection = Math.round((filteredHist.reduce((acc, curr) => acc + curr.puntaje, 0) / filteredHist.length) * 10) / 10;
+                const alertasSection = filteredHist.filter(h => h.alerta_disminucion).length;
+
+                return (
+                  <div>
+                    <div style={{ display: 'flex', gap: '16px', marginBottom: '18px', flexWrap: 'wrap' }}>
+                      <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', padding: '12px 20px', borderRadius: '12px', flex: 1, minWidth: '180px' }}>
+                        <span style={{ fontSize: '0.78rem', color: '#6D28D9', fontWeight: 'bold', display: 'block' }}>PROMEDIO HISTÓRICO SECCIÓN</span>
+                        <span style={{ fontSize: '1.8rem', fontWeight: '900', color: avgSection >= 90 ? '#15803D' : avgSection >= 75 ? '#D97706' : '#DC2626' }}>{avgSection}%</span>
+                      </div>
+                      <div style={{ background: '#FFF1F2', border: '1px solid #FECDD3', padding: '12px 20px', borderRadius: '12px', flex: 1, minWidth: '180px' }}>
+                        <span style={{ fontSize: '0.78rem', color: '#BE123C', fontWeight: 'bold', display: 'block' }}>CAÍDAS REGISTRADAS (ALERTAS)</span>
+                        <span style={{ fontSize: '1.8rem', fontWeight: '900', color: '#E11D48' }}>{alertasSection}</span>
+                      </div>
+                      <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '12px 20px', borderRadius: '12px', flex: 1, minWidth: '180px' }}>
+                        <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 'bold', display: 'block' }}>EVALUACIONES REALIZADAS</span>
+                        <span style={{ fontSize: '1.8rem', fontWeight: '900', color: '#1E293B' }}>{filteredHist.length}</span>
+                      </div>
+                    </div>
+
+                    <div className="table-responsive">
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>Fecha Evaluación</th>
+                            <th>Punto de Venta (PDV)</th>
+                            <th>Ciudad</th>
+                            <th style={{ textAlign: 'center' }}>Puntaje Obtenido</th>
+                            <th style={{ textAlign: 'center' }}>Puntaje Anterior</th>
+                            <th style={{ textAlign: 'center' }}>Variación (Pts)</th>
+                            <th style={{ textAlign: 'center' }}>Estado / Tendencia</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredHist.map((h, idx) => (
+                            <tr key={idx} style={{ background: h.alerta_disminucion ? '#FEF2F2' : 'inherit' }}>
+                              <td><strong>{h.fecha}</strong></td>
+                              <td><strong style={{ color: '#1E293B' }}>{h.pdv_nombre}</strong></td>
+                              <td>{h.ciudad_nombre}</td>
+                              <td style={{ textAlign: 'center' }}>
+                                <span style={{ fontWeight: '800', color: h.puntaje >= 90 ? '#15803D' : h.puntaje >= 75 ? '#D97706' : '#DC2626', fontSize: '1.05rem' }}>
+                                  {h.puntaje}%
+                                </span>
+                              </td>
+                              <td style={{ textAlign: 'center', color: '#64748B', fontWeight: 'bold' }}>
+                                {h.puntaje_anterior !== null ? `${h.puntaje_anterior}%` : 'Inicial'}
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                {h.puntaje_anterior !== null ? (
+                                  <span style={{ fontWeight: 'bold', color: h.diferencia > 0 ? '#16A34A' : h.diferencia < 0 ? '#DC2626' : '#64748B' }}>
+                                    {h.diferencia > 0 ? `+${h.diferencia}` : h.diferencia} pts
+                                  </span>
+                                ) : <span style={{ color: '#94A3B8' }}>-</span>}
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                {h.alerta_disminucion ? (
+                                  <span style={{ background: '#FEE2E2', color: '#991B1B', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.78rem', border: '1px solid #FECACA' }}>
+                                    🔴 Caída detectada
+                                  </span>
+                                ) : h.diferencia > 0 ? (
+                                  <span style={{ background: '#DCFCE7', color: '#166534', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.78rem' }}>
+                                    🟢 Mejoró
+                                  </span>
+                                ) : (
+                                  <span style={{ background: '#F1F5F9', color: '#475569', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.78rem' }}>
+                                    🟡 Estable
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 

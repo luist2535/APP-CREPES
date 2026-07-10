@@ -1562,10 +1562,17 @@ export default function VisitasPage() {
   // Checklist Template Editor states
   const [editingTemplateId, setEditingTemplateId] = useState('');
   const [templateFields, setTemplateFields] = useState([]);
+  const [templateNombre, setTemplateNombre] = useState('');
+  const [templateDescripcion, setTemplateDescripcion] = useState('');
+  const [templateHistorial, setTemplateHistorial] = useState([]);
+  const [guardarComoNuevaVersion, setGuardarComoNuevaVersion] = useState(true);
+  const [notaVersion, setNotaVersion] = useState('');
+  const [showVersionModal, setShowVersionModal] = useState(false);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [newFieldType, setNewFieldType] = useState('checkbox');
-  const [newFieldLabel, setNewFieldLabel] = useState('');
   const [newFieldRequired, setNewFieldRequired] = useState(true);
+  const [showVisitChecklistModal, setShowVisitChecklistModal] = useState(false);
+  const [editingVisitCampos, setEditingVisitCampos] = useState([]);
 
   // File Upload states
   const [antesFile, setAntesFile] = useState(null);
@@ -1585,6 +1592,7 @@ export default function VisitasPage() {
   const [equipoData, setEquipoData] = useState(null);
   const [equipoSearchLoading, setEquipoSearchLoading] = useState(false);
   const [equipoSearchError, setEquipoSearchError] = useState('');
+  const [equiposSugeridosVisita, setEquiposSugeridosVisita] = useState([]);
   const [isScanningEquipo, setIsScanningEquipo] = useState(false);
   const [scannerInstance, setScannerInstance] = useState(null);
   const [scannerLoaded, setScannerLoaded] = useState(false);
@@ -1852,27 +1860,31 @@ export default function VisitasPage() {
   // Load template fields for editing in the checklist designer
   useEffect(() => {
     if (activeTab === 'templates') {
+      let targetTemp = null;
       if (isUserJefe(userRole)) {
         const userAreaId = getAreaIdFromRol(userRole);
         if (userAreaId) {
-          const myTemplate = plantillas.find(p => p.area_id === parseInt(userAreaId));
-          if (myTemplate) {
-            setEditingTemplateId(String(myTemplate.id));
-            try {
-              setTemplateFields(JSON.parse(myTemplate.campos || '[]'));
-            } catch (e) {
-              setTemplateFields([]);
-            }
+          targetTemp = plantillas.find(p => p.area_id === parseInt(userAreaId));
+          if (targetTemp) {
+            setEditingTemplateId(String(targetTemp.id));
           }
         }
       } else if (editingTemplateId) {
-        const selectedTemp = plantillas.find(p => String(p.id) === editingTemplateId);
-        if (selectedTemp) {
-          try {
-            setTemplateFields(JSON.parse(selectedTemp.campos || '[]'));
-          } catch (e) {
-            setTemplateFields([]);
-          }
+        targetTemp = plantillas.find(p => String(p.id) === editingTemplateId);
+      }
+
+      if (targetTemp) {
+        setTemplateNombre(targetTemp.nombre || '');
+        setTemplateDescripcion(targetTemp.descripcion || '');
+        try {
+          setTemplateFields(JSON.parse(targetTemp.campos || '[]'));
+        } catch (e) {
+          setTemplateFields([]);
+        }
+        try {
+          setTemplateHistorial(JSON.parse(targetTemp.historial_versiones || '[]'));
+        } catch (e) {
+          setTemplateHistorial([]);
         }
       }
     }
@@ -1947,17 +1959,80 @@ export default function VisitasPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: parseInt(editingTemplateId),
-          campos: templateFields
+          nombre: templateNombre,
+          descripcion: templateDescripcion,
+          campos: templateFields,
+          guardarComoNuevaVersion,
+          notaVersion
         })
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al guardar la plantilla');
 
-      triggerAlert('Éxito', 'Plantilla de checklist guardada exitosamente.', 'success');
+      triggerAlert('Éxito', data.message || 'Plantilla de checklist guardada exitosamente.', 'success');
+      setNotaVersion('');
       loadData();
     } catch (err) {
       triggerAlert('Error', 'Error: ' + err.message, 'error');
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
+
+  const handleRestoreTemplateVersion = async (targetVer) => {
+    if (!editingTemplateId) return;
+    if (!confirm(`¿Está seguro de restaurar el checklist a la versión v${targetVer}? Se creará una nueva versión activa con los ítems previos.`)) return;
+    setIsSavingTemplate(true);
+    try {
+      const res = await fetch('/api/plantillas', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: parseInt(editingTemplateId),
+          accion: 'restaurar',
+          targetVersion: targetVer
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al restaurar la versión');
+      triggerAlert('Éxito', data.message || `Checklist restaurado a versión v${targetVer}.`, 'success');
+      setShowVersionModal(false);
+      loadData();
+    } catch (err) {
+      triggerAlert('Error', 'Error: ' + err.message, 'error');
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
+
+  const handleSaveVisitChecklistCustom = async () => {
+    if (!activeExecutionVisit) return;
+    setIsSavingTemplate(true);
+    try {
+      const res = await fetch('/api/visitas', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: activeExecutionVisit.id,
+          action: 'editar_checklist_visita',
+          campos_personalizados: editingVisitCampos,
+          version_checklist: (activeExecutionVisit.version_checklist || activePlantilla?.version || 1) + 1,
+          nota_version: 'Personalización en ejecución'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al guardar el checklist personalizado de la visita');
+      triggerAlert('Éxito', data.message || 'Checklist personalizado guardado.', 'success');
+      setShowVisitChecklistModal(false);
+      setActiveExecutionVisit({
+        ...activeExecutionVisit,
+        campos_personalizados: JSON.stringify(editingVisitCampos),
+        version_checklist: data.version || (activeExecutionVisit.version_checklist || 1) + 1
+      });
+      loadData();
+    } catch (e) {
+      triggerAlert('Error', 'Error: ' + e.message, 'error');
     } finally {
       setIsSavingTemplate(false);
     }
@@ -2065,10 +2140,14 @@ export default function VisitasPage() {
     if (!code || !code.trim()) return;
     setEquipoSearchLoading(true);
     setEquipoSearchError('');
+    setEquiposSugeridosVisita([]);
     try {
       const res = await fetch(`/api/equipos?id=${code.trim().toUpperCase()}`);
       const data = await res.json();
       if (!res.ok) {
+        if (data.equipos_sugeridos && Array.isArray(data.equipos_sugeridos)) {
+          setEquiposSugeridosVisita(data.equipos_sugeridos);
+        }
         throw new Error(data.error || 'Equipo no registrado o inactivo');
       }
       setEquipoData(data.equipo);
@@ -2711,7 +2790,47 @@ export default function VisitasPage() {
     setModalTab('general');
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    if (selectedVisit) {
+      try {
+        let formAnswers = {};
+        try { formAnswers = JSON.parse(selectedVisit.datos_formulario || '{}'); } catch (e) {}
+        const respuestasStr = Object.entries(formAnswers)
+          .map(([k, v]) => `• ${k}: ${typeof v === 'object' && v !== null ? (v.valor || v.respuesta || JSON.stringify(v)) : v}`)
+          .join('\n');
+
+        const content = `REPORTE DE VISITA Y CHECKLIST DE CALIDAD
+==================================================
+ID Visita: #${selectedVisit.id}
+Punto de Venta (PDV): ${selectedVisit.pdv_nombre || 'N/A'} (${selectedVisit.ciudad_nombre || ''})
+Plantilla / Formato: ${selectedVisit.plantilla_nombre || selectedVisit.area_nombre || 'Calidad'}
+Fecha Inspección: ${selectedVisit.fecha || 'N/A'}
+Auditor / Evaluador: ${selectedVisit.auditor_nombre || 'Auditor'}
+Estado de la Visita: ${selectedVisit.estado ? selectedVisit.estado.toUpperCase() : 'FINALIZADA'}
+Puntaje de Cumplimiento: ${selectedVisit.puntaje || 0}%
+
+OBSERVACIONES GENERALES:
+${selectedVisit.observaciones || 'Sin observaciones generales registradas.'}
+
+RESPUESTAS DEL FORMULARIO / CHECKLIST:
+${respuestasStr || 'No hay respuestas detalladas en el JSON.'}
+==================================================
+Generado e impreso el ${new Date().toLocaleString('es-ES')}
+`;
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const fileName = `Checklist_Impreso_ID${selectedVisit.id}_${(selectedVisit.pdv_nombre || 'Visita').replace(/\s+/g, '_')}_${selectedVisit.fecha || ''}.txt`;
+        const file = new File([blob], fileName, { type: 'text/plain' });
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('visita_id', selectedVisit.id);
+        formData.append('categoria', 'evidencia_visita');
+        formData.append('tipo_documento', 'Reporte Checklist Impreso (Soporte)');
+        formData.append('observaciones', `Copia automática del checklist al imprimir/exportar la visita #${selectedVisit.id}`);
+        await fetch('/api/uploads', { method: 'POST', body: formData });
+      } catch (err) {
+        console.warn('Error respaldando reporte de impresión en repositorio:', err);
+      }
+    }
     window.print();
   };
 
@@ -2957,14 +3076,17 @@ export default function VisitasPage() {
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div className="form-group" style={{ margin: 0 }}>
-                          <label className="form-label" htmlFor="exec-equipo-id" style={{ fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '4px', display: 'block' }}>Código de Equipo, Serial o Sticker</label>
+                          <label className="form-label" htmlFor="exec-equipo-id" style={{ fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '4px', display: 'block' }}>Código, Serial o Últimos 4 o 5 Dígitos del Sticker</label>
+                          <div style={{ fontSize: '0.74rem', color: '#166534', backgroundColor: '#F0FDF4', padding: '4px 8px', borderRadius: '4px', marginBottom: '6px' }}>
+                            ✨ Puedes escribir solamente los <strong>últimos 4 o 5 dígitos</strong> (Ej: <code>0144</code> o <code>2539</code>)
+                          </div>
                           <div style={{ display: 'flex', gap: '8px' }}>
                             <input
                               id="exec-equipo-id"
                               type="text"
                               className="form-input"
                               style={{ textTransform: 'uppercase', flex: 1, padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}
-                              placeholder="Ej: EQ-1002"
+                              placeholder="Ej: 0144, 2539 o EQ-1002"
                               value={equipoId}
                               onChange={(e) => setEquipoId(e.target.value)}
                             />
@@ -3016,7 +3138,30 @@ export default function VisitasPage() {
                       {/* Error Alert */}
                       {equipoSearchError && (
                         <div className="error-alert" style={{ marginTop: '12px', padding: '10px', fontSize: '0.85rem', borderRadius: 'var(--radius-md)', backgroundColor: '#ffebee', color: '#c62828', border: '1px solid #ffcdd2' }}>
-                          ⚠️ {equipoSearchError}
+                          <div style={{ marginBottom: '6px' }}>⚠️ {equipoSearchError}</div>
+                          {equiposSugeridosVisita && equiposSugeridosVisita.length > 0 && (
+                            <div style={{ marginTop: '10px', background: '#FFF7ED', border: '1px solid #FDBA74', borderRadius: '8px', padding: '10px' }}>
+                              <strong style={{ display: 'block', marginBottom: '6px', color: '#9A3412', fontSize: '0.82rem' }}>🎯 Coincidencias encontradas con esos dígitos - Selecciona uno:</strong>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '200px', overflowY: 'auto' }}>
+                                {equiposSugeridosVisita.map((eq, i) => (
+                                  <button
+                                    key={eq.id || i}
+                                    type="button"
+                                    onClick={() => loadEquipmentDetails(eq.id)}
+                                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FFF', border: '1px solid #FED7AA', padding: '8px 10px', borderRadius: '6px', cursor: 'pointer', textAlign: 'left' }}
+                                  >
+                                    <div>
+                                      <strong style={{ color: '#1E293B', display: 'block', fontSize: '0.85rem' }}>{eq.nombre}</strong>
+                                      <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Sticker/ID: <strong style={{color:'#C2410C'}}>{eq.id}</strong> | Serie: {eq.serie || 'N/A'}</span>
+                                    </div>
+                                    <span style={{ background: '#FFEDD5', color: '#C2410C', fontWeight: 'bold', padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', marginLeft: '6px' }}>
+                                      📍 {eq.pdv_nombre}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -3051,8 +3196,30 @@ export default function VisitasPage() {
                 {/* Check list Renderer (conditional on template existance) */}
                 {(activePlantilla || (activeExecutionVisit && activeExecutionVisit.campos_personalizados)) && (
                   <div className="dynamic-template-section card shadow-sm">
-                    <div className="card-header">
-                      <h4>📋 Checklist Formulario: {activeExecutionVisit.campos_personalizados ? 'Tareas Personalizadas de la Visita' : (activePlantilla ? activePlantilla.nombre : 'Checklist')}</h4>
+                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <h4 style={{ margin: 0, color: '#1E293B', fontWeight: 'bold' }}>
+                          📋 Checklist Formulario: {activeExecutionVisit.campos_personalizados ? 'Tareas Personalizadas de la Visita' : (activePlantilla ? activePlantilla.nombre : 'Checklist')}
+                        </h4>
+                        <span className="badge" style={{ background: '#7C3AED', color: '#FFF', fontSize: '0.78rem', fontWeight: '900', padding: '4px 10px', borderRadius: '14px' }}>
+                          v{activeExecutionVisit.version_checklist || activePlantilla?.version || 1}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!confirm('¿Desea personalizar o editar los ítems del checklist únicamente para esta visita? Podrá añadir/quitar preguntas sin afectar la plantilla general o restaurar el original.')) return;
+                          const currentCampos = activeExecutionVisit.campos_personalizados 
+                            ? JSON.parse(activeExecutionVisit.campos_personalizados) 
+                            : (activePlantilla ? JSON.parse(activePlantilla.campos) : []);
+                          setEditingVisitCampos(currentCampos);
+                          setShowVisitChecklistModal(true);
+                        }}
+                        className="btn btn-secondary btn-sm"
+                        style={{ background: '#F8FAFC', color: '#334155', border: '1px solid #CBD5E1', fontWeight: 'bold', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                      >
+                        ✏️ Personalizar Ítems para esta Visita
+                      </button>
                     </div>
                     <div className="card-body">
                       {(() => {
@@ -3158,6 +3325,189 @@ export default function VisitasPage() {
                           ));
                         }
                       })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Modal para Editar/Personalizar los Ítems de la Visita actual */}
+                {showVisitChecklistModal && (
+                  <div className="modal-overlay animate-fade-in" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
+                    <div className="card shadow-xl" style={{ width: '100%', maxWidth: '850px', maxHeight: '85vh', overflowY: 'auto', background: '#FFF', borderRadius: '18px', padding: '26px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #E2E8F0', paddingBottom: '16px', marginBottom: '20px' }}>
+                        <div>
+                          <h3 style={{ margin: 0, color: '#1E293B', fontSize: '1.25rem', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            ✏️ Personalización del Checklist de la Visita ID #{activeExecutionVisit.id}
+                          </h3>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748B' }}>
+                            Modifica o adapta las tareas y preguntas exclusivamente para esta visita. Se creará un registro de versión sin alterar la plantilla global de tu área.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowVisitChecklistModal(false)}
+                          style={{ background: '#F1F5F9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', color: '#475569' }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      {editingVisitCampos.length > 0 && (editingVisitCampos[0].tipo === 'matrix' || editingVisitCampos[0].tipo === 'simple_checklist') ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                          <div className="warning-alert" style={{ backgroundColor: '#FFFBEB', color: '#B45309', borderLeft: '4px solid #F59E0B', padding: '12px', borderRadius: '8px', fontSize: '0.85rem' }}>
+                            💡 <strong>Matriz de Calidad / Fija:</strong> Puedes adaptar el texto de cada aspecto o pregunta de evaluación abajo. La estructura de secciones y columnas se conserva para la exportación a Excel/PDF.
+                          </div>
+                          {editingVisitCampos[0].secciones.map((sec, sIdx) => (
+                            <div key={sIdx} style={{ background: '#F8FAFC', padding: '15px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                              <h5 style={{ fontWeight: '800', marginBottom: '10px', color: '#3B82F6', fontSize: '0.9rem' }}>📁 {sec.nombre}</h5>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                {sec.filas.map((fila, rIdx) => (
+                                  <div key={rIdx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.75rem', color: '#64748B', minWidth: '25px', fontWeight: 'bold' }}>{rIdx + 1}.</span>
+                                    <input
+                                      type="text"
+                                      className="form-input"
+                                      value={fila}
+                                      onChange={(e) => {
+                                        const updated = JSON.parse(JSON.stringify(editingVisitCampos));
+                                        updated[0].secciones[sIdx].filas[rIdx] = e.target.value;
+                                        setEditingVisitCampos(updated);
+                                      }}
+                                      style={{ flex: 1, fontWeight: '600' }}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                          {editingVisitCampos.map((field, idx) => (
+                            <div key={idx} className="card shadow-sm" style={{ padding: '15px', background: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span className="badge" style={{ background: '#E2E8F0', color: '#334155', fontSize: '0.72rem', fontWeight: 'bold' }}>
+                                  {field.tipo === 'checkbox' && '☑️ Checkbox / Sí - No'}
+                                  {field.tipo === 'textarea' && '📝 Texto Largo / Observaciones'}
+                                  {field.tipo === 'text' && '✍️ Texto Corto'}
+                                  {field.tipo === 'number' && '🔢 Número'}
+                                </span>
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    disabled={idx === 0}
+                                    onClick={() => {
+                                      const updated = [...editingVisitCampos];
+                                      [updated[idx - 1], updated[idx]] = [updated[idx], updated[idx - 1]];
+                                      setEditingVisitCampos(updated);
+                                    }}
+                                    style={{ padding: '2px 8px' }}
+                                  >▲</button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    disabled={idx === editingVisitCampos.length - 1}
+                                    onClick={() => {
+                                      const updated = [...editingVisitCampos];
+                                      [updated[idx + 1], updated[idx]] = [updated[idx], updated[idx + 1]];
+                                      setEditingVisitCampos(updated);
+                                    }}
+                                    style={{ padding: '2px 8px' }}
+                                  >▼</button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-danger btn-sm"
+                                    onClick={() => {
+                                      const updated = editingVisitCampos.filter((_, i) => i !== idx);
+                                      setEditingVisitCampos(updated);
+                                    }}
+                                    style={{ padding: '2px 8px' }}
+                                  >🗑️ Eliminar</button>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="form-label" style={{ fontSize: '0.75rem', color: '#475569' }}>Etiqueta o Pregunta</label>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  value={field.label || ''}
+                                  onChange={(e) => {
+                                    const updated = [...editingVisitCampos];
+                                    updated[idx].label = e.target.value;
+                                    setEditingVisitCampos(updated);
+                                  }}
+                                  style={{ fontWeight: 'bold' }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+
+                          <div className="card shadow-sm" style={{ padding: '16px', border: '1.5px dashed #94A3B8', background: '#FFF' }}>
+                            <h5 style={{ margin: '0 0 10px 0', color: '#1E293B', fontSize: '0.88rem', fontWeight: 'bold' }}>➕ Añadir Nuevo Ítem a la Visita</h5>
+                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                              <select id="new-visit-field-type" className="form-select" style={{ width: '180px' }}>
+                                <option value="checkbox">☑️ Sí / No</option>
+                                <option value="textarea">📝 Observación Largo</option>
+                                <option value="text">✍️ Respuesta Corta</option>
+                              </select>
+                              <input id="new-visit-field-label" type="text" className="form-input" placeholder="Pregunta o tarea nueva..." style={{ flex: 1, minWidth: '200px' }} />
+                              <button
+                                type="button"
+                                className="btn btn-primary btn-sm"
+                                onClick={() => {
+                                  const labelEl = document.getElementById('new-visit-field-label');
+                                  const typeEl = document.getElementById('new-visit-field-type');
+                                  if (!labelEl || !labelEl.value.trim()) return alert('Ingrese la etiqueta del ítem');
+                                  const labelVal = labelEl.value.trim();
+                                  const newField = {
+                                    nombre: `item_custom_${Date.now()}`,
+                                    label: labelVal,
+                                    tipo: typeEl ? typeEl.value : 'checkbox',
+                                    requerido: false
+                                  };
+                                  setEditingVisitCampos([...editingVisitCampos, newField]);
+                                  labelEl.value = '';
+                                }}
+                              >
+                                Añadir
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '2px solid #E2E8F0', paddingTop: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!confirm('¿Está seguro de restaurar los ítems a la plantilla original? Se eliminarán las personalizaciones de esta visita.')) return;
+                            const originalCampos = activePlantilla ? JSON.parse(activePlantilla.campos || '[]') : [];
+                            setEditingVisitCampos(originalCampos);
+                          }}
+                          style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', padding: '10px 18px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}
+                        >
+                          🔄 Restaurar Plantilla Original
+                        </button>
+
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          <button
+                            type="button"
+                            onClick={() => setShowVisitChecklistModal(false)}
+                            style={{ background: '#F1F5F9', color: '#475569', border: 'none', padding: '10px 20px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isSavingTemplate}
+                            onClick={handleSaveVisitChecklistCustom}
+                            className="btn btn-success"
+                            style={{ padding: '10px 24px', fontWeight: '900', fontSize: '0.95rem' }}
+                          >
+                            {isSavingTemplate ? 'Guardando...' : '💾 Guardar Ítems para esta Visita'}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -4409,6 +4759,55 @@ export default function VisitasPage() {
 
               {editingTemplateId ? (
                 <div className="template-editor-panel animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Panel Superior de Información y Versiones del Checklist */}
+                  <div className="card shadow-sm" style={{ padding: '20px', background: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', borderBottom: '1px solid #E2E8F0', paddingBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <h4 style={{ margin: 0, color: '#1E293B', fontWeight: '800', fontSize: '1.1rem' }}>
+                          📋 Datos General y Versión del Checklist
+                        </h4>
+                        <span style={{ background: '#3B82F6', color: '#FFF', padding: '4px 12px', borderRadius: '20px', fontWeight: '900', fontSize: '0.8rem' }}>
+                          Versión Activa: v{plantillas.find(p => String(p.id) === editingTemplateId)?.version || 1}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowVersionModal(true)}
+                        style={{ background: '#7C3AED', color: '#FFF', border: 'none', padding: '8px 16px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        🕒 Historial de Versiones ({templateHistorial.length})
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+                      <div>
+                        <label className="form-label" style={{ fontWeight: 'bold', fontSize: '0.82rem', color: '#334155' }}>
+                          Nombre Oficial del Checklist
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={templateNombre}
+                          onChange={(e) => setTemplateNombre(e.target.value)}
+                          placeholder="Ej: Inspección de Calidad y BPM..."
+                          style={{ fontWeight: 'bold' }}
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label" style={{ fontWeight: 'bold', fontSize: '0.82rem', color: '#334155' }}>
+                          Descripción / Alcance
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={templateDescripcion}
+                          onChange={(e) => setTemplateDescripcion(e.target.value)}
+                          placeholder="Ej: Evaluación quincenal de áreas operativas..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Warning for matrix or complex templates */}
                   {templateFields.length > 0 && (templateFields[0].tipo === 'matrix' || templateFields[0].tipo === 'simple_checklist') ? (
                     <div className="warning-alert" style={{ backgroundColor: '#FFFBEB', color: '#B45309', borderLeft: '4px solid #F59E0B', padding: '12px', borderRadius: 'var(--radius-md)', fontSize: '0.85rem' }}>
@@ -4546,17 +4945,44 @@ export default function VisitasPage() {
                     </div>
                   )}
 
-                  {/* Save button */}
-                  <div style={{ marginTop: '20px', borderTop: '1px solid var(--color-border-light)', paddingTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
-                    <button
-                      type="button"
-                      className="btn btn-success btn-lg"
-                      onClick={handleSaveTemplate}
-                      disabled={isSavingTemplate}
-                      style={{ padding: '12px 24px', fontWeight: 'bold' }}
-                    >
-                      {isSavingTemplate ? 'Guardando...' : '💾 Guardar Configuración de Checklist'}
-                    </button>
+                  {/* Save options and button */}
+                  <div style={{ marginTop: '20px', borderTop: '2px solid #CBD5E1', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: '#EFF6FF', padding: '20px', borderRadius: '14px', border: '1px solid #BFDBFE' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          id="guardar-nueva-version-chk"
+                          type="checkbox"
+                          checked={guardarComoNuevaVersion}
+                          onChange={(e) => setGuardarComoNuevaVersion(e.target.checked)}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                        />
+                        <label htmlFor="guardar-nueva-version-chk" style={{ fontWeight: 'bold', fontSize: '0.92rem', color: '#1E40AF', cursor: 'pointer' }}>
+                          ☑️ Guardar como Nueva Versión (v{(plantillas.find(p => String(p.id) === editingTemplateId)?.version || 1) + 1}) y mantener respaldo del historial
+                        </label>
+                      </div>
+                      <div style={{ flex: 1, minWidth: '240px' }}>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={notaVersion}
+                          onChange={(e) => setNotaVersion(e.target.value)}
+                          placeholder="Nota / Motivo de esta versión (Ej: Actualización de ítems 2026)..."
+                          style={{ background: '#FFF' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        className="btn btn-success btn-lg"
+                        onClick={handleSaveTemplate}
+                        disabled={isSavingTemplate}
+                        style={{ padding: '12px 28px', fontWeight: '900', fontSize: '1rem', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)' }}
+                      >
+                        {isSavingTemplate ? 'Guardando...' : `💾 Guardar y Publicar Checklist (v${(plantillas.find(p => String(p.id) === editingTemplateId)?.version || 1) + (guardarComoNuevaVersion ? 1 : 0)})`}
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -4566,6 +4992,90 @@ export default function VisitasPage() {
               )}
             </div>
           </div>
+
+          {/* Modal de Historial y Restauración de Versiones del Checklist */}
+          {showVersionModal && (
+            <div className="modal-overlay animate-fade-in" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+              <div className="card shadow-xl" style={{ width: '100%', maxWidth: '800px', maxHeight: '85vh', overflowY: 'auto', background: '#FFF', borderRadius: '18px', padding: '26px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #E2E8F0', paddingBottom: '16px', marginBottom: '20px' }}>
+                  <div>
+                    <h3 style={{ margin: 0, color: '#5B21B6', fontSize: '1.3rem', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      🕒 Historial de Versiones del Checklist
+                    </h3>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748B' }}>
+                      Aquí puedes auditar cada modificación realizada a este checklist y restaurar cualquier versión anterior como la versión activa.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowVersionModal(false)}
+                    style={{ background: '#F1F5F9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', color: '#475569' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {templateHistorial.length === 0 ? (
+                  <div style={{ padding: '30px', textAlign: 'center', color: '#64748B', fontStyle: 'italic', background: '#F8FAFC', borderRadius: '12px' }}>
+                    No hay versiones históricas guardadas aún. Al guardar modificaciones, se irá registrando el historial cronológico v1, v2, etc.
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: '80px', textAlign: 'center' }}>Versión</th>
+                          <th>Fecha / Hora</th>
+                          <th>Modificado por</th>
+                          <th>Nota / Descripción del Cambio</th>
+                          <th style={{ textAlign: 'center' }}>Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {templateHistorial.slice().reverse().map((hist, idx) => (
+                          <tr key={idx} style={{ background: idx === 0 ? '#F5F3FF' : 'inherit' }}>
+                            <td style={{ textAlign: 'center' }}>
+                              <span style={{ background: '#7C3AED', color: '#FFF', padding: '4px 10px', borderRadius: '14px', fontWeight: '900', fontSize: '0.85rem' }}>
+                                v{hist.version}
+                              </span>
+                            </td>
+                            <td style={{ fontSize: '0.85rem', fontWeight: '600', color: '#334155' }}>
+                              {new Date(hist.fecha).toLocaleString('es-ES')}
+                            </td>
+                            <td><strong style={{ color: '#1E293B' }}>{hist.usuario || 'Sistema'}</strong></td>
+                            <td style={{ fontSize: '0.88rem', color: '#475569' }}>
+                              {hist.nota || 'Actualización de versión'}
+                              {hist.nombre && <div style={{ fontSize: '0.78rem', color: '#64748B' }}>Nombre: {hist.nombre}</div>}
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleRestoreTemplateVersion(hist.version)}
+                                disabled={isSavingTemplate}
+                                style={{ background: '#2563EB', color: '#FFF', border: 'none', padding: '6px 14px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer', boxShadow: '0 2px 4px rgba(37,99,235,0.2)' }}
+                              >
+                                🔄 Restaurar v{hist.version}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #E2E8F0', paddingTop: '16px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowVersionModal(false)}
+                    style={{ background: '#64748B', color: '#FFF', border: 'none', padding: '10px 22px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}
+                  >
+                    Cerrar Historial
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

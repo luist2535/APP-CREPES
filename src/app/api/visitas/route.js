@@ -124,17 +124,29 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Campos requeridos faltantes' }, { status: 400 });
     }
     
+    // Determine initial version_checklist if not explicitly passed
+    let initialVersion = body.version_checklist || 1;
+    if (!body.version_checklist && plantilla_id) {
+      try {
+        const t = db.prepare('SELECT version FROM plantillas WHERE id = ?').get(plantilla_id);
+        if (t && t.version) initialVersion = t.version;
+      } catch (e) {}
+    }
+
     // Insert visit (when directly creating a completed visit, usually by coordinators/admin)
     const result = db.prepare(`
-      INSERT INTO visitas (pdv_id, user_id, area_id, tipo_visita_id, plantilla_id, fecha, hora_inicio, hora_fin, datos_formulario, responsable_id, fecha_compromiso, estado, observaciones, repuestos, firma_auxiliar, hallazgos, acciones_correctivas, evento_id, equipo_id, categoria_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completada', ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO visitas (pdv_id, user_id, area_id, tipo_visita_id, plantilla_id, fecha, hora_inicio, hora_fin, datos_formulario, responsable_id, fecha_compromiso, estado, observaciones, repuestos, firma_auxiliar, hallazgos, acciones_correctivas, evento_id, equipo_id, categoria_id, version_checklist, campos_personalizados, historial_versiones)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completada', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       pdv_id, user.id, area_id, tipo_visita_id, plantilla_id || null, 
       fecha, hora_inicio || null, hora_fin || null, 
       JSON.stringify(datos_formulario || {}), 
       responsable_id || null, fecha_compromiso || null, observaciones || null,
       repuestos || null, firma_auxiliar || null, hallazgos || null, acciones_correctivas || null,
-      evento_id || null, equipo_id || null, categoria_id || null
+      evento_id || null, equipo_id || null, categoria_id || null,
+      initialVersion,
+      body.campos_personalizados ? (typeof body.campos_personalizados === 'string' ? body.campos_personalizados : JSON.stringify(body.campos_personalizados)) : null,
+      body.historial_versiones ? (typeof body.historial_versiones === 'string' ? body.historial_versiones : JSON.stringify(body.historial_versiones)) : '[]'
     );
 
     const visitId = result.lastInsertRowid;
@@ -160,8 +172,8 @@ export async function POST(request) {
 
     db.prepare(`
       INSERT INTO historial_visitas (visita_id, accion, user_id, detalle)
-      VALUES (?, 'creada', ?, 'Visita registrada directamente')
-    `).run(visitId, user.id);
+      VALUES (?, 'creada', ?, 'Visita registrada directamente (Checklist v' || ? || ')')
+    `).run(visitId, user.id, initialVersion);
     
     return NextResponse.json({ id: visitId, message: 'Visita registrada correctamente y evento de calendario completado' });
   } catch (error) {
@@ -201,15 +213,55 @@ export async function PUT(request) {
       return NextResponse.json({ message: 'Trabajo iniciado correctamente', hora_inicio: nowTime });
     }
 
+    if (action === 'editar_checklist_visita') {
+      const { campos_personalizados, version_checklist, nota_version } = data;
+      let historial = [];
+      try {
+        historial = JSON.parse(visit.historial_versiones || '[]');
+      } catch (e) {}
+      
+      const verNum = version_checklist || (visit.version_checklist || 1) + 1;
+      const camposObj = typeof campos_personalizados === 'string' ? JSON.parse(campos_personalizados || '[]') : (campos_personalizados || []);
+      
+      historial.push({
+        version: verNum,
+        fecha: new Date().toISOString(),
+        usuario: user.nombre || 'Usuario',
+        nota: nota_version || 'Personalización de ítems para esta inspección',
+        campos: camposObj
+      });
+
+      const camposStr = JSON.stringify(camposObj);
+
+      db.prepare(`
+        UPDATE visitas
+        SET version_checklist = ?, campos_personalizados = ?, historial_versiones = ?
+        WHERE id = ?
+      `).run(verNum, camposStr, JSON.stringify(historial), id);
+
+      db.prepare(`
+        INSERT INTO historial_visitas (visita_id, accion, user_id, detalle)
+        VALUES (?, 'version_checklist', ?, ?)
+      `).run(id, user.id, `Checklist personalizado (Versión v${verNum})`);
+
+      return NextResponse.json({ message: `Ítems del checklist de la visita actualizados (v${verNum})`, version: verNum });
+    }
+
     if (action === 'guardar_progreso') {
-      const { datos_formulario, observaciones } = data;
+      const { datos_formulario, observaciones, version_checklist, campos_personalizados, historial_versiones } = data;
       db.prepare(`
         UPDATE visitas 
-        SET datos_formulario = ?, observaciones = COALESCE(?, observaciones)
+        SET datos_formulario = ?, observaciones = COALESCE(?, observaciones),
+            version_checklist = COALESCE(?, version_checklist),
+            campos_personalizados = COALESCE(?, campos_personalizados),
+            historial_versiones = COALESCE(?, historial_versiones)
         WHERE id = ?
       `).run(
         JSON.stringify(datos_formulario || {}),
         observaciones || null,
+        version_checklist || null,
+        campos_personalizados ? (typeof campos_personalizados === 'string' ? campos_personalizados : JSON.stringify(campos_personalizados)) : null,
+        historial_versiones ? (typeof historial_versiones === 'string' ? historial_versiones : JSON.stringify(historial_versiones)) : null,
         id
       );
       
@@ -226,7 +278,7 @@ export async function PUT(request) {
         datos_formulario, observaciones, evidencias, repuestos, 
         firma_auxiliar, hallazgos, acciones_correctivas, tipo_visita_id, plantilla_id,
         firma_pdv, solicitante_nombre, solicitante_documento, solicitante_telefono, equipo_id,
-        categoria_id
+        categoria_id, version_checklist, campos_personalizados, historial_versiones
       } = data;
       
       const nowTime = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -239,7 +291,10 @@ export async function PUT(request) {
             firma_auxiliar = ?, hallazgos = ?, acciones_correctivas = ?, 
             tipo_visita_id = COALESCE(?, tipo_visita_id), plantilla_id = COALESCE(?, plantilla_id),
             firma_pdv = ?, solicitante_nombre = ?, solicitante_documento = ?, solicitante_telefono = ?,
-            equipo_id = ?, categoria_id = COALESCE(?, categoria_id), estado = ? 
+            equipo_id = ?, categoria_id = COALESCE(?, categoria_id), estado = ?,
+            version_checklist = COALESCE(?, version_checklist),
+            campos_personalizados = COALESCE(?, campos_personalizados),
+            historial_versiones = COALESCE(?, historial_versiones)
         WHERE id = ?
       `).run(
         nowTime,
@@ -258,6 +313,9 @@ export async function PUT(request) {
         equipo_id || null,
         categoria_id || null,
         targetEstado,
+        version_checklist || null,
+        campos_personalizados ? (typeof campos_personalizados === 'string' ? campos_personalizados : JSON.stringify(campos_personalizados)) : null,
+        historial_versiones ? (typeof historial_versiones === 'string' ? historial_versiones : JSON.stringify(historial_versiones)) : null,
         id
       );
 

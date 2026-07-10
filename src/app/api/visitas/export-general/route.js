@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 import { getDb } from '@/lib/db';
 import { getUserFromRequest, getUserAssignedCityId } from '@/lib/auth';
 import Excel from 'exceljs';
@@ -66,19 +68,20 @@ export async function GET(request) {
       { header: 'Auditor / Inspector', key: 'auditor', width: 26 },
       { header: 'Responsable PDV', key: 'responsable', width: 24 },
       { header: 'Estado', key: 'estado', width: 16 },
+      { header: 'Versión Checklist', key: 'version_checklist', width: 18 },
       { header: 'Observaciones Generales', key: 'observaciones', width: 45 }
     ];
 
     sheet.spliceRows(1, 0, [], []);
-    sheet.mergeCells('A1:J1');
+    sheet.mergeCells('A1:K1');
     const titleCell = sheet.getCell('A1');
-    titleCell.value = '📋 REPORTE Y HISTORIAL GENERAL DE VISITAS OPERATIVAS';
+    titleCell.value = '📋 REPORTE E HISTORIAL GENERAL DE VISITAS OPERATIVAS';
     titleCell.font = { name: 'Arial', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
     titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6B3A2A' } };
     titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
     sheet.getRow(1).height = 32;
 
-    sheet.mergeCells('A2:J2');
+    sheet.mergeCells('A2:K2');
     const metaCell = sheet.getCell('A2');
     const nowStr = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     metaCell.value = `Generado por: ${user.nombre || 'Usuario'} | Fecha de exportación: ${nowStr} | Total registros: ${visitas.length}`;
@@ -112,6 +115,7 @@ export async function GET(request) {
         auditor: v.auditor_nombre || 'N/A',
         responsable: v.responsable_nombre || 'N/A',
         estado: v.estado ? v.estado.toUpperCase() : '',
+        version_checklist: `v${v.version_checklist || 1}`,
         observaciones: v.observaciones || ''
       });
 
@@ -131,6 +135,41 @@ export async function GET(request) {
 
     const buffer = await workbook.xlsx.writeBuffer();
     const fileName = `Reporte_Visitas_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+    // Guardar automáticamente en las carpetas del servidor y repositorio documental
+    try {
+      const timestamp = Date.now();
+      const savedFileName = `${timestamp}_${fileName}`;
+      const uploadDir = path.join(process.cwd(), 'public', 'archivos', 'excel');
+      await fs.promises.mkdir(uploadDir, { recursive: true });
+      const filePath = path.join(uploadDir, savedFileName);
+      await fs.promises.writeFile(filePath, Buffer.from(buffer));
+
+      try {
+        db.prepare('ALTER TABLE archivos_repositorio ADD COLUMN tipo_documento TEXT').run();
+      } catch (e) {}
+
+      db.prepare(`
+        INSERT INTO archivos_repositorio (
+          nombre_original, nombre_guardado, ruta_archivo, tipo_archivo, 
+          extension, tamano_bytes, categoria, referencia_id, user_id, observaciones, tipo_documento
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        fileName, 
+        savedFileName, 
+        `/archivos/excel/${savedFileName}`, 
+        'excel', 
+        'xlsx', 
+        buffer.byteLength || buffer.length || 0, 
+        'calidad_reporte_general', 
+        null, 
+        user.id, 
+        `Reporte General de Visitas de Calidad exportado el ${new Date().toLocaleDateString('es-ES')}`,
+        'Reporte General Visitas Excel'
+      );
+    } catch (saveErr) {
+      console.error('Error guardando copia del Reporte General en repositorio:', saveErr);
+    }
 
     return new Response(buffer, {
       status: 200,

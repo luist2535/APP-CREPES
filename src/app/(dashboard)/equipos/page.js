@@ -17,6 +17,7 @@ export default function EquiposPage() {
   const [archivosEquipo, setArchivosEquipo] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const [equiposSugeridos, setEquiposSugeridos] = useState([]);
 
   // Attach File to Equipment state
   const [showAttachModal, setShowAttachModal] = useState(false);
@@ -124,12 +125,16 @@ export default function EquiposPage() {
     setSearchError('');
     setEquipo(null);
     setMantenimientos([]);
+    setEquiposSugeridos([]);
 
     try {
       const res = await fetch(`/api/equipos?id=${code.trim().toUpperCase()}`);
       const data = await res.json();
 
       if (!res.ok) {
+        if (data.equipos_sugeridos && Array.isArray(data.equipos_sugeridos)) {
+          setEquiposSugeridos(data.equipos_sugeridos);
+        }
         throw new Error(data.error || 'Equipo no encontrado');
       }
 
@@ -668,13 +673,16 @@ export default function EquiposPage() {
                 }}
               >
                 <div className="form-group mb-0">
-                  <label className="form-label" htmlFor="manual-qr-input">Código de Equipo, Serial o Sticker</label>
+                  <label className="form-label" htmlFor="manual-qr-input">Código de Equipo, Serial o los Últimos 4 o 5 Dígitos del Sticker</label>
+                  <div style={{ fontSize: '0.78rem', color: '#166534', backgroundColor: '#F0FDF4', padding: '6px 10px', borderRadius: '6px', marginBottom: '8px', border: '1px solid #BBF7D0' }}>
+                    ✨ <strong>Búsqueda Rápida:</strong> Puedes digitar solamente los <strong>últimos 4 o 5 dígitos</strong> del Sticker o ID (Ej: <code>0144</code> o <code>2539</code>) para encontrar tu equipo al instante.
+                  </div>
                   <div className="input-with-button">
                     <input
                       id="manual-qr-input"
                       type="text"
                       className="form-input"
-                      placeholder="Ej: RCSUIBZ1412230144 o EQ-1001"
+                      placeholder="Ej: 0144, 2539 o EQ-1001"
                       value={qrInput}
                       onChange={(e) => setQrInput(e.target.value)}
                       onFocus={(e) => e.target.select()}
@@ -706,10 +714,10 @@ export default function EquiposPage() {
               <div className="quick-test-section">
                 <span>Ejemplos de Códigos y Stickers de Prueba:</span>
                 <div className="quick-test-buttons">
-                  <button className="btn btn-secondary btn-sm" onClick={() => handleSearchEquipment('RCSUIBZ1412230144')}>📦 RCSUIBZ... (Tu Sticker)</button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => handleSearchEquipment('0144')}>📦 0144 (Últimos dígitos de tu Sticker)</button>
                   <button className="btn btn-secondary btn-sm" onClick={() => handleSearchEquipment('EQ-1001')}>🔌 EQ-1001 (Licuadora)</button>
-                  <button className="btn btn-secondary btn-sm" onClick={() => handleSearchEquipment('R05 000001613')}>🖥️ R05 000001613 (Servidor)</button>
-                  <button className="btn btn-secondary btn-sm" onClick={() => handleSearchEquipment('ADM 000002539')}>💻 ADM 000002539 (Desktop)</button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => handleSearchEquipment('1613')}>🖥️ 1613 (Servidor)</button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => handleSearchEquipment('2539')}>💻 2539 (Desktop)</button>
                 </div>
               </div>
 
@@ -723,10 +731,37 @@ export default function EquiposPage() {
             <div className="card error-card animate-fade-in">
               <div className="card-body text-center">
                 <span className="error-icon">❌</span>
-                <h4>{searchError.includes('cámara') ? 'Cámara no disponible' : 'No se encontró el equipo'}</h4>
+                <h4>{searchError.includes('cámara') ? 'Cámara no disponible' : 'No se encontró coincidencia exacta'}</h4>
                 <p className="text-muted">{searchError}</p>
-                {!searchError.includes('cámara') && (
-                  <p className="suggest-hint">Prueba con códigos como `EQ-1001` o con números de sticker de inventario como `R05 000001613` o `ADM 000002539` para validar la ficha técnica.</p>
+                
+                {equiposSugeridos && equiposSugeridos.length > 0 ? (
+                  <div style={{ marginTop: '16px', textAlign: 'left', background: '#FFF7ED', border: '1px solid #FDBA74', borderRadius: '10px', padding: '14px' }}>
+                    <h5 style={{ margin: '0 0 10px 0', color: '#9A3412', fontWeight: 'bold', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      🎯 Coincidencias encontradas (Últimos dígitos) - Haz clic en tu equipo:
+                    </h5>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '350px', overflowY: 'auto' }}>
+                      {equiposSugeridos.map((eq, i) => (
+                        <button
+                          key={eq.id || i}
+                          type="button"
+                          onClick={() => handleSearchEquipment(eq.id)}
+                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FFF', border: '1px solid #FED7AA', padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s' }}
+                        >
+                          <div>
+                            <strong style={{ color: '#1E293B', display: 'block', fontSize: '0.92rem' }}>{eq.nombre}</strong>
+                            <span style={{ fontSize: '0.8rem', color: '#64748B' }}>Sticker/ID: <strong style={{ color: '#C2410C' }}>{eq.id}</strong> | Serie: {eq.serie || 'N/A'} | Marca: {eq.marca || 'N/A'}</span>
+                          </div>
+                          <span style={{ background: '#FFEDD5', color: '#C2410C', fontWeight: 'bold', padding: '4px 10px', borderRadius: '12px', fontSize: '0.78rem', whiteSpace: 'nowrap', marginLeft: '10px' }}>
+                            📍 {eq.pdv_nombre}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  !searchError.includes('cámara') && (
+                    <p className="suggest-hint">Prueba escribiendo solo los últimos 4 o 5 dígitos del sticker (Ej: <code>0144</code> o <code>2539</code>) para una búsqueda general en todas las sedes.</p>
+                  )
                 )}
               </div>
             </div>
@@ -929,7 +964,7 @@ export default function EquiposPage() {
                               👁️ Ver / Abrir
                             </a>
                             <a 
-                              href={a.ruta_archivo} 
+                              href={`${a.ruta_archivo}${a.ruta_archivo?.includes('?') ? '&' : '?'}download=1`} 
                               download={a.nombre_original}
                               style={{ flex: 1, textAlign: 'center', padding: '7px 12px', backgroundColor: '#10B981', color: '#ffffff', borderRadius: '6px', fontWeight: '700', fontSize: '0.8rem', textDecoration: 'none', border: 'none' }}
                             >

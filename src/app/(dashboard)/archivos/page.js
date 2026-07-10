@@ -344,7 +344,7 @@ export default function RepositorioArchivosPage() {
                         ) : null}
                         
                         <a 
-                          href={arch.ruta_archivo} 
+                          href={`${arch.ruta_archivo}${arch.ruta_archivo?.includes('?') ? '&' : '?'}download=1`} 
                           download={arch.nombre_original}
                           target="_blank" 
                           rel="noopener noreferrer"
@@ -472,7 +472,7 @@ export default function RepositorioArchivosPage() {
               )}
             </div>
             <div className="preview-footer">
-              <a href={previewFile.ruta_archivo} download={previewFile.nombre_original} target="_blank" rel="noopener noreferrer" className="btn-download-large">
+              <a href={`${previewFile.ruta_archivo}${previewFile.ruta_archivo?.includes('?') ? '&' : '?'}download=1`} download={previewFile.nombre_original} target="_blank" rel="noopener noreferrer" className="btn-download-large">
                 ⬇️ Descargar Archivo Original
               </a>
             </div>

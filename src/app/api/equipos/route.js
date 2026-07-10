@@ -42,7 +42,7 @@ export async function GET(request) {
 
     const cleanedId = id.trim();
 
-    const equipo = db.prepare(`
+    let equipo = db.prepare(`
       SELECT e.*, p.nombre as pdv_nombre, c.nombre as ciudad_nombre
       FROM equipos e
       JOIN pdv p ON e.pdv_id = p.id
@@ -53,6 +53,36 @@ export async function GET(request) {
         OR LOWER(e.serie) = LOWER(?)
       ) AND e.activo = 1
     `).get(cleanedId, cleanedId, cleanedId);
+
+    if (!equipo && cleanedId.length >= 3) {
+      const sugerencias = db.prepare(`
+        SELECT e.*, p.nombre as pdv_nombre, c.nombre as ciudad_nombre
+        FROM equipos e
+        JOIN pdv p ON e.pdv_id = p.id
+        JOIN ciudades c ON p.ciudad_id = c.id
+        WHERE (
+          LOWER(e.id) LIKE '%' || LOWER(?)
+          OR LOWER(json_extract(e.datos_tecnicos, '$.sticker')) LIKE '%' || LOWER(?)
+          OR LOWER(e.serie) LIKE '%' || LOWER(?)
+        ) AND e.activo = 1
+        ORDER BY 
+          CASE 
+            WHEN LOWER(e.id) LIKE '%' || LOWER(?) THEN 1
+            WHEN LOWER(json_extract(e.datos_tecnicos, '$.sticker')) LIKE '%' || LOWER(?) THEN 2
+            ELSE 3
+          END ASC
+        LIMIT 10
+      `).all(cleanedId, cleanedId, cleanedId, cleanedId, cleanedId);
+
+      if (sugerencias.length === 1) {
+        equipo = sugerencias[0];
+      } else if (sugerencias.length > 1) {
+        return NextResponse.json({ 
+          error: `Se encontraron ${sugerencias.length} equipos coincidentes con la terminación o dígitos "${cleanedId}". Por favor selecciona el correcto en la lista:`, 
+          equipos_sugeridos: sugerencias 
+        }, { status: 404 });
+      }
+    }
 
     if (!equipo) {
       return NextResponse.json({ error: 'Equipo no registrado o inactivo en el sistema' }, { status: 404 });

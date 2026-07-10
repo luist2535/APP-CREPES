@@ -5,13 +5,17 @@ import fs from 'fs/promises';
 export async function GET(request, { params }) {
   try {
     const resolvedParams = await params;
-    const filename = resolvedParams.filename;
+    const pathSegments = resolvedParams.path || [];
 
-    if (!filename) {
-      return new NextResponse('Filename missing', { status: 400 });
+    if (pathSegments.length === 0) {
+      return new NextResponse('Archivo o ruta no especificada', { status: 400 });
     }
 
+    const filename = pathSegments[pathSegments.length - 1];
+
+    // Array de posibles ubicaciones en el sistema de archivos
     const candidatePaths = [
+      path.join(process.cwd(), 'public', 'archivos', ...pathSegments),
       path.join(process.cwd(), 'public', 'uploads', filename),
       path.join(process.cwd(), 'public', 'archivos', 'general', filename),
       path.join(process.cwd(), 'public', 'archivos', 'pdf', filename),
@@ -30,15 +34,16 @@ export async function GET(request, { params }) {
         foundPath = candidate;
         break;
       } catch (e) {
-        // Continue checking candidates
+        // Continuar buscando en las demás carpetas candidatas
       }
     }
 
     if (!fileBuffer) {
-      console.error(`File not found across candidates: ${filename}`);
-      return new NextResponse('File not found', { status: 404 });
+      console.error(`[Servidor de Archivos] Archivo no encontrado. Ruta solicitada: /archivos/${pathSegments.join('/')}`);
+      return new NextResponse('Archivo no encontrado (404)', { status: 404 });
     }
 
+    // Determinar el tipo MIME según la extensión
     const ext = path.extname(filename).toLowerCase();
     const mimeTypes = {
       '.jpg': 'image/jpeg',
@@ -64,9 +69,11 @@ export async function GET(request, { params }) {
 
     const contentType = mimeTypes[ext] || 'application/octet-stream';
 
+    // Verificar si se solicita descarga forzada mediante query param ?download=1
     const { searchParams } = new URL(request.url);
     const isDownload = searchParams.get('download') === '1' || searchParams.get('dl') === '1' || searchParams.get('descargar') === '1';
 
+    // Si es descarga o si no podemos previsualizarlo nativamente y es un binario genérico/excel/word
     const forceAttachment = isDownload || ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip', 'application/vnd.rar'].includes(contentType);
 
     const dispositionType = forceAttachment ? 'attachment' : 'inline';
@@ -81,7 +88,7 @@ export async function GET(request, { params }) {
       },
     });
   } catch (error) {
-    console.error('Serve uploads route error:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    console.error('[Servidor de Archivos] Error procesando solicitud:', error);
+    return new NextResponse('Error interno del servidor al procesar el archivo', { status: 500 });
   }
 }

@@ -66,16 +66,12 @@ export default function LoginPage() {
       <div className="login-card card animate-fade-in">
         <div className="login-logo-container">
           <div className="login-logo" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            {!logoError ? (
-              <img 
-                src="/logo.png" 
-                alt="Crepes en Punto" 
-                onError={() => setLogoError(true)} 
-                style={{ width: '80px', height: '80px', objectFit: 'contain' }}
-              />
-            ) : (
-              "🥞"
-            )}
+            <img 
+              src="/images/logo-crepes-brown.png" 
+              alt="Crepes en Punto" 
+              className="logo-theme-responsive"
+              style={{ width: '85px', height: '85px', objectFit: 'contain', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.15))' }}
+            />
           </div>
           <h1 className="heading-display login-brand-title">Crepes en Punto</h1>
           <p className="login-brand-subtitle">Gestión y Control Operativo</p>

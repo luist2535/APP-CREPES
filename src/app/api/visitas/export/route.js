@@ -43,11 +43,12 @@ export async function GET(request) {
       return NextResponse.json({ error: 'No autorizado para exportar visitas de otra ciudad' }, { status: 403 });
     }
 
-    if (!visit.campos) {
-      return NextResponse.json({ error: 'Esta visita no posee un formulario checklist' }, { status: 400 });
+    const rawCampos = visit.campos_personalizados || visit.campos;
+    if (!rawCampos) {
+      return NextResponse.json({ error: 'Esta visita no posee un formulario checklist o campos configurados' }, { status: 400 });
     }
 
-    const templateConfig = JSON.parse(visit.campos)[0];
+    const templateConfig = JSON.parse(rawCampos)[0];
     if (!templateConfig || !templateConfig.code) {
       return NextResponse.json({ error: 'Código de plantilla no configurado' }, { status: 400 });
     }
@@ -471,10 +472,46 @@ export async function GET(request) {
       genTextRow.height = 40;
     }
 
-    // 10. Generate file buffer and return as response
+    // 10. Generate file buffer
     const buffer = await workbook.xlsx.writeBuffer();
 
-    const fileName = `Visita_Calidad_${templateConfig.code}_${visit.pdv_nombre.replace(/\s+/g, '_')}_${visit.fecha}.xlsx`;
+    const verNum = visit.version_checklist || visit.plantilla_version || 1;
+    const fileName = `Visita_Calidad_${templateConfig.code}_v${verNum}_${visit.pdv_nombre.replace(/\s+/g, '_')}_${visit.fecha}.xlsx`;
+
+    // 11. Guardar automáticamente en las carpetas y repositorio del servidor (Calidad)
+    try {
+      const timestamp = Date.now();
+      const savedFileName = `${timestamp}_${fileName}`;
+      const uploadDir = path.join(process.cwd(), 'public', 'archivos', 'excel');
+      await fs.promises.mkdir(uploadDir, { recursive: true });
+      const filePath = path.join(uploadDir, savedFileName);
+      await fs.promises.writeFile(filePath, Buffer.from(buffer));
+
+      try {
+        db.prepare('ALTER TABLE archivos_repositorio ADD COLUMN tipo_documento TEXT').run();
+      } catch (e) {}
+
+      db.prepare(`
+        INSERT INTO archivos_repositorio (
+          nombre_original, nombre_guardado, ruta_archivo, tipo_archivo, 
+          extension, tamano_bytes, categoria, referencia_id, user_id, observaciones, tipo_documento
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        fileName, 
+        savedFileName, 
+        `/archivos/excel/${savedFileName}`, 
+        'excel', 
+        'xlsx', 
+        buffer.byteLength || buffer.length || 0, 
+        'calidad_checklist', 
+        visit.id ? String(visit.id) : null, 
+        user.id, 
+        `Exportación de Checklist de Calidad ID #${visit.id} - ${visit.pdv_nombre} (${visit.fecha}) [Checklist v${verNum}]`,
+        'Checklist Calidad Excel'
+      );
+    } catch (saveErr) {
+      console.error('Error guardando copia del Excel en repositorio:', saveErr);
+    }
 
     return new Response(buffer, {
       status: 200,

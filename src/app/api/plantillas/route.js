@@ -41,10 +41,11 @@ export async function PUT(request) {
     }
 
     const db = getDb();
-    const { id, campos } = await request.json();
+    const body = await request.json();
+    const { id, campos, nombre, descripcion, guardarComoNuevaVersion, notaVersion, accion, targetVersion } = body;
 
-    if (!id || !campos) {
-      return NextResponse.json({ error: 'ID de plantilla y campos son obligatorios' }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: 'ID de plantilla es obligatorio' }, { status: 400 });
     }
 
     const template = db.prepare('SELECT * FROM plantillas WHERE id = ?').get(id);
@@ -71,6 +72,46 @@ export async function PUT(request) {
       }
     }
 
+    let historial = [];
+    try {
+      historial = JSON.parse(template.historial_versiones || '[]');
+    } catch (e) {
+      historial = [];
+    }
+
+    if (accion === 'restaurar') {
+      const vObj = historial.find(h => h.version === parseInt(targetVersion));
+      if (!vObj || !vObj.campos) {
+        return NextResponse.json({ error: 'La versión solicitada para restaurar no existe en el historial' }, { status: 404 });
+      }
+
+      // Guardar el estado actual en el historial antes de restaurar
+      historial.push({
+        version: template.version || 1,
+        fecha: new Date().toISOString(),
+        usuario: user.nombre || 'Usuario',
+        nombre: template.nombre,
+        descripcion: template.descripcion || '',
+        campos: JSON.parse(template.campos || '[]'),
+        nota: `Respaldo automático antes de restaurar a versión v${targetVersion}`
+      });
+
+      const nextVer = (template.version || 1) + 1;
+      const camposRestauradosStr = JSON.stringify(vObj.campos);
+      const nombreRestaurado = vObj.nombre || template.nombre;
+      const descripcionRestaurada = vObj.descripcion || template.descripcion || '';
+
+      db.prepare('UPDATE plantillas SET nombre = ?, descripcion = ?, campos = ?, version = ?, historial_versiones = ? WHERE id = ?')
+        .run(nombreRestaurado, descripcionRestaurada, camposRestauradosStr, nextVer, JSON.stringify(historial), id);
+
+      return NextResponse.json({ message: `Plantilla restaurada exitosamente a la versión v${targetVersion} como nueva versión v${nextVer}`, version: nextVer });
+    }
+
+    // Acción normal: Actualizar o Guardar como nueva versión
+    if (!campos) {
+      return NextResponse.json({ error: 'Los campos del checklist son obligatorios' }, { status: 400 });
+    }
+
     let camposStr;
     try {
       const parsed = typeof campos === 'string' ? JSON.parse(campos) : campos;
@@ -79,9 +120,25 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'Estructura de campos inválida' }, { status: 400 });
     }
 
-    db.prepare('UPDATE plantillas SET campos = ?, version = version + 1 WHERE id = ?').run(camposStr, id);
+    // Guardar versión anterior en historial
+    historial.push({
+      version: template.version || 1,
+      fecha: new Date().toISOString(),
+      usuario: user.nombre || 'Usuario',
+      nombre: template.nombre,
+      descripcion: template.descripcion || '',
+      campos: JSON.parse(template.campos || '[]'),
+      nota: notaVersion || (guardarComoNuevaVersion ? 'Nueva versión guardada' : 'Edición y actualización de ítems')
+    });
 
-    return NextResponse.json({ message: 'Plantilla de checklist actualizada exitosamente' });
+    const newVer = (template.version || 1) + 1;
+    const updateNombre = nombre || template.nombre;
+    const updateDesc = descripcion !== undefined ? descripcion : (template.descripcion || '');
+
+    db.prepare('UPDATE plantillas SET nombre = ?, descripcion = ?, campos = ?, version = ?, historial_versiones = ? WHERE id = ?')
+      .run(updateNombre, updateDesc, camposStr, newVer, JSON.stringify(historial), id);
+
+    return NextResponse.json({ message: `Checklist guardado exitosamente (Versión v${newVer})`, version: newVer });
   } catch (error) {
     console.error('Error updating template:', error);
     return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
