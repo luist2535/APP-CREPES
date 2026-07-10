@@ -36,6 +36,7 @@ export default function ReportesPage() {
   const [calidadPeriodo, setCalidadPeriodo] = useState('trimestral');
   const [calidadPdv, setCalidadPdv] = useState('all');
   const [calidadCiudad, setCalidadCiudad] = useState('all');
+  const [calidadSeccion, setCalidadSeccion] = useState('all');
   const [calidadSubTab, setCalidadSubTab] = useState('evolucion'); // 'evolucion' | 'ranking' | 'historial' | 'comparador' | 'longitudinal'
   const [compPeriodoA, setCompPeriodoA] = useState('');
   const [compPeriodoB, setCompPeriodoB] = useState('');

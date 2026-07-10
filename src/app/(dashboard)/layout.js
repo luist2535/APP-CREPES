@@ -365,12 +365,16 @@ export default function DashboardLayout({ children }) {
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="sidebar-logo" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <img 
-              src="/images/logo-crepes-light.png" 
-              alt="Logo Crepes en Punto" 
-              className="sidebar-logo-img"
-              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            />
+            {!logoError ? (
+              <img 
+                src="/logo.png" 
+                alt="Logo" 
+                onError={() => setLogoError(true)} 
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              />
+            ) : (
+              "🥞"
+            )}
           </div>
           <div className="sidebar-brand">
             <h2>Crepes en Punto</h2>
@@ -442,12 +446,16 @@ export default function DashboardLayout({ children }) {
           {/* Mobile Logo & Brand */}
           <div className="header-brand-mobile">
             <div className="header-logo-mobile">
-              <img 
-                src="/images/logo-crepes-brown.png" 
-                alt="Logo Crepes en Punto" 
-                className="logo-theme-responsive"
-                style={{ width: '28px', height: '28px', objectFit: 'contain' }}
-              />
+              {!logoError ? (
+                <img 
+                  src="/logo.png" 
+                  alt="Logo" 
+                  onError={() => setLogoError(true)} 
+                  style={{ width: '28px', height: '28px', objectFit: 'contain' }}
+                />
+              ) : (
+                "🥞"
+              )}
             </div>
             <div className="header-text-mobile">
               <span className="brand-line-1">Crepes</span>
