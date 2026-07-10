@@ -1731,10 +1731,13 @@ Impreso y registrado en el repositorio el ${new Date().toLocaleString('es-ES')}
                   {(() => {
                     let answers = {};
                     try {
-                      answers = typeof selectedVisitaDetalle.datos_formulario === 'string'
+                      const raw = typeof selectedVisitaDetalle.datos_formulario === 'string'
                         ? JSON.parse(selectedVisitaDetalle.datos_formulario || '{}')
                         : (selectedVisitaDetalle.datos_formulario || {});
-                    } catch (e) {}
+                      answers = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+                    } catch (e) {
+                      answers = {};
+                    }
 
                     const entries = Object.entries(answers).filter(([k, v]) => v !== '' && v !== null && !k.endsWith('__obs') && !k.endsWith('_obs'));
                     if (entries.length === 0) {

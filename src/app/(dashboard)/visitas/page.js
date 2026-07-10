@@ -386,21 +386,17 @@ const getInitials = (name) => {
 const calculateVisitScore = (visit, plantillas) => {
   try {
     if (!visit || !visit.datos_formulario) return null;
-    let data = {};
-    try {
-      data = JSON.parse(visit.datos_formulario || '{}');
-    } catch (e) {
-      return null;
-    }
+    let data = safeParseAnswers(visit.datos_formulario);
+    if (!data || typeof data !== 'object') return null;
 
     let template = null;
     let fields = null;
     if (visit.campos_personalizados) {
-      try { fields = JSON.parse(visit.campos_personalizados); } catch (e) { }
+      fields = safeParseCampos(visit.campos_personalizados);
     } else if (visit.plantilla_id && plantillas) {
       template = plantillas.find(p => p.id === visit.plantilla_id);
       if (template) {
-        try { fields = JSON.parse(template.campos); } catch (e) { }
+        fields = safeParseCampos(template.campos);
       }
     }
 
@@ -1777,8 +1773,11 @@ export default function VisitasPage() {
         setCurrentUser(u);
         setUserRole(parseInt(u.rol_id));
 
-        // Determinate active tab based on role
-        if (isUserAuxiliar(u.rol_id)) {
+        // Determinate active tab based on role or URL parameter
+        const queryTab = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null;
+        if (queryTab) {
+          setActiveTab(queryTab);
+        } else if (isUserAuxiliar(u.rol_id)) {
           setActiveTab('pending_tasks');
         } else if (isUserJefe(u.rol_id)) {
           setActiveTab('awaiting_approval');
@@ -1905,16 +1904,8 @@ export default function VisitasPage() {
       if (targetTemp) {
         setTemplateNombre(targetTemp.nombre || '');
         setTemplateDescripcion(targetTemp.descripcion || '');
-        try {
-          setTemplateFields(JSON.parse(targetTemp.campos || '[]'));
-        } catch (e) {
-          setTemplateFields([]);
-        }
-        try {
-          setTemplateHistorial(JSON.parse(targetTemp.historial_versiones || '[]'));
-        } catch (e) {
-          setTemplateHistorial([]);
-        }
+        setTemplateFields(safeParseCampos(targetTemp.campos));
+        setTemplateHistorial(safeParseCampos(targetTemp.historial_versiones));
       }
     }
   }, [activeTab, editingTemplateId, plantillas, userRole]);
@@ -2125,7 +2116,7 @@ export default function VisitasPage() {
       if (template) {
         setActivePlantilla(template);
         try {
-          const fields = JSON.parse(template.campos);
+          const fields = safeParseCampos(template.campos);
           const initialAnswers = {};
           if (fields[0] && (fields[0].tipo === 'matrix' || fields[0].tipo === 'simple_checklist')) {
             const hasSubTabs = fields[0].columnas && fields[0].columnas.length > 0 && !fields[0].columnas.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
@@ -3094,7 +3085,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
           </button>
         )}
 
-        {(userRole === 1 || userRole === 2 || isUserJefe(userRole)) && (
+        {(userRole === 1 || userRole === 2 || isUserJefe(userRole) || userRole === 13 || userRole === 5) && (
           <button
             className={`tab-btn ${activeTab === 'templates' ? 'active' : ''}`}
             onClick={() => { setActiveTab('templates'); setActiveExecutionVisit(null); }}
@@ -3112,7 +3103,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
               whiteSpace: 'nowrap'
             }}
           >
-            ⚙️ Configurar
+            ⚙️ Configurar / Modificar Ítems
           </button>
         )}
       </div>
@@ -3283,19 +3274,32 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                           v{activeExecutionVisit.version_checklist || activePlantilla?.version || 1}
                         </span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!confirm('¿Desea personalizar o editar los ítems del checklist únicamente para esta visita? Podrá añadir/quitar preguntas sin afectar la plantilla general o restaurar el original.')) return;
-                          const currentCampos = safeParseCampos(activeExecutionVisit.campos_personalizados || activePlantilla?.campos);
-                          setEditingVisitCampos(currentCampos);
-                          setShowVisitChecklistModal(true);
-                        }}
-                        className="btn btn-secondary btn-sm"
-                        style={{ background: '#F8FAFC', color: '#334155', border: '1px solid #CBD5E1', fontWeight: 'bold', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
-                      >
-                        ✏️ Personalizar Ítems para esta Visita
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!confirm('¿Desea personalizar o editar los ítems del checklist únicamente para esta visita? Podrá añadir/quitar preguntas sin afectar la plantilla general o restaurar el original.')) return;
+                            const currentCampos = safeParseCampos(activeExecutionVisit.campos_personalizados || activePlantilla?.campos);
+                            setEditingVisitCampos(currentCampos);
+                            setShowVisitChecklistModal(true);
+                          }}
+                          className="btn btn-secondary btn-sm"
+                          style={{ background: '#F8FAFC', color: '#334155', border: '1px solid #CBD5E1', fontWeight: 'bold', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                        >
+                          ✏️ Modificar Ítems (v{activeExecutionVisit.version_checklist || activePlantilla?.version || 1})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingTemplateId(null);
+                            setShowVersionModal(true);
+                          }}
+                          className="btn btn-secondary btn-sm"
+                          style={{ background: '#F5F3FF', color: '#6D28D9', border: '1px solid #DDD6FE', fontWeight: 'bold', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer' }}
+                        >
+                          🕒 Historial v{activeExecutionVisit.version_checklist || activePlantilla?.version || 1}
+                        </button>
+                      </div>
                     </div>
                     <div className="card-body">
                       {(() => {
@@ -3617,9 +3621,8 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                   </div>
                   <div className="card-body">
 
-                    {/* General observations */}
                     {(!activePlantilla || !activePlantilla.campos || (() => {
-                      try { return JSON.parse(activePlantilla.campos)[0]?.tipo !== 'matrix'; } catch (e) { return true; }
+                      try { return safeParseCampos(activePlantilla.campos)[0]?.tipo !== 'matrix'; } catch (e) { return true; }
                     })()) && (
                         <div className="form-group">
                           <label className="form-label" htmlFor="exec-observaciones">Observaciones Generales</label>
@@ -4610,7 +4613,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                     </div>
                     <div className="card-body">
                       {(() => {
-                        const parsedCampos = JSON.parse(activePlantilla.campos);
+                        const parsedCampos = safeParseCampos(activePlantilla.campos);
                         const firstField = parsedCampos[0];
                         if (firstField && (firstField.tipo === 'matrix' || firstField.tipo === 'simple_checklist')) {
                           return (
