@@ -383,6 +383,36 @@ const getInitials = (name) => {
   }
 };
 
+// --- Module-level parse helpers (used by calculateVisitScore and inside the component) ---
+const safeParseCampos = (data) => {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (typeof data === 'object') return [data];
+  if (typeof data === 'string') {
+    try {
+      const parsed = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : (typeof parsed === 'object' ? [parsed] : []);
+    } catch (e) {
+      return [];
+    }
+  }
+  return [];
+};
+
+const safeParseAnswers = (data) => {
+  if (!data) return {};
+  if (typeof data === 'object' && !Array.isArray(data)) return data;
+  if (typeof data === 'string') {
+    try {
+      const parsed = JSON.parse(data);
+      return typeof parsed === 'object' && parsed !== null ? parsed : {};
+    } catch (e) {
+      return {};
+    }
+  }
+  return {};
+};
+
 const calculateVisitScore = (visit, plantillas) => {
   try {
     if (!visit || !visit.datos_formulario) return null;
@@ -733,16 +763,18 @@ const MatrixChecklistForm = ({
     setCollapsedSections(prev => ({ ...prev, [sIdx]: !prev[sIdx] }));
   };
 
-  const hasSubareaTabs = template.columnas &&
-    template.columnas.length > 0 &&
-    !template.columnas.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
+  const safeColumnas = Array.isArray(template?.columnas) ? template.columnas : [];
+  const safeSecciones = Array.isArray(template?.secciones) ? template.secciones : [];
+
+  const hasSubareaTabs = safeColumnas.length > 0 &&
+    !safeColumnas.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
 
   const getAnswerKey = (fila) => {
     if (hasSubareaTabs) {
       return `${fila}__${activeTab}`;
     }
-    if (template.tipo === 'matrix' && template.columnas && template.columnas.length > 0) {
-      return `${fila}__${template.columnas[0]}`;
+    if (template?.tipo === 'matrix' && safeColumnas.length > 0) {
+      return `${fila}__${safeColumnas[0]}`;
     }
     return fila;
   };
@@ -759,9 +791,9 @@ const MatrixChecklistForm = ({
       {/* Scrollable sub-area tabs (only when checklist has actual sub-areas) */}
       {hasSubareaTabs && (
         <div className="matrix-tabs-header" style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '20px', borderBottom: '2px solid #E8DDD4', justifyContent: 'flex-start', flexWrap: 'nowrap' }}>
-          {template.columnas.map((col) => {
+          {safeColumnas.map((col) => {
             const isActive = activeTab === col;
-            const isFormulaciones = col.toUpperCase() === 'FORMULACIONES';
+            const isFormulaciones = String(col || '').toUpperCase() === 'FORMULACIONES';
             return (
               <button
                 key={col}
@@ -813,8 +845,9 @@ const MatrixChecklistForm = ({
 
       {/* Checklist items for the active sub-area or sections */}
       <div className="matrix-items-list" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {template.secciones.map((sec, sIdx) => {
+        {safeSecciones.map((sec, sIdx) => {
           const isCollapsed = !!collapsedSections[sIdx];
+          const safeFilas = Array.isArray(sec?.filas) ? sec.filas : [];
           return (
             <div key={sIdx} className="section-block shadow-sm" style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
 
@@ -839,7 +872,7 @@ const MatrixChecklistForm = ({
                     {isCollapsed ? '▶' : '▼'}
                   </span>
                   <h5 style={{ margin: 0, color: '#1e293b', fontSize: '0.88rem', fontWeight: '700', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                    {sec.nombre}
+                    {sec?.nombre || `Sección ${sIdx + 1}`}
                   </h5>
                 </div>
               </div>
@@ -860,12 +893,12 @@ const MatrixChecklistForm = ({
 
                   {/* Item Rows */}
                   <div className="section-rows">
-                    {sec.filas.map((fila, fIdx) => {
+                    {safeFilas.map((fila, fIdx) => {
                       const answerKey = getAnswerKey(fila);
-                      const currentValue = answers[answerKey] || answers[fila] || '';
+                      const currentValue = answers ? (answers[answerKey] || answers[fila] || '') : '';
 
                       return (
-                        <div key={fIdx} className="checklist-row-item" style={{ display: 'flex', flexDirection: 'column', padding: '12px 18px', borderBottom: fIdx === sec.filas.length - 1 ? 'none' : '1px solid #f1f5f9', transition: 'background-color 0.15s' }}>
+                        <div key={fIdx} className="checklist-row-item" style={{ display: 'flex', flexDirection: 'column', padding: '12px 18px', borderBottom: fIdx === safeFilas.length - 1 ? 'none' : '1px solid #f1f5f9', transition: 'background-color 0.15s' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                             <span style={{ fontSize: '0.85rem', fontWeight: '500', color: '#334155', flex: '1', lineHeight: '1.3', paddingRight: '15px' }}>{fila}</span>
 
@@ -1250,29 +1283,30 @@ function SearchableCategorySelect({ categories, selectedId, onChange, areaId }) 
   }, [areaId]);
 
   // Filter categories by area inspectora
-  const filtered = categories.filter(c => c.area_id === parseInt(areaId));
+  const safeCategories = Array.isArray(categories) ? categories : [];
+  const filtered = safeCategories.filter(c => c && c.area_id === parseInt(areaId));
 
   // Helper to build full hierarchical path
   const getCategoryFullPath = (catId) => {
     const path = [];
-    let current = filtered.find(c => c.id === catId);
+    let current = filtered.find(c => c && c.id === catId);
     while (current) {
-      path.unshift(current.nombre);
-      current = filtered.find(c => c.id === current.padre_id);
+      path.unshift(current.nombre || 'Sin nombre');
+      current = filtered.find(c => c && c.id === current.padre_id);
     }
     return path.join(' › ');
   };
 
   // Find currently selected option
-  const selectedCat = filtered.find(c => String(c.id) === String(selectedId));
+  const selectedCat = filtered.find(c => c && String(c.id) === String(selectedId));
   const selectedFullPath = selectedCat ? getCategoryFullPath(selectedCat.id) : '';
 
   // Breadcrumbs for drill-down navigation
   const crumbs = [];
-  let curr = filtered.find(c => c.id === activeParentId);
+  let curr = filtered.find(c => c && c.id === activeParentId);
   while (curr) {
     crumbs.unshift(curr);
-    curr = filtered.find(c => c.id === curr.padre_id);
+    curr = filtered.find(c => c && c.id === curr.padre_id);
   }
 
   // Determine which options to show
@@ -1280,20 +1314,20 @@ function SearchableCategorySelect({ categories, selectedId, onChange, areaId }) 
   if (searchTerm) {
     // Search mode: Flat list of matching categories
     visibleOptions = filtered
-      .filter(c => c.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
+      .filter(c => c && (c.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()))
       .map(c => ({
         ...c,
         fullPath: getCategoryFullPath(c.id),
-        hasChildren: filtered.some(child => child.padre_id === c.id)
+        hasChildren: filtered.some(child => child && child.padre_id === c.id)
       }));
   } else {
     // Drill-down mode: direct children of activeParentId
     visibleOptions = filtered
-      .filter(c => activeParentId ? c.padre_id === activeParentId : !c.padre_id)
+      .filter(c => c && (activeParentId ? c.padre_id === activeParentId : !c.padre_id))
       .map(c => ({
         ...c,
-        fullPath: c.nombre,
-        hasChildren: filtered.some(child => child.padre_id === c.id)
+        fullPath: c.nombre || 'Sin nombre',
+        hasChildren: filtered.some(child => child && child.padre_id === c.id)
       }));
   }
 
@@ -1517,34 +1551,8 @@ export default function VisitasPage() {
     });
   };
 
-  const safeParseCampos = (data) => {
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (typeof data === 'object') return [data];
-    if (typeof data === 'string') {
-      try {
-        const parsed = JSON.parse(data);
-        return Array.isArray(parsed) ? parsed : (typeof parsed === 'object' ? [parsed] : []);
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
-  };
-
-  const safeParseAnswers = (data) => {
-    if (!data) return {};
-    if (typeof data === 'object' && !Array.isArray(data)) return data;
-    if (typeof data === 'string') {
-      try {
-        const parsed = JSON.parse(data);
-        return typeof parsed === 'object' && parsed !== null ? parsed : {};
-      } catch (e) {
-        return {};
-      }
-    }
-    return {};
-  };
+  // safeParseCampos and safeParseAnswers are now defined at module level (before calculateVisitScore)
+  // so they can be used both here inside the component and by module-level helper functions.
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -1596,6 +1604,7 @@ export default function VisitasPage() {
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [newFieldType, setNewFieldType] = useState('checkbox');
   const [newFieldRequired, setNewFieldRequired] = useState(true);
+  const [newFieldLabel, setNewFieldLabel] = useState('');
   const [showVisitChecklistModal, setShowVisitChecklistModal] = useState(false);
   const [editingVisitCampos, setEditingVisitCampos] = useState([]);
 
@@ -1889,7 +1898,9 @@ export default function VisitasPage() {
   useEffect(() => {
     if (activeTab === 'templates') {
       let targetTemp = null;
-      if (isUserJefe(userRole)) {
+
+      // For non-admin roles with a specific area, auto-select their area's template ONLY on first load
+      if (!editingTemplateId && (isUserJefe(userRole) || isUserAuxiliar(userRole) || userRole === 5 || userRole === 13)) {
         const userAreaId = getAreaIdFromRol(userRole);
         if (userAreaId) {
           targetTemp = plantillas.find(p => p.area_id === parseInt(userAreaId));
@@ -1897,14 +1908,45 @@ export default function VisitasPage() {
             setEditingTemplateId(String(targetTemp.id));
           }
         }
-      } else if (editingTemplateId) {
+      }
+
+      // If a template is already selected by the user, load that one
+      if (!targetTemp && editingTemplateId) {
         targetTemp = plantillas.find(p => String(p.id) === editingTemplateId);
+      }
+
+      // Fallback: if nothing selected and no area-specific default, pick the first available
+      if (!targetTemp && !editingTemplateId && plantillas.length > 0) {
+        // For area-specific roles, pick the first template of their area
+        const userAreaId = getAreaIdFromRol(userRole);
+        if (userAreaId && userAreaId !== 'admin') {
+          targetTemp = plantillas.find(p => p.area_id === parseInt(userAreaId));
+        }
+        if (!targetTemp) {
+          targetTemp = plantillas[0];
+        }
+        if (targetTemp) {
+          setEditingTemplateId(String(targetTemp.id));
+        }
       }
 
       if (targetTemp) {
         setTemplateNombre(targetTemp.nombre || '');
         setTemplateDescripcion(targetTemp.descripcion || '');
-        setTemplateFields(safeParseCampos(targetTemp.campos));
+        const parsedCampos = safeParseCampos(targetTemp.campos);
+        const sanitizedFields = parsedCampos.map(field => {
+          if (field && (field.tipo === 'matrix' || field.tipo === 'simple_checklist')) {
+            return {
+              ...field,
+              secciones: Array.isArray(field.secciones) ? field.secciones.map(sec => ({
+                ...sec,
+                filas: Array.isArray(sec.filas) ? sec.filas : []
+              })) : []
+            };
+          }
+          return field;
+        });
+        setTemplateFields(sanitizedFields);
         setTemplateHistorial(safeParseCampos(targetTemp.historial_versiones));
       }
     }
@@ -1965,8 +2007,10 @@ export default function VisitasPage() {
 
   const handleMatrixRowChange = (sectionIdx, rowIdx, val) => {
     const updated = JSON.parse(JSON.stringify(templateFields));
-    updated[0].secciones[sectionIdx].filas[rowIdx] = val;
-    setTemplateFields(updated);
+    if (updated?.[0]?.secciones?.[sectionIdx]?.filas) {
+      updated[0].secciones[sectionIdx].filas[rowIdx] = val;
+      setTemplateFields(updated);
+    }
   };
 
   const handleSaveTemplate = async () => {
@@ -3434,17 +3478,17 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                           <div className="warning-alert" style={{ backgroundColor: '#FFFBEB', color: '#B45309', borderLeft: '4px solid #F59E0B', padding: '12px', borderRadius: '8px', fontSize: '0.85rem' }}>
                             💡 <strong>Matriz de Calidad / Fija:</strong> Puedes adaptar el texto de cada aspecto o pregunta de evaluación abajo. La estructura de secciones y columnas se conserva para la exportación a Excel/PDF.
                           </div>
-                          {editingVisitCampos[0].secciones.map((sec, sIdx) => (
+                          {(Array.isArray(editingVisitCampos[0]?.secciones) ? editingVisitCampos[0].secciones : []).map((sec, sIdx) => (
                             <div key={sIdx} style={{ background: '#F8FAFC', padding: '15px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
                               <h5 style={{ fontWeight: '800', marginBottom: '10px', color: '#3B82F6', fontSize: '0.9rem' }}>📁 {sec?.nombre || `Sección ${sIdx + 1}`}</h5>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                {Array.isArray(sec?.filas) && sec.filas.map((fila, rIdx) => (
+                                {(Array.isArray(sec?.filas) ? sec.filas : []).map((fila, rIdx) => (
                                   <div key={rIdx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                     <span style={{ fontSize: '0.75rem', color: '#64748B', minWidth: '25px', fontWeight: 'bold' }}>{rIdx + 1}.</span>
                                     <input
                                       type="text"
                                       className="form-input"
-                                      value={fila}
+                                      value={fila || ''}
                                       onChange={(e) => {
                                         const updated = JSON.parse(JSON.stringify(editingVisitCampos));
                                         if (updated[0]?.secciones?.[sIdx]?.filas) {
@@ -4818,7 +4862,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
               {/* Area selector for Admin/Coordinator. Read-only area for Jefes */}
               <div className="form-group" style={{ marginBottom: '20px' }}>
                 <label className="form-label" style={{ fontWeight: 'bold' }}>Seleccionar Checklist</label>
-                {userRole === 1 || userRole === 2 ? (
+                {userRole === 1 || userRole === 2 || userRole === 5 || userRole === 13 || isUserJefe(userRole) || isUserAuxiliar(userRole) ? (
                   <select
                     className="form-select"
                     value={editingTemplateId}
@@ -4827,13 +4871,22 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                     }}
                   >
                     <option value="">-- Seleccionar Checklist de Área --</option>
-                    {plantillas.map(p => (
-                      <option key={p.id} value={p.id}>{p.nombre} ({areas.find(a => a.id === p.area_id)?.nombre || 'Área indefinida'})</option>
+                    {(Array.isArray(plantillas) ? plantillas : []).filter(p => {
+                      // Admin (1) and Coordinator (2) see all checklists
+                      if (userRole === 1 || userRole === 2) return true;
+                      // Other roles only see checklists from their own area
+                      const userAreaId = getAreaIdFromRol(userRole);
+                      if (userAreaId && userAreaId !== 'admin') {
+                        return p.area_id === parseInt(userAreaId);
+                      }
+                      return true;
+                    }).map(p => (
+                      <option key={p.id} value={p.id}>{p.nombre} ({(Array.isArray(areas) ? areas : []).find(a => a.id === p.area_id)?.nombre || 'Área indefinida'})</option>
                     ))}
                   </select>
                 ) : (
                   <div style={{ padding: '12px 14px', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-light)', fontWeight: 'bold', color: 'var(--color-primary-dark)' }}>
-                    Checklist de Área: {plantillas.find(p => String(p.id) === editingTemplateId)?.nombre || 'Cargando...'}
+                    Checklist de Área: {(Array.isArray(plantillas) ? plantillas : []).find(p => String(p.id) === editingTemplateId)?.nombre || 'Cargando...'}
                   </div>
                 )}
               </div>
@@ -4848,7 +4901,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                           📋 Datos General y Versión del Checklist
                         </h4>
                         <span style={{ background: '#3B82F6', color: '#FFF', padding: '4px 12px', borderRadius: '20px', fontWeight: '900', fontSize: '0.8rem' }}>
-                          Versión Activa: v{plantillas.find(p => String(p.id) === editingTemplateId)?.version || 1}
+                          Versión Activa: v{(Array.isArray(plantillas) ? plantillas : []).find(p => String(p.id) === editingTemplateId)?.version || 1}
                         </span>
                       </div>
                       <button
@@ -4856,7 +4909,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                         onClick={() => setShowVersionModal(true)}
                         style={{ background: '#7C3AED', color: '#FFF', border: 'none', padding: '8px 16px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                       >
-                        🕒 Historial de Versiones ({templateHistorial.length})
+                        🕒 Historial de Versiones ({(Array.isArray(templateHistorial) ? templateHistorial : []).length})
                       </button>
                     </div>
 
@@ -4901,19 +4954,19 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                     <h4 style={{ borderBottom: '1px solid var(--color-border-light)', paddingBottom: '8px', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>Elementos del Checklist</h4>
 
                     {/* Matrix Row Editor */}
-                    {templateFields.length > 0 && (templateFields[0].tipo === 'matrix' || templateFields[0].tipo === 'simple_checklist') ? (
+                    {Array.isArray(templateFields) && templateFields.length > 0 && (templateFields[0]?.tipo === 'matrix' || templateFields[0]?.tipo === 'simple_checklist') ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        {templateFields[0].secciones.map((sec, sIdx) => (
+                        {(Array.isArray(templateFields[0]?.secciones) ? templateFields[0].secciones : []).map((sec, sIdx) => (
                           <div key={sIdx} style={{ background: 'var(--color-bg-secondary)', padding: '15px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-light)' }}>
-                            <h5 style={{ fontWeight: 'bold', marginBottom: '10px', color: 'var(--color-primary-dark)', fontSize: '0.88rem' }}>📁 Sección: {sec.nombre}</h5>
+                            <h5 style={{ fontWeight: 'bold', marginBottom: '10px', color: 'var(--color-primary-dark)', fontSize: '0.88rem' }}>📁 Sección: {sec?.nombre || `Sección ${sIdx + 1}`}</h5>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                              {sec.filas.map((fila, rIdx) => (
+                              {(Array.isArray(sec?.filas) ? sec.filas : []).map((fila, rIdx) => (
                                 <div key={rIdx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                   <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', minWidth: '25px' }}>{rIdx + 1}.</span>
                                   <input
                                     type="text"
                                     className="form-input"
-                                    value={fila}
+                                    value={fila || ''}
                                     onChange={(e) => handleMatrixRowChange(sIdx, rIdx, e.target.value)}
                                     placeholder="Nombre de la pregunta/tarea..."
                                     style={{ flex: 1 }}
@@ -4926,7 +4979,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                       </div>
                     ) : (
                       /* Simple checklist fields editor */
-                      templateFields.map((field, idx) => (
+                      (Array.isArray(templateFields) ? templateFields : []).map((field, idx) => (
                         <div key={field.nombre || idx} className="field-editor-row card shadow-sm" style={{ display: 'flex', flexDirection: 'column', padding: '15px', gap: '10px', backgroundColor: 'var(--color-bg-primary)', borderLeft: '4px solid var(--color-primary)' }}>
                           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                             <span className="badge" style={{ backgroundColor: 'var(--color-bg-secondary)', color: 'var(--color-primary-dark)', fontSize: '0.7rem', fontWeight: 'bold', padding: '4px 8px', borderRadius: '4px' }}>
@@ -5076,9 +5129,10 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
 
           {/* Modal de Historial y Restauración de Versiones del Checklist */}
           {showVersionModal && (() => {
-            const activeHistList = Array.isArray(templateHistorial) && templateHistorial.length > 0
+            const rawHist = Array.isArray(templateHistorial) && templateHistorial.length > 0
               ? templateHistorial
               : safeParseCampos((activeExecutionVisit || selectedVisit)?.historial_versiones);
+            const activeHistList = Array.isArray(rawHist) ? rawHist : [];
             return (
               <div className="modal-overlay animate-fade-in" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
                 <div className="card shadow-xl" style={{ width: '100%', maxWidth: '800px', maxHeight: '85vh', overflowY: 'auto', background: '#FFF', borderRadius: '18px', padding: '26px' }}>

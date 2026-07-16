@@ -1890,3 +1890,37 @@ h4 { font-size: 1rem; font-weight: 600; line-height: 1.4; }
   content: url('/images/logo-crepes-light.png');
 }
 
+/* =============================================
+   ROLES Y PERMISOS - RESPONSIVE GRID
+   ============================================= */
+
+.roles-permissions-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 767px) {
+  .roles-permissions-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px;
+  }
+
+  /* Selector de cargo: limitar altura máxima en celular */
+  .roles-list-col {
+    max-height: 220px;
+    overflow-y: auto;
+  }
+
+  /* Botones de permiso granular: área táctil mínima */
+  .perm-toggle-btn {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  /* Módulos de permisos: texto más compacto */
+  .perm-module-row {
+    font-size: 0.82rem;
+  }
+}

@@ -42,22 +42,42 @@ if errorlevel 1 (
 echo Base de datos lista.
 echo.
 
-:: 4. Compilar el proyecto para producción
+:: 4. Elegir Modo de Ejecución
+echo ========================================================================
+echo.
+echo ¿En que modo deseas iniciar el sistema?
+echo.
+echo [1] Modo Produccion (Recomendado para el uso diario normal, mas rapido)
+echo [2] Modo Desarrollo (Actualizacion en Tiempo Real si modificas codigo)
+echo.
+set /p modo="Ingresa 1 o 2 y presiona ENTER: "
+
+if "%modo%"=="2" goto run_dev
+
+:: MODO PRODUCCION
+echo.
 echo [4/5] Compilando la aplicacion para produccion (Next.js Build)...
 call npm run build
 if errorlevel 1 goto build_error
 echo Aplicacion compilada con exito.
 echo.
-
-:: 5. Abrir la URL en el navegador y arrancar el servidor
-echo [5/5] Levantando el servidor local de Crepes en Punto...
+echo [5/5] Levantando el servidor local de Crepes en Punto (Produccion)...
 echo La aplicacion estara disponible en: http://localhost:3000
 echo.
 start http://localhost:3000 >nul 2>&1
-
-:: Lanzar el servidor en producción
 call npm run start
+goto end
 
+:run_dev
+:: MODO DESARROLLO (TIEMPO REAL)
+echo.
+echo [4/5] Omitiendo compilacion para activar recarga en Tiempo Real...
+echo.
+echo [5/5] Levantando el servidor local en MODO DESARROLLO (npm run dev)...
+echo La aplicacion estara disponible en: http://localhost:3000
+echo.
+start http://localhost:3000 >nul 2>&1
+call npm run dev
 goto end
 
 :node_missing

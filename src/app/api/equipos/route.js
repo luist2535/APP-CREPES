@@ -90,16 +90,28 @@ export async function GET(request) {
 
     // Load recent maintenance visits for this specific equipment (using equipo_id)
     const mantenimientos = db.prepare(`
-      SELECT v.id, v.fecha, v.hora_inicio, v.observaciones, u.nombre as auditor_nombre
-      FROM visitas v
-      JOIN users u ON v.user_id = u.id
-      WHERE v.equipo_id = ? AND v.area_id = 3
-      ORDER BY v.fecha DESC LIMIT 5
+      SELECT m.id, m.fecha_evidencia as fecha, m.descripcion as observaciones, m.estado,
+             m.solucion_aplicada, m.fecha_real_finalizacion, m.tipo_mantenimiento,
+             u.nombre as auditor_nombre, m.evidencias, m.checklist_tareas
+      FROM mantenimientos m
+      LEFT JOIN users u ON m.tecnico_id = u.id
+      WHERE m.equipo_id = ?
+      ORDER BY m.fecha_registro DESC LIMIT 10
     `).all(equipo.id);
 
     // Fetch attached files (evidencias) for each maintenance service
     for (const m of mantenimientos) {
-      m.evidencias = db.prepare('SELECT * FROM evidencias WHERE visita_id = ?').all(m.id);
+      // Intentar mapear las nuevas evidencias si existen
+      if (m.evidencias) {
+        try {
+          const arr = JSON.parse(m.evidencias);
+          m.evidencias_lista = arr.map(a => ({ ruta_archivo: a }));
+        } catch (e) {
+          m.evidencias_lista = [];
+        }
+      } else {
+        m.evidencias_lista = [];
+      }
     }
 
     try {

@@ -433,9 +433,14 @@ export async function DELETE(request) {
     const deleteTx = db.transaction(() => {
       db.prepare('DELETE FROM evidencias WHERE visita_id = ?').run(id);
       db.prepare('DELETE FROM historial_visitas WHERE visita_id = ?').run(id);
+      db.prepare('DELETE FROM historial_secciones_calidad WHERE visita_id = ?').run(id);
       db.prepare('DELETE FROM visitas WHERE id = ?').run(id);
       if (visita.evento_id) {
-        db.prepare('DELETE FROM eventos_calendario WHERE id = ?').run(visita.evento_id);
+        const otherVisits = db.prepare('SELECT COUNT(*) as count FROM visitas WHERE evento_id = ?').get(visita.evento_id);
+        if (otherVisits && otherVisits.count === 0) {
+          db.prepare("UPDATE solicitudes_visita SET evento_id = NULL, estado = 'pendiente' WHERE evento_id = ?").run(visita.evento_id);
+          db.prepare('DELETE FROM eventos_calendario WHERE id = ?').run(visita.evento_id);
+        }
       }
     });
     deleteTx();

@@ -97,7 +97,8 @@ export default function DashboardLayout({ children }) {
       '/solicitudes': 'solicitudes',
       '/reportes': 'reportes',
       '/archivos': 'archivos',
-      '/admin': 'admin'
+      '/admin': 'admin',
+      '/mantenimiento': 'mantenimiento'
     };
     const modKey = moduleMap[path];
     if (modKey && user.permisos_adicionales && user.permisos_adicionales[modKey] !== undefined) {
@@ -111,25 +112,28 @@ export default function DashboardLayout({ children }) {
 
     switch (path) {
       case '/dashboard':
-        return true; // All roles can see dashboard
+        return true;
       case '/territorial':
-        return [2, 8].includes(rol); // Coordinator, Visualizador
+        return [2, 8].includes(rol);
       case '/calendario':
-        return [2, 8, 17, ...todosOperacionales].includes(rol); // Coordinator, Visualizador, PDV, and operational staff
+        return [2, 8, 17, ...todosOperacionales].includes(rol);
       case '/visitas':
-        return [2, 17, ...todosOperacionales].includes(rol); // Coordinator, PDV, Supervisors, and Auxiliares
+        return [2, 17, ...todosOperacionales].includes(rol);
       case '/bloqueos':
-        return [2].includes(rol); // Coordinator
+        return [2].includes(rol);
       case '/equipos':
-        return [2, 4, 9, 12, 16].includes(rol); // Coordinator, Maintenance, and Systems roles can scan
+        return [2, 4, 9, 12, 16].includes(rol);
       case '/solicitudes':
-        return [1, 2, 4, 9, 12, 16, 17].includes(rol); // Admin, Coordinator, Mantenimiento, Sistemas, and PDVs
+        return [1, 2, 4, 9, 12, 16, 17].includes(rol);
       case '/reportes':
-        return [1, 2, 3, 4, 5, 6, 7, 8, 9].includes(rol); // Only Admin, Coordinator, Visualizador, and Area Chiefs can view reports
+        return [1, 2, 3, 4, 5, 6, 7, 8, 9].includes(rol);
       case '/archivos':
-        return true; // Todos los roles con acceso pueden ver y gestionar archivos del repositorio
+        return true;
       case '/admin':
-        return rol === 1; // Admin only
+        return rol === 1;
+      case '/mantenimiento':
+        // Admin, Jefe Mantenimiento (4), Aux Mantenimiento (12), Jefe Sistemas (9), Aux Sistemas (16), Coordinador (2), Calidad roles
+        return [1, 2, 3, 4, 5, 6, 9, 12, 16].includes(rol);
       default:
         return false;
     }
@@ -218,6 +222,16 @@ export default function DashboardLayout({ children }) {
           icon: (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+          )
+        },
+        {
+          name: 'Mantenimiento MT/ST',
+          path: '/mantenimiento',
+          accessPath: '/mantenimiento',
+          icon: (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
             </svg>
           )
         }
@@ -361,6 +375,7 @@ export default function DashboardLayout({ children }) {
     if (pathname === '/bloqueos') return 'Gestión de Bloqueos de Horario';
     if (pathname === '/archivos') return 'Repositorio Central de Archivos';
     if (pathname === '/admin') return 'Panel de Administración';
+    if (pathname === '/mantenimiento') return 'Módulo de Mantenimiento';
     return 'Crepes en Punto';
   };
 
@@ -531,6 +546,15 @@ export default function DashboardLayout({ children }) {
               </svg>
             </span>
             <span className="bottom-nav-label">Calendario</span>
+          </Link>
+
+          <Link href="/mantenimiento" className={`bottom-nav-item ${pathname === '/mantenimiento' ? 'active' : ''}`}>
+            <span className="bottom-nav-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+              </svg>
+            </span>
+            <span className="bottom-nav-label">Mant.</span>
           </Link>
 
           <button onClick={() => setSidebarOpen(true)} className={`bottom-nav-item button-reset ${sidebarOpen ? 'active' : ''}`}>

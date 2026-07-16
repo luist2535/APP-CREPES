@@ -1661,7 +1661,7 @@ function AdminContent() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 320px) 1fr', gap: '24px', alignItems: 'start' }}>
+          <div className="roles-permissions-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 320px) 1fr', gap: '24px', alignItems: 'start' }}>
             {/* Left Column: Roles Selector */}
             <div className="card" style={{ borderRadius: '14px', border: '1px solid #E8DDD4', overflow: 'hidden' }}>
               <div className="card-header" style={{ background: '#F8F4EE', padding: '14px 18px', borderBottom: '1px solid #E8DDD4' }}>
@@ -1859,7 +1859,14 @@ function AdminContent() {
                                     const actionKey = `${mod.key}.${action.key}`;
                                     const customActionEntry = rolesPermisosData.customPermissions.find(cp => cp.rol_id === currentRole.id && cp.modulo === actionKey);
                                     const sensitiveActions = ['eliminar', 'eliminar_documentos', 'admin_carpetas', 'firmar_jefe'];
-                                    const isDefaultActionAllowed = sensitiveActions.includes(action.key) ? [1, 2, 3, 4, 5, 6, 7, 8, 9].includes(currentRole.id) : true;
+                                    let isDefaultActionAllowed = sensitiveActions.includes(action.key) ? [1, 2, 3, 4, 5, 6, 7, 8, 9].includes(currentRole.id) : true;
+                                    if (mod.key === 'mantenimiento') {
+                                      if (action.key === 'exportar_excel' || action.key === 'asignar_tickets') {
+                                        isDefaultActionAllowed = [1, 4, 9].includes(currentRole.id);
+                                      } else if (action.key === 'gestionar_tablero' || action.key === 'ver_indicadores') {
+                                        if ([12, 5, 13].includes(currentRole.id)) isDefaultActionAllowed = false;
+                                      }
+                                    }
                                     const isActionAllowed = isAdmin ? true : (customActionEntry !== undefined ? Boolean(customActionEntry.permitido) : isDefaultActionAllowed);
 
                                     return (
@@ -2142,8 +2149,20 @@ function AdminContent() {
           border: 1px solid rgba(34, 197, 94, 0.2);
         }
 
-        /* Mobile responsive overrides for admin page */
         @media (max-width: 767px) {
+          .desktop-only-table {
+            display: none !important;
+          }
+          .mobile-only-cards {
+            display: grid;
+            gap: var(--spacing-sm);
+          }
+          .desktop-role-filter {
+            display: none !important;
+          }
+          .mobile-role-filter {
+            display: block;
+          }
           .tabs-header {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
@@ -2196,6 +2215,42 @@ function AdminContent() {
 
           .form-row-split {
             grid-template-columns: 1fr;
+          }
+
+          /* ===== RESPONSIVE ROLES Y PERMISOS (CELULAR) ===== */
+          /* Convierte la cuadrícula de 2 columnas en apilada */
+          .roles-permissions-section > div[style*="grid-template-columns"],
+          .roles-permissions-section [style*="grid-template-columns"] {
+            grid-template-columns: 1fr !important;
+          }
+
+          /* Lista de cargos: scroll horizontal -> lista vertical compacta */
+          .roles-permissions-section [style*="maxHeight: '650px'"],
+          .roles-permissions-section [style*="max-height"] {
+            max-height: 200px !important;
+          }
+
+          /* Botones de cargo: más compactos en celular */
+          .roles-permissions-section button[style*="flexDirection: 'column'"] {
+            padding: 10px 12px !important;
+          }
+
+          /* Área de táctil mínima 44px para toggles y checkboxes */
+          .roles-permissions-section input[type="checkbox"],
+          .roles-permissions-section button[style*="borderRadius: '50%'"] {
+            min-width: 40px !important;
+            min-height: 40px !important;
+          }
+
+          /* Header de la sección de permisos: apilar en celular */
+          .roles-permissions-section [style*="display: 'flex'"][style*="justifyContent: 'space-between'"] {
+            flex-direction: column !important;
+            gap: 10px !important;
+          }
+
+          /* Fila de acciones granulares: envolver en celular */
+          .roles-permissions-section [style*="flexWrap: 'wrap'"] {
+            gap: 6px !important;
           }
         }
 

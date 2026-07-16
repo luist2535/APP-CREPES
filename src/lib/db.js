@@ -57,6 +57,13 @@ function getDb() {
     try { db.exec('ALTER TABLE visitas ADD COLUMN historial_versiones TEXT DEFAULT "[]"'); } catch (e) {}
     try { db.exec('ALTER TABLE plantillas ADD COLUMN descripcion TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE plantillas ADD COLUMN historial_versiones TEXT DEFAULT "[]"'); } catch (e) {}
+    try { db.exec('ALTER TABLE mantenimientos ADD COLUMN firma_tecnico TEXT'); } catch (e) {}
+    try { db.exec('ALTER TABLE mantenimientos ADD COLUMN firma_solicitante TEXT'); } catch (e) {}
+    try { db.exec('ALTER TABLE mantenimientos ADD COLUMN checklist_tareas TEXT'); } catch (e) {}
+    try { db.exec('ALTER TABLE mantenimientos ADD COLUMN firma_jefe TEXT'); } catch (e) {}
+    try { db.exec('ALTER TABLE mantenimientos ADD COLUMN observaciones_aprobacion TEXT'); } catch (e) {}
+    try { db.exec('ALTER TABLE mantenimientos ADD COLUMN fecha_aprobacion DATETIME'); } catch (e) {}
+    try { db.exec('ALTER TABLE mantenimientos ADD COLUMN pdv_id INTEGER'); } catch (e) {}
   }
   return db;
 }

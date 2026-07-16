@@ -19,10 +19,10 @@ export default function RootLayout({ children }) {
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="brown-translucent" />
-        <link rel="icon" href="/images/logo-crepes-brown.png" media="(prefers-color-scheme: light)" />
-        <link rel="icon" href="/images/logo-crepes-light.png" media="(prefers-color-scheme: dark)" />
-        <link rel="shortcut icon" href="/images/logo-crepes-brown.png" />
-        <link rel="apple-touch-icon" href="/images/logo-crepes-brown.png" />
+        <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png?v=6" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png?v=6" />
+        <link rel="shortcut icon" href="/favicon.ico?v=6" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=6" />
       </head>
       <body>{children}</body>
     </html>

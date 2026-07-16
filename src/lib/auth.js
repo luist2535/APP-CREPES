@@ -79,22 +79,22 @@ function getUserAssignedCityId(user, db) {
 }
 
 const DEFAULT_ROLE_PERMISSIONS = {
-  1: ['dashboard', 'territorial', 'calendario', 'visitas', 'bloqueos', 'equipos', 'solicitudes', 'reportes', 'archivos', 'admin'],
-  2: ['dashboard', 'territorial', 'calendario', 'visitas', 'bloqueos', 'equipos', 'solicitudes', 'reportes', 'archivos'],
+  1: ['dashboard', 'territorial', 'calendario', 'visitas', 'bloqueos', 'equipos', 'mantenimiento', 'solicitudes', 'reportes', 'archivos', 'admin'],
+  2: ['dashboard', 'territorial', 'calendario', 'visitas', 'bloqueos', 'equipos', 'mantenimiento', 'solicitudes', 'reportes', 'archivos'],
   3: ['dashboard', 'calendario', 'visitas', 'reportes', 'archivos'],
-  4: ['dashboard', 'calendario', 'visitas', 'equipos', 'solicitudes', 'reportes', 'archivos'],
-  5: ['dashboard', 'calendario', 'visitas', 'reportes', 'archivos'],
+  4: ['dashboard', 'calendario', 'visitas', 'equipos', 'mantenimiento', 'solicitudes', 'reportes', 'archivos'],
+  5: ['dashboard', 'calendario', 'visitas', 'mantenimiento', 'reportes', 'archivos'],
   6: ['dashboard', 'calendario', 'visitas', 'reportes', 'archivos'],
   7: ['dashboard', 'calendario', 'visitas', 'reportes', 'archivos'],
   8: ['dashboard', 'territorial', 'calendario', 'reportes', 'archivos'],
-  9: ['dashboard', 'calendario', 'visitas', 'equipos', 'solicitudes', 'reportes', 'archivos'],
+  9: ['dashboard', 'calendario', 'visitas', 'equipos', 'mantenimiento', 'solicitudes', 'reportes', 'archivos'],
   10: ['dashboard', 'calendario', 'visitas', 'archivos'],
   11: ['dashboard', 'calendario', 'visitas', 'archivos'],
-  12: ['dashboard', 'calendario', 'visitas', 'equipos', 'solicitudes', 'archivos'],
-  13: ['dashboard', 'calendario', 'visitas', 'archivos'],
+  12: ['dashboard', 'calendario', 'visitas', 'equipos', 'mantenimiento', 'solicitudes', 'archivos'],
+  13: ['dashboard', 'calendario', 'visitas', 'mantenimiento', 'archivos'],
   14: ['dashboard', 'calendario', 'visitas', 'archivos'],
   15: ['dashboard', 'calendario', 'visitas', 'archivos'],
-  16: ['dashboard', 'calendario', 'visitas', 'equipos', 'solicitudes', 'archivos'],
+  16: ['dashboard', 'calendario', 'visitas', 'equipos', 'mantenimiento', 'solicitudes', 'archivos'],
   17: ['dashboard', 'calendario', 'visitas', 'solicitudes', 'archivos']
 };
 
@@ -102,7 +102,8 @@ const MODULE_DEFINITIONS = [
   { key: 'dashboard', nombre: 'Dashboard Principal', icon: '📊', desc: 'Vista general de indicadores y estadísticas' },
   { key: 'visitas', nombre: 'Checklists e Inspecciones', icon: '📋', desc: 'Realización y consulta de auditorías y visitas' },
   { key: 'calendario', nombre: 'Calendario y Programación', icon: '📅', desc: 'Cronograma de inspecciones y agendas del equipo' },
-  { key: 'equipos', nombre: 'Escanear / Mantenimiento', icon: '📷', desc: 'Escaneo QR de equipos, repositorios y hojas de vida' },
+  { key: 'mantenimiento', nombre: 'Tickets y Órdenes de Mantenimiento', icon: '🛠️', desc: 'Gestión de tickets, hojas de vida de equipos, asignación y modo visita' },
+  { key: 'equipos', nombre: 'Escanear / Hoja de Vida', icon: '📷', desc: 'Escaneo QR de equipos y consulta técnica' },
   { key: 'solicitudes', nombre: 'Solicitudes de Visita', icon: '🎟️', desc: 'Creación y atención de tickets o solicitudes' },
   { key: 'reportes', nombre: 'Analítica y Reportes', icon: '📈', desc: 'Exportaciones de Excel y reportes estadísticos' },
   { key: 'territorial', nombre: 'Gestión Territorial / Mapa', icon: '🗺️', desc: 'Mapa interactivo y distribución por zonas' },
@@ -112,6 +113,15 @@ const MODULE_DEFINITIONS = [
 ];
 
 const GRANULAR_MODULE_ACTIONS = {
+  mantenimiento: [
+    { key: 'exportar_excel', label: 'Exportar reportes de mantenimiento a Excel' },
+    { key: 'ver_asignados', label: 'Modo Visita: Ver y ejecutar solo los tickets asignados (Técnicos de Mantenimiento)' },
+    { key: 'crear_hallazgo', label: 'Crear nuevos tickets / reportar hallazgos (Sistemas de Calidad)' },
+    { key: 'gestionar_tablero', label: 'Acceso al Tablero general y vista de todos los tickets' },
+    { key: 'asignar_tickets', label: 'Acceso a pestaña Asignación para distribuir y supervisar tickets' },
+    { key: 'ver_indicadores', label: 'Acceso a Indicadores (KPIs) y Alertas de mantenimiento' },
+    { key: 'generar_pdf', label: 'Generar e imprimir reporte PDF del mantenimiento' }
+  ],
   archivos: [
     { key: 'ver_fotos', label: 'Ver fotografías' },
     { key: 'subir_fotos', label: 'Subir fotografías' },
@@ -207,6 +217,25 @@ function hasActionPermission(user, modulo, accion, db) {
         return Boolean(customAction.permitido);
       }
     } catch (e) {}
+  }
+
+  // Reglas específicas por módulo si no existe override en base de datos
+  if (modulo === 'mantenimiento') {
+    if (accion === 'exportar_excel') {
+      // Solo Admin (1), Supervisor/Jefe Mantenimiento (4), Jefe Sistemas (9)
+      return [1, 4, 9].includes(rolInt);
+    }
+    if (accion === 'ver_asignados' || accion === 'crear_hallazgo') {
+      return true; // Todos los roles que acceden a mantenimiento pueden ver sus tareas o crear hallazgos
+    }
+    if (accion === 'gestionar_tablero' || accion === 'ver_indicadores') {
+      // Si es Auxiliar de Mantenimiento (12) o Sistemas de Calidad (5, 13), por defecto NO ven el tablero completo ni indicadores
+      if (rolInt === 12 || rolInt === 5 || rolInt === 13) return false;
+      return true;
+    }
+    if (accion === 'asignar_tickets') {
+      return [1, 4, 9].includes(rolInt);
+    }
   }
 
   // By default, if the user has general access to the module and no specific action denial exists,
