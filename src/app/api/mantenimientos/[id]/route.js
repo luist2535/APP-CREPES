@@ -98,24 +98,25 @@ export async function PATCH(request, { params }) {
       if (!ROLES_JEFE.includes(rolId)) {
         return NextResponse.json({ error: 'Solo el Jefe de Mantenimiento o Sistemas puede asignar tickets.' }, { status: 403 });
       }
-      const { tecnico_id, fecha_programada, prioridad, observaciones_asignacion, checklist_tareas } = body;
+      const { tecnico_id, fecha_programada, prioridad, observaciones_asignacion, checklist_tareas, categoria_id } = body;
       if (!tecnico_id || !fecha_programada) {
         return NextResponse.json({ error: 'Técnico y fecha programada son obligatorios para asignar.' }, { status: 400 });
       }
 
       const checklistJson = checklist_tareas ? JSON.stringify(checklist_tareas) : '[]';
+      const catId = categoria_id ? parseInt(categoria_id) : null;
 
       db.prepare(`
         UPDATE mantenimientos 
-        SET tecnico_id = ?, fecha_programada = ?, prioridad = ?, observaciones_asignacion = ?, estado = 'Asignado', responsable_asignacion_id = ?, checklist_tareas = ?
+        SET tecnico_id = ?, fecha_programada = ?, prioridad = ?, observaciones_asignacion = ?, estado = 'Asignado', responsable_asignacion_id = ?, checklist_tareas = ?, categoria_id = COALESCE(?, categoria_id)
         WHERE id = ?
-      `).run(tecnico_id, fecha_programada, prioridad || actual.prioridad, observaciones_asignacion || null, user.id, checklistJson, id);
+      `).run(tecnico_id, fecha_programada, prioridad || actual.prioridad, observaciones_asignacion || null, user.id, checklistJson, catId, id);
 
       // Registrar en historial
       db.prepare(`
         INSERT INTO historial_mantenimientos (mantenimiento_id, user_id, accion, estado_anterior, estado_nuevo, detalles_cambio)
         VALUES (?, ?, 'ASIGNACION', ?, 'Asignado', ?)
-      `).run(id, user.id, actual.estado, JSON.stringify({ tecnico_id, fecha_programada, prioridad, checklist_count: checklist_tareas?.length || 0 }));
+      `).run(id, user.id, actual.estado, JSON.stringify({ tecnico_id, fecha_programada, prioridad, categoria_id: catId, checklist_count: checklist_tareas?.length || 0 }));
 
       // Integración con el Calendario
       try {
@@ -313,7 +314,7 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ message: 'Ticket actualizado' });
     }
 
-    // ===== GUARDAR AVANCE (CHECKLIST / SOLUCION TEMPORAL) =====
+    // ===== GUARDAR AVANCE (CHECKLIST / SOLUCION TEMPORAL / FOTOS) =====
     if (accion === 'guardar_avance') {
       const { solucion_aplicada, observaciones, checklist_completado } = body;
       if (checklist_completado) {
@@ -324,6 +325,11 @@ export async function PATCH(request, { params }) {
       }
       if (solucion_aplicada !== undefined || observaciones !== undefined) {
         db.prepare('UPDATE mantenimientos SET solucion_aplicada = COALESCE(?, solucion_aplicada), observaciones = COALESCE(?, observaciones) WHERE id = ?').run(solucion_aplicada || null, observaciones || null, id);
+      }
+      if (fileUrls.length > 0) {
+        let evidenciasActuales = actual.evidencias ? JSON.parse(actual.evidencias) : [];
+        evidenciasActuales = [...evidenciasActuales, ...fileUrls];
+        db.prepare('UPDATE mantenimientos SET evidencias = ? WHERE id = ?').run(JSON.stringify(evidenciasActuales), id);
       }
       return NextResponse.json({ message: 'Avance del trabajo guardado correctamente' });
     }

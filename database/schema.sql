@@ -313,6 +313,7 @@ CREATE TABLE IF NOT EXISTS mantenimientos (
   area_hallazgo TEXT,                   -- Área donde se detectó el hallazgo
   equipo_id TEXT,                       -- NULL para mantenimientos locativos
   pdv_id INTEGER,                       -- PDV o lugar específico donde está el hallazgo
+  categoria_id INTEGER,                 -- Categoría / subcategoría asignada al ticket
   descripcion TEXT NOT NULL,            -- Descripción del hallazgo o problema
   fecha_evidencia DATE NOT NULL,        -- Fecha en que se evidenció el problema
   fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP,

@@ -64,6 +64,45 @@ function getDb() {
     try { db.exec('ALTER TABLE mantenimientos ADD COLUMN observaciones_aprobacion TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE mantenimientos ADD COLUMN fecha_aprobacion DATETIME'); } catch (e) {}
     try { db.exec('ALTER TABLE mantenimientos ADD COLUMN pdv_id INTEGER'); } catch (e) {}
+    try { db.exec('ALTER TABLE mantenimientos ADD COLUMN categoria_id INTEGER'); } catch (e) {}
+
+    // Migración para separar Techos, Paredes y Pisos en plantillas existentes
+    try {
+      const plantillas = db.prepare("SELECT id, campos FROM plantillas WHERE campos LIKE '%techos, paredes%'").all();
+      for (const p of plantillas) {
+        if (p.campos) {
+          let camposObj = JSON.parse(p.campos);
+          let modificado = false;
+          if (Array.isArray(camposObj)) {
+            camposObj.forEach(c => {
+              if (c && Array.isArray(c.secciones)) {
+                c.secciones.forEach(sec => {
+                  if (sec && Array.isArray(sec.filas)) {
+                    const newFilas = [];
+                    sec.filas.forEach(fila => {
+                      if (typeof fila === 'string' && fila.includes('techos, paredes están libres de humedades')) {
+                        newFilas.push('Los techos están libres de humedades, limpios y en buen estado.');
+                        newFilas.push('Las paredes están completamente lisas, limpias y libres de humedades.');
+                        newFilas.push('Los pisos están limpios, escurridos y en buen estado.');
+                        modificado = true;
+                      } else {
+                        newFilas.push(fila);
+                      }
+                    });
+                    sec.filas = newFilas;
+                  }
+                });
+              }
+            });
+          }
+          if (modificado) {
+            db.prepare('UPDATE plantillas SET campos = ? WHERE id = ?').run(JSON.stringify(camposObj), p.id);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error migrando plantillas techos/paredes:', e);
+    }
   }
   return db;
 }

@@ -45,7 +45,8 @@ export async function GET(request) {
         ua.nombre as responsable_asignacion_nombre,
         ut.nombre as tecnico_nombre,
         e.nombre as equipo_nombre, e.pdv_id as equipo_pdv_id,
-        p.nombre as pdv_nombre, c.nombre as ciudad_nombre
+        p.nombre as pdv_nombre, c.nombre as ciudad_nombre,
+        cat.nombre as categoria_nombre
       FROM mantenimientos m
       LEFT JOIN users ur ON m.user_id_registro = ur.id
       LEFT JOIN users ua ON m.responsable_asignacion_id = ua.id
@@ -53,6 +54,7 @@ export async function GET(request) {
       LEFT JOIN equipos e ON m.equipo_id = e.id
       LEFT JOIN pdv p ON p.id = COALESCE(m.pdv_id, e.pdv_id, ur.pdv_id)
       LEFT JOIN ciudades c ON p.ciudad_id = c.id
+      LEFT JOIN categorias_visita cat ON m.categoria_id = cat.id
       WHERE 1=1
     `;
     const params = [];
@@ -133,7 +135,15 @@ export async function GET(request) {
       ORDER BY u.nombre
     `).all();
 
-    return NextResponse.json({ mantenimientos, stats, tecnicosMT, tecnicosST });
+    const categorias = db.prepare(`
+      SELECT c.*, p.nombre as padre_nombre
+      FROM categorias_visita c
+      LEFT JOIN categorias_visita p ON c.padre_id = p.id
+      WHERE c.activa = 1
+      ORDER BY c.area_id, c.padre_id NULLS FIRST, c.nombre
+    `).all();
+
+    return NextResponse.json({ mantenimientos, stats, tecnicosMT, tecnicosST, categorias });
   } catch (error) {
     console.error('GET /api/mantenimientos error:', error);
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 });

@@ -452,12 +452,14 @@ const calculateVisitScore = (visit, plantillas) => {
           let colSi = 0;
           let colNo = 0;
           let colNa = 0;
-          firstField.secciones.forEach(sec => {
+          firstField.secciones.forEach((sec, sIdx) => {
+            const hasMultiSec = firstField.secciones.length > 1;
             if (sec && Array.isArray(sec.filas)) {
               sec.filas.forEach(fila => {
                 colTotal++;
                 totalAspectos++;
-                const val = data[`${fila}__${col}`];
+                const baseKey = hasMultiSec ? `${fila}__sec_${sIdx}` : fila;
+                const val = data[`${baseKey}__${col}`] || data[`${fila}__${col}`];
                 if (val === 'SI') { colSi++; satisfactorios++; }
                 else if (val === 'NO') { colNo++; noSatisfactorios++; }
                 else if (val === 'NA') { colNa++; noAplica++; }
@@ -488,11 +490,13 @@ const calculateVisitScore = (visit, plantillas) => {
           let secSi = 0;
           let secNo = 0;
           let secNa = 0;
+          const hasMultiSec = firstField.secciones.length > 1;
           if (sec && Array.isArray(sec.filas)) {
             sec.filas.forEach(fila => {
               secTotal++;
               totalAspectos++;
-              const val = data[fila] || (Array.isArray(firstField.columnas) && firstField.columnas[0] ? data[`${fila}__${firstField.columnas[0]}`] : null);
+              const baseKey = hasMultiSec ? `${fila}__sec_${idx}` : fila;
+              const val = data[baseKey] || data[fila] || (Array.isArray(firstField.columnas) && firstField.columnas[0] ? (data[`${baseKey}__${firstField.columnas[0]}`] || data[`${fila}__${firstField.columnas[0]}`]) : null);
               if (val === 'SI') { secSi++; satisfactorios++; }
               else if (val === 'NO') { secNo++; noSatisfactorios++; }
               else if (val === 'NA') { secNa++; noAplica++; }
@@ -755,7 +759,11 @@ const MatrixChecklistForm = ({
   observaciones,
   onObservacionesChange,
   onSaveProgress,
-  savingProgress
+  savingProgress,
+  evidenciasList,
+  onMultiFileUpload,
+  onRemoveEvidencia,
+  evidenciasUploading
 }) => {
   const [collapsedSections, setCollapsedSections] = useState({});
 
@@ -769,19 +777,23 @@ const MatrixChecklistForm = ({
   const hasSubareaTabs = safeColumnas.length > 0 &&
     !safeColumnas.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
 
-  const getAnswerKey = (fila) => {
+  const getAnswerKey = (fila, sec, sIdx) => {
+    let base = fila;
+    if (safeSecciones.length > 1 && sec !== undefined) {
+      base = `${fila}__sec_${sIdx}`;
+    }
     if (hasSubareaTabs) {
-      return `${fila}__${activeTab}`;
+      return `${base}__${activeTab}`;
     }
     if (template?.tipo === 'matrix' && safeColumnas.length > 0) {
-      return `${fila}__${safeColumnas[0]}`;
+      return `${base}__${safeColumnas[0]}`;
     }
-    return fila;
+    return base;
   };
 
   const handleRadioChange = (key, val, fila) => {
     onChange(key, val);
-    if (!hasSubareaTabs && key !== fila) {
+    if (!hasSubareaTabs && safeSecciones.length <= 1 && key !== fila) {
       onChange(fila, val);
     }
   };
@@ -894,8 +906,8 @@ const MatrixChecklistForm = ({
                   {/* Item Rows */}
                   <div className="section-rows">
                     {safeFilas.map((fila, fIdx) => {
-                      const answerKey = getAnswerKey(fila);
-                      const currentValue = answers ? (answers[answerKey] || answers[fila] || '') : '';
+                      const answerKey = getAnswerKey(fila, sec, sIdx);
+                      const currentValue = answers ? (answers[answerKey] !== undefined ? answers[answerKey] : (!hasSubareaTabs && safeSecciones.length <= 1 ? (answers[fila] || '') : '')) : '';
 
                       return (
                         <div key={fIdx} className="checklist-row-item" style={{ display: 'flex', flexDirection: 'column', padding: '12px 18px', borderBottom: fIdx === safeFilas.length - 1 ? 'none' : '1px solid #f1f5f9', transition: 'background-color 0.15s' }}>
@@ -990,10 +1002,10 @@ const MatrixChecklistForm = ({
                             <input
                               type="text"
                               placeholder="💬 Observación o hallazgo para este ítem (opcional)..."
-                              value={hasSubareaTabs ? (answers[`${answerKey}__obs`] || '') : (answers[`${answerKey}__obs`] || answers[`${fila}__obs`] || '')}
+                              value={answers ? (answers[`${answerKey}__obs`] !== undefined ? answers[`${answerKey}__obs`] : (!hasSubareaTabs && safeSecciones.length <= 1 ? (answers[`${fila}__obs`] || '') : '')) : ''}
                               onChange={(e) => {
                                 onChange(`${answerKey}__obs`, e.target.value);
-                                if (!hasSubareaTabs && answerKey !== fila) {
+                                if (!hasSubareaTabs && safeSecciones.length <= 1 && `${answerKey}__obs` !== `${fila}__obs`) {
                                   onChange(`${fila}__obs`, e.target.value);
                                 }
                               }}
@@ -1185,6 +1197,90 @@ const MatrixChecklistForm = ({
           </div>
         );
       })()}
+
+      {/* Sección Integrada de Evidencias Fotográficas Múltiples del Checklist */}
+      {onMultiFileUpload && (
+        <div className="matrix-evidencias-box" style={{ marginTop: '26px', padding: '18px', backgroundColor: '#EFF6FF', borderRadius: '14px', border: '2px dashed #3B82F6' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
+            <div>
+              <h4 style={{ margin: 0, color: '#1E3A8A', fontSize: '1.05rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                📸 Evidencias Fotográficas del Checklist ({evidenciasList?.length || 0} adjuntas)
+              </h4>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#3B82F6', fontWeight: '600' }}>
+                Puedes adjuntar varias fotos simultáneamente (ej. 5 o más evidencias de hallazgos en este checklist).
+              </p>
+            </div>
+            <div>
+              <input
+                id="upload-evidencias-matrix"
+                type="file"
+                accept="image/*,application/pdf"
+                multiple
+                onChange={onMultiFileUpload}
+                style={{ display: 'none' }}
+              />
+              <button
+                type="button"
+                onClick={() => document.getElementById('upload-evidencias-matrix')?.click()}
+                disabled={evidenciasUploading}
+                style={{
+                  background: '#2563EB',
+                  color: '#FFF',
+                  border: 'none',
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  fontWeight: '800',
+                  fontSize: '0.88rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 2px 6px rgba(37,99,235,0.3)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {evidenciasUploading ? '⌛ Cargando...' : '➕ Adjuntar Evidencias (Subir 5+ fotos)'}
+              </button>
+            </div>
+          </div>
+
+          {Array.isArray(evidenciasList) && evidenciasList.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '12px', marginTop: '14px' }}>
+              {evidenciasList.map((ev, idx) => (
+                <div key={ev.id || idx} style={{ backgroundColor: '#FFF', border: '1px solid #BFDBFE', borderRadius: '10px', padding: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveEvidencia && onRemoveEvidencia(idx)}
+                    style={{ position: 'absolute', top: '4px', right: '4px', background: '#EF4444', color: '#FFF', border: 'none', borderRadius: '50%', width: '22px', height: '22px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}
+                    title="Eliminar evidencia"
+                  >
+                    ×
+                  </button>
+                  {ev.url && (ev.url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || ev.url.includes('/uploads/')) ? (
+                    <div style={{ width: '100%', height: '80px', borderRadius: '6px', overflow: 'hidden', marginBottom: '6px', backgroundColor: '#F1F5F9' }}>
+                      <img src={ev.url} alt={`Evidencia ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                  ) : (
+                    <div style={{ width: '100%', height: '80px', borderRadius: '6px', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', marginBottom: '6px' }}>
+                      📄
+                    </div>
+                  )}
+                  <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#1E293B', width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>
+                    {ev.nombre || `Foto ${idx + 1}`}
+                  </span>
+                  <a href={ev.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.7rem', color: '#2563EB', textDecoration: 'underline', marginTop: '2px', fontWeight: '600' }}>
+                    Ver foto
+                  </a>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '16px 10px', color: '#60A5FA', fontSize: '0.85rem', fontWeight: '600' }}>
+              No hay fotografías adjuntas al checklist. Pulsa en "➕ Adjuntar Evidencias (Subir 5+ fotos)" para cargar múltiples evidencias.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* General Observations & Save Progress Button */}
       <div className="observations-save-section" style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1621,6 +1717,9 @@ export default function VisitasPage() {
   const [soporteUrl, setSoporteUrl] = useState('');
   const [soporteUploading, setSoporteUploading] = useState(false);
 
+  const [evidenciasList, setEvidenciasList] = useState([]); // Lista multi-imagen para Calidad e Inspecciones
+  const [evidenciasUploading, setEvidenciasUploading] = useState(false);
+
   // Equipment selection and scanning states
   const [equipoId, setEquipoId] = useState('');
   const [equipoData, setEquipoData] = useState(null);
@@ -1744,7 +1843,42 @@ export default function VisitasPage() {
       if (!resVisitas.ok) throw new Error('Error al cargar visitas');
       const dataVisitas = await resVisitas.json();
 
-      setVisitas(dataVisitas.visitas);
+      let combinedVisitas = [...(dataVisitas.visitas || [])];
+
+      // Cargar también los tickets de mantenimiento/sistemas asignados para el área "Modo Visita"
+      try {
+        const resMt = await fetch('/api/mantenimientos');
+        if (resMt.ok) {
+          const dataMt = await resMt.json();
+          const mtList = dataMt.mantenimientos || dataMt.tickets || [];
+          const mappedMt = mtList
+            .filter(m => ['Pendiente', 'Asignado', 'En proceso', 'Por Aprobar'].includes(m.estado))
+            .map(m => {
+              let stMap = 'pendiente';
+              if (m.estado === 'En proceso' || m.estado === 'Por Aprobar') stMap = 'en_progreso';
+
+              return {
+                ...m,
+                id: m.id, // MT-xxxx o ST-xxxx
+                fecha: m.fecha_programada || (m.fecha_registro ? m.fecha_registro.split(' ')[0] : (m.created_at ? m.created_at.split(' ')[0] : '')),
+                pdv_nombre: m.pdv_nombre || (m.equipo_nombre ? `Equipo: ${m.equipo_nombre}` : 'Soporte / Visita Técnica'),
+                ciudad_nombre: m.ciudad_nombre || 'N/A',
+                area_nombre: m.prefijo === 'ST' ? 'Sistemas / Tecnología (ST)' : 'Mantenimiento Técnico (MT)',
+                area_color: m.prefijo === 'ST' ? '#2563EB' : '#D97706',
+                tipo_visita_nombre: `Ticket ${m.id} · ${m.tipo_mantenimiento || 'Soporte Correctivo'}`,
+                observaciones: m.descripcion || m.observaciones || 'Visita asignada para atención en punto',
+                estado: stMap,
+                estado_original: m.estado,
+                origen: 'mantenimiento'
+              };
+            });
+          combinedVisitas = [...combinedVisitas, ...mappedMt];
+        }
+      } catch (errMt) {
+        console.warn('Error cargando mantenimientos asignados en Modo Visita:', errMt);
+      }
+
+      setVisitas(combinedVisitas);
       setAreas(dataVisitas.areas);
       setTiposVisita(dataVisitas.tiposVisita);
       setPlantillas(dataVisitas.plantillas);
@@ -1823,6 +1957,7 @@ export default function VisitasPage() {
           formRepuestos,
           formHallazgos,
           formAccionesCorrectivas,
+          evidenciasList,
           solicitanteNombre,
           solicitanteDocumento,
           solicitanteTelefono,
@@ -2248,6 +2383,47 @@ export default function VisitasPage() {
     }
   };
 
+  const handleMultiFileUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setEvidenciasUploading(true);
+    const newEvidencias = [];
+
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('etiqueta', 'calidad_inspeccion');
+
+      try {
+        const res = await fetch('/api/uploads', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (res.ok && data.url) {
+          newEvidencias.push({
+            id: Date.now() + Math.random(),
+            url: data.url,
+            nombre: file.name,
+            fecha: new Date().toISOString().split('T')[0],
+            etiqueta: 'calidad_inspeccion'
+          });
+        }
+      } catch (err) {
+        console.error('Error cargando evidencia múltiple:', err);
+      }
+    }
+
+    setEvidenciasList(prev => [...prev, ...newEvidencias]);
+    setEvidenciasUploading(false);
+    e.target.value = '';
+  };
+
+  const handleRemoveEvidencia = (idx) => {
+    setEvidenciasList(prev => prev.filter((_, i) => i !== idx));
+  };
+
   // Equipment integration helper functions
   const loadEquipmentDetails = async (code) => {
     if (!code || !code.trim()) return;
@@ -2383,6 +2559,8 @@ export default function VisitasPage() {
     setDespuesFile(null);
     setSoporteUrl('');
     setSoporteFile(null);
+    const existingAnswersData = safeParseAnswers(visit.datos_formulario);
+    setEvidenciasList(visit.evidencias || existingAnswersData?.evidencias_lista || []);
 
     setEquipoId(visit.equipo_id || '');
     setEquipoData(null);
@@ -2455,15 +2633,18 @@ export default function VisitasPage() {
             if (hasSubTabs && fields[0].columnas[0]) {
               setActiveMatrixTab(fields[0].columnas[0]);
             }
-            fields[0].secciones.forEach((sec) => {
+            fields[0].secciones.forEach((sec, sIdx) => {
+              const hasMultiSec = fields[0].secciones.length > 1;
               sec.filas.forEach((fila) => {
-                initialAnswers[fila] = existingAnswers[fila] || '';
-                initialAnswers[`${fila}__obs`] = existingAnswers[`${fila}__obs`] || existingAnswers[`${fila}_obs`] || '';
+                const baseKey = hasMultiSec ? `${fila}__sec_${sIdx}` : fila;
+                initialAnswers[baseKey] = existingAnswers[baseKey] !== undefined ? existingAnswers[baseKey] : (existingAnswers[fila] || '');
+                initialAnswers[`${baseKey}__obs`] = existingAnswers[`${baseKey}__obs`] !== undefined ? existingAnswers[`${baseKey}__obs`] : (existingAnswers[`${fila}__obs`] || existingAnswers[`${fila}_obs`] || '');
                 if (fields[0].columnas) {
                   fields[0].columnas.forEach((col) => {
-                    const key = `${fila}__${col}`;
-                    initialAnswers[key] = existingAnswers[key] || '';
-                    initialAnswers[`${key}__obs`] = existingAnswers[`${key}__obs`] || existingAnswers[`${key}_obs`] || '';
+                    const key = `${baseKey}__${col}`;
+                    const oldKey = `${fila}__${col}`;
+                    initialAnswers[key] = existingAnswers[key] !== undefined ? existingAnswers[key] : (existingAnswers[oldKey] || '');
+                    initialAnswers[`${key}__obs`] = existingAnswers[`${key}__obs`] !== undefined ? existingAnswers[`${key}__obs`] : (existingAnswers[`${oldKey}__obs`] || existingAnswers[`${oldKey}_obs`] || '');
                   });
                 }
               });
@@ -2506,6 +2687,7 @@ export default function VisitasPage() {
                 if (draft.formRepuestos) setFormRepuestos(draft.formRepuestos);
                 if (draft.formHallazgos) setFormHallazgos(draft.formHallazgos);
                 if (draft.formAccionesCorrectivas) setFormAccionesCorrectivas(draft.formAccionesCorrectivas);
+                if (draft.evidenciasList && Array.isArray(draft.evidenciasList)) setEvidenciasList(draft.evidenciasList);
                 if (draft.solicitanteNombre) setSolicitanteNombre(draft.solicitanteNombre);
                 if (draft.solicitanteDocumento) setSolicitanteDocumento(draft.solicitanteDocumento);
                 if (draft.solicitanteTelefono) setSolicitanteTelefono(draft.solicitanteTelefono);
@@ -2530,6 +2712,7 @@ export default function VisitasPage() {
       try {
         localStorage.setItem(draftKey, JSON.stringify({
           formAnswers, formObservaciones, formRepuestos, formHallazgos, formAccionesCorrectivas,
+          evidenciasList,
           solicitanteNombre, solicitanteDocumento, solicitanteTelefono, timestamp: new Date().toISOString()
         }));
         setSubmitSuccess('📶 Sin conexión: Tu progreso se ha guardado de forma segura en la memoria interna de este dispositivo.');
@@ -2543,13 +2726,14 @@ export default function VisitasPage() {
     }
 
     try {
+      const datosFormConEvidencias = { ...formAnswers, evidencias_lista: evidenciasList };
       const res = await fetch('/api/visitas', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: activeExecutionVisit.id,
           action: 'guardar_progreso',
-          datos_formulario: formAnswers,
+          datos_formulario: datosFormConEvidencias,
           observaciones: formObservaciones
         })
       });
@@ -2561,9 +2745,10 @@ export default function VisitasPage() {
       if (!navigator.onLine || err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
         const draftKey = `crepes_offline_draft_${activeExecutionVisit.id}`;
         try {
+          const datosFormConEvidencias = { ...formAnswers, evidencias_lista: evidenciasList };
           localStorage.setItem(draftKey, JSON.stringify({
-            formAnswers, formObservaciones, formRepuestos, formHallazgos, formAccionesCorrectivas,
-            solicitanteNombre, solicitanteDocumento, solicitanteTelefono, timestamp: new Date().toISOString()
+            formAnswers: datosFormConEvidencias, formObservaciones, formRepuestos, formHallazgos, formAccionesCorrectivas,
+            solicitanteNombre, solicitanteDocumento, solicitanteTelefono, evidenciasList, timestamp: new Date().toISOString()
           }));
           setSubmitSuccess('📶 Sin conexión: Tu progreso ha sido guardado de manera segura en la memoria interna de tu celular.');
           setTimeout(() => setSubmitSuccess(''), 4000);
@@ -2634,6 +2819,12 @@ export default function VisitasPage() {
       if (antesUrl) evidenciasArray.push({ url: antesUrl, nombre: antesFile?.name || 'Antes', etiqueta: 'antes' });
       if (despuesUrl) evidenciasArray.push({ url: despuesUrl, nombre: despuesFile?.name || 'Después', etiqueta: 'despues' });
       if (soporteUrl) evidenciasArray.push({ url: soporteUrl, nombre: soporteFile?.name || 'Soporte', etiqueta: 'soporte' });
+      if (Array.isArray(evidenciasList)) {
+        evidenciasList.forEach(ev => {
+          if (ev.url) evidenciasArray.push({ url: ev.url, nombre: ev.nombre || 'Evidencia Inspección', etiqueta: ev.etiqueta || 'calidad_inspeccion' });
+        });
+      }
+      const datosFormConEvidencias = { ...formAnswers, evidencias_lista: evidenciasList };
 
       // Determine template/visit type IDs to link if they were null
       let areaId = activeExecutionVisit.area_id;
@@ -2649,7 +2840,7 @@ export default function VisitasPage() {
       const payload = {
         id: activeExecutionVisit.id,
         action: 'finalizar',
-        datos_formulario: formAnswers,
+        datos_formulario: datosFormConEvidencias,
         observaciones: formObservaciones,
         repuestos: isTech ? formRepuestos : null,
         firma_auxiliar: isTech ? auxiliarSignature : null,
@@ -3156,14 +3347,24 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
       {activeExecutionVisit ? (
         <div className="new-visita-tab animate-fade-in no-print">
           <div className="card shadow-md">
-            <div className="card-header execution-header" style={{ borderLeftColor: activeExecutionVisit.area_color || '#6B3A2A' }}>
+            <div className="card-header execution-header" style={{ borderLeftColor: activeExecutionVisit.area_color || '#6B3A2A', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
               <div className="exec-title">
-                <h3>🛠️ Ejecución de Visita / Tarea</h3>
-                <p><strong>Punto de Venta:</strong> {activeExecutionVisit.pdv_nombre} | <strong>Área:</strong> {activeExecutionVisit.area_nombre} ({activeExecutionVisit.area_tipo_flujo === 'tecnico' ? 'Flujo Técnico' : 'Flujo Administrativo'})</p>
+                <h3 style={{ margin: 0, fontSize: '1.2rem' }}>🛠️ Ejecución de Visita / Tarea</h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem' }}><strong>Punto de Venta:</strong> {activeExecutionVisit.pdv_nombre} | <strong>Área:</strong> {activeExecutionVisit.area_nombre} ({activeExecutionVisit.area_tipo_flujo === 'tecnico' ? 'Flujo Técnico' : 'Flujo Administrativo'})</p>
               </div>
-              <button className="btn btn-secondary btn-sm" onClick={() => setActiveExecutionVisit(null)}>
-                Volver a la lista ⬅
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setActiveExecutionVisit(null)} style={{ fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  Volver a la lista ⬅
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveExecutionVisit(null)}
+                  style={{ backgroundColor: '#EF4444', color: '#FFF', border: 'none', width: '34px', height: '34px', borderRadius: '50%', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 5px rgba(239, 68, 68, 0.3)' }}
+                  title="Cerrar vista de ejecución (×)"
+                >
+                  ×
+                </button>
+              </div>
             </div>
             <div className="card-body">
               {submitSuccess && <div className="success-alert">{submitSuccess}</div>}
@@ -3361,6 +3562,10 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                               onObservacionesChange={(val) => setFormObservaciones(val)}
                               onSaveProgress={handleSaveProgress}
                               savingProgress={savingProgress}
+                              evidenciasList={evidenciasList}
+                              onMultiFileUpload={handleMultiFileUpload}
+                              onRemoveEvidencia={handleRemoveEvidencia}
+                              evidenciasUploading={evidenciasUploading}
                             />
                           );
                         } else {
@@ -3453,7 +3658,15 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
 
                 {/* Modal para Editar/Personalizar los Ítems de la Visita actual */}
                 {showVisitChecklistModal && (
-                  <div className="modal-overlay animate-fade-in" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
+                  <div
+                    className="modal-overlay animate-fade-in"
+                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}
+                    onClick={(e) => {
+                      if (e.target && e.target.className && typeof e.target.className === 'string' && e.target.className.includes('modal-overlay')) {
+                        setShowVisitChecklistModal(false);
+                      }
+                    }}
+                  >
                     <div className="card shadow-xl" style={{ width: '100%', maxWidth: '850px', maxHeight: '85vh', overflowY: 'auto', background: '#FFF', borderRadius: '18px', padding: '26px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #E2E8F0', paddingBottom: '16px', marginBottom: '20px' }}>
                         <div>
@@ -3467,7 +3680,8 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                         <button
                           type="button"
                           onClick={() => setShowVisitChecklistModal(false)}
-                          style={{ background: '#F1F5F9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', color: '#475569' }}
+                          style={{ background: '#EF4444', border: 'none', width: '38px', height: '38px', borderRadius: '50%', fontSize: '1.4rem', fontWeight: '900', cursor: 'pointer', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(239, 68, 68, 0.4)' }}
+                          title="Cerrar (✕)"
                         >
                           ✕
                         </button>
@@ -3720,72 +3934,176 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                       </div>
                     )}
 
-                    {/* Evidences (grouped by label) */}
-                    <div className="evidencias-upload-section">
-                      <h5>📸 Cargar Evidencias ({activeExecutionVisit.area_tipo_flujo === 'tecnico' ? 'Obligatorias' : 'Opcionales'})</h5>
+                    {/* Evidencias Múltiples (Solo se muestra aquí si no hay checklist integrado visible) */}
+                    {(() => {
+                      const parsedCampos = safeParseCampos(activeExecutionVisit.campos_personalizados || activePlantilla?.campos);
+                      const firstField = parsedCampos[0];
+                      const hasChecklist = firstField && (firstField.tipo === 'matrix' || firstField.tipo === 'simple_checklist');
+                      return !hasChecklist;
+                    })() && (
+                      <div className="evidencias-upload-section" style={{ marginTop: '24px' }}>
+                        <h5 style={{ fontSize: '1.08rem', fontWeight: '800', color: '#1E293B', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          📸 Registro de Evidencias Fotográficas y Hallazgos ({evidenciasList.length} adjuntas)
+                        </h5>
 
-                      <div className="upload-fields-grid">
-
-                        {/* 1. Foto del ANTES */}
-                        <div className="upload-card">
-                          <label className="form-label">
-                            Foto del ANTES {activeExecutionVisit.area_tipo_flujo === 'tecnico' && <span className="req-star">*</span>}
-                          </label>
-                          <div className="real-upload-control">
-                            <input
-                              id="exec-upload-antes"
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handleFileUpload(e, 'antes', setAntesFile, setAntesUrl, setAntesUploading)}
-                              style={{ display: 'none' }}
-                            />
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm btn-block"
-                              onClick={() => document.getElementById('exec-upload-antes').click()}
-                              disabled={antesUploading}
-                            >
-                              {antesUploading ? 'Subiendo...' : '📸 Cargar Foto Antes'}
-                            </button>
-                            {antesUrl && (
-                              <div className="upload-success-badge">
-                                ✓ Subido: <a href={antesUrl} target="_blank" rel="noreferrer">Ver imagen</a>
-                              </div>
-                            )}
+                        {/* Galería de Evidencias Múltiples */}
+                        <div style={{ padding: '20px', backgroundColor: '#EFF6FF', borderRadius: '14px', border: '2px dashed #3B82F6', marginBottom: '20px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+                            <div>
+                              <strong style={{ display: 'block', color: '#1E3A8A', fontSize: '0.95rem' }}>Adjuntar Evidencias Fotográficas al Checklist</strong>
+                              <span style={{ fontSize: '0.82rem', color: '#3B82F6', fontWeight: '600' }}>
+                                {activeExecutionVisit.area_tipo_flujo !== 'tecnico'
+                                  ? 'Puedes subir varias fotos al mismo tiempo (ej. 5 o más evidencias de la inspección de calidad). No requiere foto antes/después.'
+                                  : 'Adjunta evidencias adicionales, documentos técnicos o fotografías complementarias.'}
+                              </span>
+                            </div>
+                            <div>
+                              <input
+                                id="exec-upload-evidencias-multi"
+                                type="file"
+                                accept="image/*,application/pdf"
+                                multiple
+                                onChange={handleMultiFileUpload}
+                                style={{ display: 'none' }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => document.getElementById('exec-upload-evidencias-multi').click()}
+                                disabled={evidenciasUploading}
+                                style={{
+                                  background: '#2563EB',
+                                  color: '#FFF',
+                                  border: 'none',
+                                  padding: '12px 20px',
+                                  borderRadius: '10px',
+                                  fontWeight: '800',
+                                  fontSize: '0.88rem',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  boxShadow: '0 2px 6px rgba(37,99,235,0.3)',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                {evidenciasUploading ? '⌛ Subiendo evidencias...' : '➕ Adjuntar Evidencias (Subir 5+ fotos)'}
+                              </button>
+                            </div>
                           </div>
+
+                          {evidenciasList.length > 0 ? (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '14px', marginTop: '14px' }}>
+                              {evidenciasList.map((ev, idx) => (
+                                <div key={ev.id || idx} style={{ backgroundColor: '#FFF', border: '1px solid #BFDBFE', borderRadius: '10px', padding: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveEvidencia(idx)}
+                                    style={{ position: 'absolute', top: '6px', right: '6px', background: '#EF4444', color: '#FFF', border: 'none', borderRadius: '50%', width: '24px', height: '24px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}
+                                    title="Eliminar evidencia"
+                                  >
+                                    ×
+                                  </button>
+                                  {ev.url && (ev.url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || ev.url.includes('/uploads/')) ? (
+                                    <div style={{ width: '100%', height: '90px', borderRadius: '8px', overflow: 'hidden', marginBottom: '8px', backgroundColor: '#F1F5F9' }}>
+                                      <img src={ev.url} alt={`Evidencia ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    </div>
+                                  ) : (
+                                    <div style={{ width: '100%', height: '90px', borderRadius: '8px', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', marginBottom: '8px' }}>
+                                      📄
+                                    </div>
+                                  )}
+                                  <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#1E293B', width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>
+                                    {ev.nombre || `Foto ${idx + 1}`}
+                                  </span>
+                                  <a href={ev.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.72rem', color: '#2563EB', textDecoration: 'underline', marginTop: '4px', fontWeight: '600' }}>
+                                    Ver foto
+                                  </a>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div style={{ textAlign: 'center', padding: '24px 10px', color: '#3B82F6', fontSize: '0.88rem', fontWeight: '600' }}>
+                              No hay fotografías adjuntas aún. Haz clic en "➕ Adjuntar Evidencias (Subir 5+ fotos)" para cargar múltiples fotos de la inspección.
+                            </div>
+                          )}
                         </div>
-
-                        {/* 2. Foto del DESPUÉS */}
-                        <div className="upload-card">
-                          <label className="form-label">
-                            Foto del DESPUÉS {activeExecutionVisit.area_tipo_flujo === 'tecnico' && <span className="req-star">*</span>}
-                          </label>
-                          <div className="real-upload-control">
-                            <input
-                              id="exec-upload-despues"
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handleFileUpload(e, 'despues', setDespuesFile, setDespuesUrl, setDespuesUploading)}
-                              style={{ display: 'none' }}
-                            />
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm btn-block"
-                              onClick={() => document.getElementById('exec-upload-despues').click()}
-                              disabled={despuesUploading}
-                            >
-                              {despuesUploading ? 'Subiendo...' : '📸 Cargar Foto Después'}
-                            </button>
-                            {despuesUrl && (
-                              <div className="upload-success-badge">
-                                ✓ Subido: <a href={despuesUrl} target="_blank" rel="noreferrer">Ver imagen</a>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-
                       </div>
+                    )}
+
+                    <div className="evidencias-upload-section" style={{ marginTop: (() => {
+                      const pc = safeParseCampos(activeExecutionVisit.campos_personalizados || activePlantilla?.campos);
+                      const ff = pc[0];
+                      return (ff && (ff.tipo === 'matrix' || ff.tipo === 'simple_checklist')) ? '0px' : '24px';
+                    })() }}>
+                      {/* Solo mostrar Antes y Después si es Flujo Técnico (Mantenimiento / Sistemas / Soporte Técnico) */}
+                      {activeExecutionVisit.area_tipo_flujo === 'tecnico' && (
+                        <div style={{ marginTop: '20px' }}>
+                          <h6 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#334155', marginBottom: '12px' }}>
+                            📸 Registro Técnico Comparativo (Obligatorio en Mantenimiento / Sistemas)
+                          </h6>
+                          <div className="upload-fields-grid">
+                            {/* 1. Foto del ANTES */}
+                            <div className="upload-card" style={{ backgroundColor: '#F8FAFC', padding: '14px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                              <label className="form-label" style={{ fontWeight: '700', color: '#334155' }}>
+                                Foto del ANTES <span className="req-star">*</span>
+                              </label>
+                              <div className="real-upload-control" style={{ marginTop: '8px' }}>
+                                <input
+                                  id="exec-upload-antes"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleFileUpload(e, 'antes', setAntesFile, setAntesUrl, setAntesUploading)}
+                                  style={{ display: 'none' }}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm btn-block"
+                                  onClick={() => document.getElementById('exec-upload-antes').click()}
+                                  disabled={antesUploading}
+                                  style={{ width: '100%' }}
+                                >
+                                  {antesUploading ? 'Subiendo...' : '📸 Cargar Foto Antes'}
+                                </button>
+                                {antesUrl && (
+                                  <div className="upload-success-badge" style={{ marginTop: '8px', fontSize: '0.78rem', color: '#15803D' }}>
+                                    ✓ Subido: <a href={antesUrl} target="_blank" rel="noreferrer" style={{ fontWeight: 'bold' }}>Ver imagen</a>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* 2. Foto del DESPUÉS */}
+                            <div className="upload-card" style={{ backgroundColor: '#F8FAFC', padding: '14px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                              <label className="form-label" style={{ fontWeight: '700', color: '#334155' }}>
+                                Foto del DESPUÉS <span className="req-star">*</span>
+                              </label>
+                              <div className="real-upload-control" style={{ marginTop: '8px' }}>
+                                <input
+                                  id="exec-upload-despues"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleFileUpload(e, 'despues', setDespuesFile, setDespuesUrl, setDespuesUploading)}
+                                  style={{ display: 'none' }}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm btn-block"
+                                  onClick={() => document.getElementById('exec-upload-despues').click()}
+                                  disabled={despuesUploading}
+                                  style={{ width: '100%' }}
+                                >
+                                  {despuesUploading ? 'Subiendo...' : '📸 Cargar Foto Después'}
+                                </button>
+                                {despuesUrl && (
+                                  <div className="upload-success-badge" style={{ marginTop: '8px', fontSize: '0.78rem', color: '#15803D' }}>
+                                    ✓ Subido: <a href={despuesUrl} target="_blank" rel="noreferrer" style={{ fontWeight: 'bold' }}>Ver imagen</a>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Applicant Info and Signature for Technical/Systems Flow */}
@@ -3914,20 +4232,34 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                             </td>
                             <td>
                               <div className="action-buttons-group">
-                                {v.estado === 'pendiente' && (
-                                  <button className="btn btn-primary btn-sm" onClick={() => handleStartWork(v.id)}>
-                                    Iniciar Trabajo 🚀
+                                {v.origen === 'mantenimiento' ? (
+                                  <button
+                                    className="btn btn-primary btn-sm"
+                                    style={{ background: v.area_color || '#D97706', border: 'none', color: '#fff', fontWeight: 'bold' }}
+                                    onClick={() => {
+                                      window.location.href = `/mantenimiento?tab=ejecucion&openTicket=${v.id}`;
+                                    }}
+                                  >
+                                    {v.estado === 'en_progreso' ? '📋 Continuar Visita MT/ST' : '🚀 Iniciar Visita MT/ST'}
                                   </button>
-                                )}
-                                {v.estado === 'devuelta' && (
-                                  <button className="btn btn-warning btn-sm" onClick={() => handleOpenExecutionForm(v)}>
-                                    Corregir y Abrir ⚙️
-                                  </button>
-                                )}
-                                {v.estado === 'en_progreso' && (
-                                  <button className="btn btn-success btn-sm" onClick={() => handleOpenExecutionForm(v)}>
-                                    Diligenciar Formulario 📋
-                                  </button>
+                                ) : (
+                                  <>
+                                    {v.estado === 'pendiente' && (
+                                      <button className="btn btn-primary btn-sm" onClick={() => handleStartWork(v.id)}>
+                                        Iniciar Trabajo 🚀
+                                      </button>
+                                    )}
+                                    {v.estado === 'devuelta' && (
+                                      <button className="btn btn-warning btn-sm" onClick={() => handleOpenExecutionForm(v)}>
+                                        Corregir y Abrir ⚙️
+                                      </button>
+                                    )}
+                                    {v.estado === 'en_progreso' && (
+                                      <button className="btn btn-success btn-sm" onClick={() => handleOpenExecutionForm(v)}>
+                                        Diligenciar Formulario 📋
+                                      </button>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </td>
@@ -4014,56 +4346,79 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
 
                           {/* Card Footer Actions */}
                           <div className="pending-card-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #f2ece6', paddingTop: '12px' }}>
-                            {v.estado === 'pendiente' && (
+                            {v.origen === 'mantenimiento' ? (
                               <button
                                 className="btn btn-primary"
-                                onClick={() => handleStartWork(v.id)}
                                 style={{
-                                  backgroundColor: '#6B3A2A',
+                                  backgroundColor: v.area_color || '#6B3A2A',
                                   color: '#fff',
                                   fontWeight: 'bold',
                                   fontSize: '0.82rem',
                                   padding: '10px 20px',
                                   borderRadius: '6px',
-                                  cursor: 'pointer'
+                                  cursor: 'pointer',
+                                  width: '100%'
+                                }}
+                                onClick={() => {
+                                  window.location.href = `/mantenimiento?tab=ejecucion&openTicket=${v.id}`;
                                 }}
                               >
-                                Iniciar Trabajo 🚀
+                                {v.estado === 'en_progreso' ? '📋 Continuar Visita MT/ST' : '🚀 Iniciar Visita MT/ST'}
                               </button>
-                            )}
-                            {v.estado === 'devuelta' && (
-                              <button
-                                className="btn btn-warning"
-                                onClick={() => handleOpenExecutionForm(v)}
-                                style={{
-                                  backgroundColor: '#F59E0B',
-                                  color: '#fff',
-                                  fontWeight: 'bold',
-                                  fontSize: '0.82rem',
-                                  padding: '10px 20px',
-                                  borderRadius: '6px',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                Corregir y Reenviar ⚙️
-                              </button>
-                            )}
-                            {v.estado === 'en_progreso' && (
-                              <button
-                                className="btn btn-success"
-                                onClick={() => handleOpenExecutionForm(v)}
-                                style={{
-                                  backgroundColor: '#15803D',
-                                  color: '#fff',
-                                  fontWeight: 'bold',
-                                  fontSize: '0.82rem',
-                                  padding: '10px 20px',
-                                  borderRadius: '6px',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                Diligenciar Formulario 📋
-                              </button>
+                            ) : (
+                              <>
+                                {v.estado === 'pendiente' && (
+                                  <button
+                                    className="btn btn-primary"
+                                    onClick={() => handleStartWork(v.id)}
+                                    style={{
+                                      backgroundColor: '#6B3A2A',
+                                      color: '#fff',
+                                      fontWeight: 'bold',
+                                      fontSize: '0.82rem',
+                                      padding: '10px 20px',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    Iniciar Trabajo 🚀
+                                  </button>
+                                )}
+                                {v.estado === 'devuelta' && (
+                                  <button
+                                    className="btn btn-warning"
+                                    onClick={() => handleOpenExecutionForm(v)}
+                                    style={{
+                                      backgroundColor: '#F59E0B',
+                                      color: '#fff',
+                                      fontWeight: 'bold',
+                                      fontSize: '0.82rem',
+                                      padding: '10px 20px',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    Corregir y Reenviar ⚙️
+                                  </button>
+                                )}
+                                {v.estado === 'en_progreso' && (
+                                  <button
+                                    className="btn btn-success"
+                                    onClick={() => handleOpenExecutionForm(v)}
+                                    style={{
+                                      backgroundColor: '#15803D',
+                                      color: '#fff',
+                                      fontWeight: 'bold',
+                                      fontSize: '0.82rem',
+                                      padding: '10px 20px',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    Diligenciar Formulario 📋
+                                  </button>
+                                )}
+                              </>
                             )}
                           </div>
                         </div>
@@ -4671,6 +5026,10 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                               onObservacionesChange={(val) => setFormObservaciones(val)}
                               onSaveProgress={handleSaveProgress}
                               savingProgress={savingProgress}
+                              evidenciasList={evidenciasList}
+                              onMultiFileUpload={handleMultiFileUpload}
+                              onRemoveEvidencia={handleRemoveEvidencia}
+                              evidenciasUploading={evidenciasUploading}
                             />
                           );
                         } else {
@@ -4777,63 +5136,156 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                       ></textarea>
                     </div>
 
-                    <div className="evidencias-upload-section">
-                      <h5>📸 Registro de Evidencias (Fotos y Archivos)</h5>
-                      <div className="upload-fields-grid">
-                        <div className="upload-card">
-                          <label className="form-label">Foto del ANTES</label>
-                          <div className="real-upload-control">
-                            <input
-                              id="upload-antes"
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handleFileUpload(e, 'antes', setAntesFile, setAntesUrl, setAntesUploading)}
-                              style={{ display: 'none' }}
-                            />
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm btn-block"
-                              onClick={() => document.getElementById('upload-antes').click()}
-                              disabled={antesUploading}
-                            >
-                              {antesUploading ? 'Subiendo...' : '📸 Cargar Foto Antes'}
-                            </button>
-                            {antesUrl && (
-                              <div className="upload-success-badge">
-                                ✓ Subido: <a href={antesUrl} target="_blank" rel="noreferrer">Ver imagen</a>
-                              </div>
-                            )}
+                    {/* Galería de Evidencias Múltiples (Solo si no hay checklist integrado visible) */}
+                    {!activePlantilla && (
+                      <div className="evidencias-upload-section" style={{ marginTop: '20px' }}>
+                        <h5 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#1E293B', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          📸 Registro de Evidencias de Inspección (Múltiples Fotos y Archivos)
+                        </h5>
+
+                        <div style={{ padding: '18px', backgroundColor: '#F8FAFC', borderRadius: '14px', border: '1.5px dashed #CBD5E1', marginBottom: '20px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+                            <div>
+                              <strong style={{ display: 'block', color: '#334155', fontSize: '0.92rem' }}>Evidencias Adjuntas ({evidenciasList.length})</strong>
+                              <span style={{ fontSize: '0.78rem', color: '#64748B' }}>Puede adjuntar varias fotografías, documentos o capturas para respaldar los hallazgos.</span>
+                            </div>
+                            <div>
+                              <input
+                                id="upload-evidencias-multi"
+                                type="file"
+                                accept="image/*,application/pdf"
+                                multiple
+                                onChange={handleMultiFileUpload}
+                                style={{ display: 'none' }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => document.getElementById('upload-evidencias-multi').click()}
+                                disabled={evidenciasUploading}
+                                style={{
+                                  background: '#2563EB',
+                                  color: '#FFF',
+                                  border: 'none',
+                                  padding: '10px 18px',
+                                  borderRadius: '10px',
+                                  fontWeight: '800',
+                                  fontSize: '0.85rem',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  boxShadow: '0 2px 5px rgba(37,99,235,0.25)',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                {evidenciasUploading ? '⌛ Subiendo evidencias...' : '➕ Adjuntar Evidencias (Múltiple)'}
+                              </button>
+                            </div>
                           </div>
+
+                          {evidenciasList.length > 0 ? (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '14px', marginTop: '12px' }}>
+                              {evidenciasList.map((ev, idx) => (
+                                <div key={ev.id || idx} style={{ backgroundColor: '#FFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveEvidencia(idx)}
+                                    style={{ position: 'absolute', top: '6px', right: '6px', background: '#EF4444', color: '#FFF', border: 'none', borderRadius: '50%', width: '22px', height: '22px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    title="Eliminar evidencia"
+                                  >
+                                    ×
+                                  </button>
+                                  {ev.url && (ev.url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || ev.url.includes('/uploads/')) ? (
+                                    <div style={{ width: '100%', height: '85px', borderRadius: '8px', overflow: 'hidden', marginBottom: '8px', backgroundColor: '#F1F5F9' }}>
+                                      <img src={ev.url} alt={`Evidencia ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    </div>
+                                  ) : (
+                                    <div style={{ width: '100%', height: '85px', borderRadius: '8px', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', marginBottom: '8px' }}>
+                                      📄
+                                    </div>
+                                  )}
+                                  <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155', width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>
+                                    {ev.nombre || `Evidencia ${idx + 1}`}
+                                  </span>
+                                  <a href={ev.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.72rem', color: '#2563EB', textDecoration: 'underline', marginTop: '4px' }}>
+                                    Ver archivo
+                                  </a>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div style={{ textAlign: 'center', padding: '24px 10px', color: '#94A3B8', fontSize: '0.85rem' }}>
+                              No hay evidencias adjuntas aún. Haga clic en "Adjuntar Evidencias (Múltiple)" para cargar imágenes de la inspección.
+                            </div>
+                          )}
                         </div>
-
-                        <div className="upload-card">
-                          <label className="form-label">Foto del DESPUÉS</label>
-                          <div className="real-upload-control">
-                            <input
-                              id="upload-despues"
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handleFileUpload(e, 'despues', setDespuesFile, setDespuesUrl, setDespuesUploading)}
-                              style={{ display: 'none' }}
-                            />
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm btn-block"
-                              onClick={() => document.getElementById('upload-despues').click()}
-                              disabled={despuesUploading}
-                            >
-                              {despuesUploading ? 'Subiendo...' : '📸 Cargar Foto Después'}
-                            </button>
-                            {despuesUrl && (
-                              <div className="upload-success-badge">
-                                ✓ Subido: <a href={despuesUrl} target="_blank" rel="noreferrer">Ver imagen</a>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-
                       </div>
+                    )}
+
+                    <div className="evidencias-upload-section" style={{ marginTop: activePlantilla ? '0px' : '20px' }}>
+                      {/* Campos opcionales de Antes y Después solo para áreas técnicas (Mantenimiento o Sistemas) */}
+                      {(parseInt(selectedAreaId) === 3 || parseInt(selectedAreaId) === 7) && (
+                        <div style={{ marginTop: '20px' }}>
+                          <h6 style={{ fontSize: '0.92rem', fontWeight: '700', color: '#334155', marginBottom: '12px' }}>
+                            📸 Registro Técnico Comparativo (Mantenimiento / Sistemas)
+                          </h6>
+                          <div className="upload-fields-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                            <div className="upload-card" style={{ backgroundColor: '#F8FAFC', padding: '14px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                              <label className="form-label" style={{ fontWeight: '700', color: '#334155', fontSize: '0.85rem' }}>Foto del ANTES (Requerido en Mantenimiento)</label>
+                              <div className="real-upload-control" style={{ marginTop: '8px' }}>
+                                <input
+                                  id="upload-antes"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleFileUpload(e, 'antes', setAntesFile, setAntesUrl, setAntesUploading)}
+                                  style={{ display: 'none' }}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm btn-block"
+                                  onClick={() => document.getElementById('upload-antes').click()}
+                                  disabled={antesUploading}
+                                  style={{ width: '100%' }}
+                                >
+                                  {antesUploading ? 'Subiendo...' : '📸 Cargar Foto Antes'}
+                                </button>
+                                {antesUrl && (
+                                  <div className="upload-success-badge" style={{ marginTop: '8px', fontSize: '0.78rem', color: '#15803D' }}>
+                                    ✓ Subido: <a href={antesUrl} target="_blank" rel="noreferrer" style={{ fontWeight: 'bold' }}>Ver imagen</a>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="upload-card" style={{ backgroundColor: '#F8FAFC', padding: '14px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                              <label className="form-label" style={{ fontWeight: '700', color: '#334155', fontSize: '0.85rem' }}>Foto del DESPUÉS (Requerido en Mantenimiento)</label>
+                              <div className="real-upload-control" style={{ marginTop: '8px' }}>
+                                <input
+                                  id="upload-despues"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleFileUpload(e, 'despues', setDespuesFile, setDespuesUrl, setDespuesUploading)}
+                                  style={{ display: 'none' }}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm btn-block"
+                                  onClick={() => document.getElementById('upload-despues').click()}
+                                  disabled={despuesUploading}
+                                  style={{ width: '100%' }}
+                                >
+                                  {despuesUploading ? 'Subiendo...' : '📸 Cargar Foto Después'}
+                                </button>
+                                {despuesUrl && (
+                                  <div className="upload-success-badge" style={{ marginTop: '8px', fontSize: '0.78rem', color: '#15803D' }}>
+                                    ✓ Subido: <a href={despuesUrl} target="_blank" rel="noreferrer" style={{ fontWeight: 'bold' }}>Ver imagen</a>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -5134,7 +5586,15 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
               : safeParseCampos((activeExecutionVisit || selectedVisit)?.historial_versiones);
             const activeHistList = Array.isArray(rawHist) ? rawHist : [];
             return (
-              <div className="modal-overlay animate-fade-in" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+              <div
+                className="modal-overlay animate-fade-in"
+                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}
+                onClick={(e) => {
+                  if (e.target && e.target.className && typeof e.target.className === 'string' && e.target.className.includes('modal-overlay')) {
+                    setShowVersionModal(false);
+                  }
+                }}
+              >
                 <div className="card shadow-xl" style={{ width: '100%', maxWidth: '800px', maxHeight: '85vh', overflowY: 'auto', background: '#FFF', borderRadius: '18px', padding: '26px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #E2E8F0', paddingBottom: '16px', marginBottom: '20px' }}>
                     <div>
@@ -5148,7 +5608,8 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                     <button
                       type="button"
                       onClick={() => setShowVersionModal(false)}
-                      style={{ background: '#F1F5F9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', color: '#475569' }}
+                      style={{ background: '#EF4444', border: 'none', width: '38px', height: '38px', borderRadius: '50%', fontSize: '1.4rem', fontWeight: '900', cursor: 'pointer', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(239, 68, 68, 0.4)' }}
+                      title="Cerrar (✕)"
                     >
                       ✕
                     </button>
@@ -5221,17 +5682,57 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
 
       {/* Details / Print modal & Jefe Approval actions */}
       {selectedVisit && (
-        <div className="modal-backdrop">
-          <div className="modal-content card animate-fade-in printable-modal">
+        <div
+          className="modal-backdrop"
+          onClick={(e) => {
+            if (e.target && e.target.className && typeof e.target.className === 'string' && e.target.className.includes('modal-backdrop')) {
+              setSelectedVisit(null);
+              setJefeComments('');
+              setJefeSignature('');
+              setModalTab('general');
+            }
+          }}
+        >
+          <div className="modal-content card animate-fade-in printable-modal" style={{ position: 'relative' }}>
+
+            {/* Botón flotante de cierre siempre visible en la esquina superior derecha */}
+            <button
+              type="button"
+              className="no-print"
+              onClick={() => { setSelectedVisit(null); setJefeComments(''); setJefeSignature(''); setModalTab('general'); }}
+              style={{
+                position: 'absolute',
+                top: '14px',
+                right: '16px',
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                backgroundColor: '#EF4444',
+                color: '#FFFFFF',
+                border: '2px solid #FFFFFF',
+                boxShadow: '0 4px 10px rgba(239, 68, 68, 0.4)',
+                fontSize: '1.4rem',
+                fontWeight: '900',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                zIndex: 1000,
+                transition: 'transform 0.2s, background-color 0.2s'
+              }}
+              title="Cerrar ventana (×)"
+            >
+              ×
+            </button>
 
             {/* Modal actions (hide on printing) */}
-            <div className="card-header no-print">
-              <h3>Auditoría Operativa de Punto de Venta</h3>
-              <div className="modal-header-actions">
+            <div className="card-header no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', paddingRight: '60px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: '#1E293B' }}>Auditoría Operativa de Punto de Venta</h3>
+              <div className="modal-header-actions" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 {(parseInt(currentUser?.rol_id) === 1 || parseInt(currentUser?.rol_id) > 9 || parseInt(selectedVisit.user_id) === parseInt(currentUser?.id)) && (
                   <button
                     className="btn btn-sm"
-                    style={{ backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+                    style={{ backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
                     onClick={() => {
                       triggerConfirm(
                         '¿Eliminar Visita?',
@@ -5263,7 +5764,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                     href={`/api/visitas/export?id=${selectedVisit.id}`}
                     className="btn btn-success btn-sm"
                     download
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', textDecoration: 'none' }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', textDecoration: 'none', padding: '6px 12px' }}
                   >
                     📥 Exportar Excel
                   </a>
@@ -5273,7 +5774,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                     <button
                       type="button"
                       className="btn btn-secondary btn-sm"
-                      style={{ background: '#F8FAFC', color: '#334155', border: '1px solid #CBD5E1', fontWeight: 'bold' }}
+                      style={{ background: '#F8FAFC', color: '#334155', border: '1px solid #CBD5E1', fontWeight: 'bold', padding: '6px 12px' }}
                       onClick={() => {
                         const currentCampos = safeParseCampos(selectedVisit.campos_personalizados || selectedVisit.fields);
                         setEditingVisitCampos(currentCampos);
@@ -5285,7 +5786,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                     <button
                       type="button"
                       className="btn btn-secondary btn-sm"
-                      style={{ background: '#F5F3FF', color: '#6D28D9', border: '1px solid #DDD6FE', fontWeight: 'bold' }}
+                      style={{ background: '#F5F3FF', color: '#6D28D9', border: '1px solid #DDD6FE', fontWeight: 'bold', padding: '6px 12px' }}
                       onClick={() => {
                         setEditingTemplateId(null);
                         setShowVersionModal(true);
@@ -5295,10 +5796,17 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                     </button>
                   </>
                 )}
-                <button className="btn btn-primary btn-sm" onClick={handlePrint}>
+                <button className="btn btn-primary btn-sm" style={{ padding: '6px 12px' }} onClick={handlePrint}>
                   🖨️ Imprimir / PDF
                 </button>
-                <button className="modal-close-btn" onClick={() => { setSelectedVisit(null); setJefeComments(''); setJefeSignature(''); setModalTab('general'); }}>×</button>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  style={{ backgroundColor: '#475569', color: '#FFF', border: 'none', padding: '6px 14px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  onClick={() => { setSelectedVisit(null); setJefeComments(''); setJefeSignature(''); setModalTab('general'); }}
+                >
+                  ✖ Cerrar Ventana
+                </button>
               </div>
             </div>
 
@@ -5608,6 +6116,32 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                           </>
                         )}
 
+                        {(() => {
+                          const ansData = safeParseAnswers(selectedVisit.datos_formulario);
+                          const evs = selectedVisit.evidencias || ansData?.evidencias_lista || [];
+                          if (!Array.isArray(evs) || evs.length === 0) return null;
+                          return (
+                            <>
+                              <div style={{ backgroundColor: '#2C1810', color: '#fff', padding: '5px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', borderBottom: '1.5px solid #2C1810', textAlign: 'center' }}>
+                                EVIDENCIAS Y REGISTRO FOTOGRÁFICO ({evs.length})
+                              </div>
+                              <div style={{ padding: '12px', borderBottom: '1.5px solid #2C1810', backgroundColor: '#fff', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
+                                {evs.map((ev, idx) => (
+                                  <div key={idx} style={{ border: '1px solid #ddd', borderRadius: '6px', padding: '6px', textAlign: 'center' }}>
+                                    {ev.url && (ev.url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || ev.url.includes('/uploads/')) ? (
+                                      <img src={ev.url} alt={`Evidencia ${idx + 1}`} style={{ width: '100%', height: '75px', objectFit: 'cover', borderRadius: '4px' }} />
+                                    ) : (
+                                      <div style={{ width: '100%', height: '75px', backgroundColor: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', borderRadius: '4px' }}>📄</div>
+                                    )}
+                                    <div style={{ fontSize: '0.68rem', fontWeight: '600', color: '#333', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.nombre || ev.etiqueta || `Evidencia ${idx + 1}`}</div>
+                                    <a href={ev.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.65rem', color: '#0066cc', textDecoration: 'underline' }}>Ver archivo</a>
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          );
+                        })()}
+
                         {/* 3 Signatures block */}
                         <div style={{ backgroundColor: '#2C1810', color: '#fff', padding: '5px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', borderBottom: '1.5px solid #2C1810', textAlign: 'center' }}>
                           FIRMAS Y APROBACIONES DEL SERVICIO
@@ -5709,6 +6243,35 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                         <p className="obs-content" style={{ borderColor: 'var(--color-secondary)' }}>{selectedVisit.repuestos}</p>
                       </div>
                     )}
+
+                    {/* Evidencias de Inspección y Hallazgos */}
+                    {(() => {
+                      const ansData = safeParseAnswers(selectedVisit.datos_formulario);
+                      const evs = selectedVisit.evidencias || ansData?.evidencias_lista || [];
+                      if (!Array.isArray(evs) || evs.length === 0) return null;
+                      return (
+                        <div className="visit-obs-section" style={{ marginTop: '16px' }}>
+                          <h4 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>📸 Evidencias Fotográficas y Archivos Adjuntos ({evs.length})</h4>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '12px', marginTop: '10px' }}>
+                            {evs.map((ev, idx) => (
+                              <div key={idx} style={{ border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px', backgroundColor: '#FFF', textAlign: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                                {ev.url && (ev.url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || ev.url.includes('/uploads/')) ? (
+                                  <div style={{ width: '100%', height: '80px', borderRadius: '6px', overflow: 'hidden', marginBottom: '6px' }}>
+                                    <img src={ev.url} alt={ev.nombre || `Evidencia ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  </div>
+                                ) : (
+                                  <div style={{ width: '100%', height: '80px', borderRadius: '6px', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', marginBottom: '6px' }}>
+                                    📄
+                                  </div>
+                                )}
+                                <div style={{ fontSize: '0.72rem', fontWeight: '600', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.nombre || ev.etiqueta || `Evidencia ${idx + 1}`}</div>
+                                <a href={ev.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.7rem', color: '#2563EB', textDecoration: 'underline', display: 'block', marginTop: '4px' }}>Ver archivo</a>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Display Signatures */}
                     {(selectedVisit.firma_auxiliar || selectedVisit.firma_jefe || selectedVisit.area_tipo_flujo === 'tecnico') && (
@@ -6208,6 +6771,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
         .modal-header-actions {
           display: flex;
           align-items: center;
+          flex-wrap: wrap;
           gap: var(--spacing-md);
         }
 

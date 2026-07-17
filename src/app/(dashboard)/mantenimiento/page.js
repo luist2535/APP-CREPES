@@ -256,6 +256,31 @@ function formatDate(d) {
   return new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function parseChecklist(input) {
+  if (!input) return [];
+  let arr = [];
+  try {
+    arr = typeof input === 'string' ? JSON.parse(input) : input;
+  } catch (e) {
+    return [];
+  }
+  if (!Array.isArray(arr)) return [];
+  return arr.map(item => {
+    if (typeof item === 'string') {
+      return { texto: item, completada: false };
+    }
+    if (item && typeof item === 'object') {
+      const texto = item.texto || item.tarea || item.descripcion || item.nombre || item.label || item.item || item.actividad || item.title || item.name || item[0] || '(Actividad de mantenimiento)';
+      return {
+        ...item,
+        texto: String(texto),
+        completada: Boolean(item.completada || item.completado || item.checked || item.done || item.status === 'done' || item.status === 'completed')
+      };
+    }
+    return { texto: '(Actividad de mantenimiento)', completada: false };
+  });
+}
+
 // =================== TICKET CARD (Mobile exacto a input_file_1.png) ===================
 function TicketCard({ ticket, onOpen, onStartModoVisita, onOpenModoVisita, onApprove, esJefe }) {
   const ec = ESTADO_COLORS[ticket.estado] || ESTADO_COLORS['Pendiente'];
@@ -339,6 +364,234 @@ function TicketCard({ ticket, onOpen, onStartModoVisita, onOpenModoVisita, onApp
   );
 }
 
+function SearchableCategorySelect({ categories, selectedId, onChange, areaId }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeParentId, setActiveParentId] = useState(null);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  useEffect(() => {
+    setActiveParentId(null);
+  }, [areaId]);
+
+  const safeCategories = Array.isArray(categories) ? categories : [];
+  const filtered = safeCategories.filter(c => c && c.area_id === parseInt(areaId));
+
+  const getCategoryFullPath = (catId) => {
+    const path = [];
+    let current = filtered.find(c => c && c.id === catId);
+    while (current) {
+      path.unshift(current.nombre || 'Sin nombre');
+      current = filtered.find(c => c && c.id === current.padre_id);
+    }
+    return path.join(' › ');
+  };
+
+  const selectedCat = filtered.find(c => c && String(c.id) === String(selectedId));
+  const selectedFullPath = selectedCat ? getCategoryFullPath(selectedCat.id) : '';
+
+  const crumbs = [];
+  let curr = filtered.find(c => c && c.id === activeParentId);
+  while (curr) {
+    crumbs.unshift(curr);
+    curr = filtered.find(c => c && c.id === curr.padre_id);
+  }
+
+  let visibleOptions = [];
+  if (searchTerm) {
+    visibleOptions = filtered
+      .filter(c => c && (c.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()))
+      .map(c => ({
+        ...c,
+        fullPath: getCategoryFullPath(c.id),
+        hasChildren: filtered.some(child => child && child.padre_id === c.id)
+      }));
+  } else {
+    visibleOptions = filtered
+      .filter(c => c && (activeParentId ? c.padre_id === activeParentId : !c.padre_id))
+      .map(c => ({
+        ...c,
+        fullPath: c.nombre || 'Sin nombre',
+        hasChildren: filtered.some(child => child && child.padre_id === c.id)
+      }));
+  }
+
+  return (
+    <div className="searchable-select-container" ref={containerRef} style={{ position: 'relative' }}>
+      <div
+        className="searchable-select-trigger"
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!isOpen) {
+            if (selectedCat && selectedCat.padre_id) {
+              setActiveParentId(selectedCat.padre_id);
+            } else {
+              setActiveParentId(null);
+            }
+          }
+        }}
+        style={{
+          padding: '10px 14px',
+          border: '1px solid #D1D5DB',
+          borderRadius: '8px',
+          backgroundColor: '#fff',
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: '0.88rem',
+          minHeight: '40px',
+          boxSizing: 'border-box'
+        }}
+      >
+        <span style={{ color: selectedCat ? '#111827' : '#6B7280', fontWeight: selectedCat ? '600' : 'normal' }}>
+          {selectedCat ? selectedFullPath : '-- Seleccionar Categoría / Subcategoría --'}
+        </span>
+        <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>{isOpen ? '▲' : '▼'}</span>
+      </div>
+
+      {isOpen && (
+        <div
+          className="searchable-select-dropdown"
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            backgroundColor: '#fff',
+            border: '1px solid #D1D5DB',
+            borderRadius: '8px',
+            marginTop: '4px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            maxHeight: '280px',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}
+        >
+          <input
+            type="text"
+            className="searchable-select-input"
+            placeholder="Buscar por nombre..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            autoFocus
+            onClick={e => e.stopPropagation()}
+            style={{
+              padding: '10px 12px',
+              border: 'none',
+              borderBottom: '1px solid #E5E7EB',
+              outline: 'none',
+              fontSize: '0.85rem',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}
+          />
+
+          {!searchTerm && (
+            <div
+              className="maint-breadcrumbs"
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#F9FAFB',
+                borderBottom: '1px solid #E5E7EB',
+                fontSize: '0.75rem',
+                color: '#4B5563',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                flexWrap: 'wrap',
+                textAlign: 'left'
+              }}
+            >
+              <span
+                style={{ cursor: 'pointer', color: '#2563EB', fontWeight: !activeParentId ? 'bold' : 'normal' }}
+                onClick={() => setActiveParentId(null)}
+              >
+                Categorías
+              </span>
+              {crumbs.map((c, idx) => (
+                <span key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span>›</span>
+                  <span
+                    style={{
+                      cursor: 'pointer',
+                      color: idx === crumbs.length - 1 ? '#1F2937' : '#2563EB',
+                      fontWeight: idx === crumbs.length - 1 ? 'bold' : 'normal'
+                    }}
+                    onClick={() => setActiveParentId(c.id)}
+                  >
+                    {c.nombre}
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="searchable-select-options" style={{ overflowY: 'auto', flex: 1, maxHeight: '200px' }}>
+            {visibleOptions.length === 0 ? (
+              <div style={{ padding: '12px', fontSize: '0.82rem', color: '#9CA3AF', textAlign: 'center' }}>
+                No se encontraron categorías
+              </div>
+            ) : (
+              visibleOptions.map(cat => (
+                <div
+                  key={cat.id}
+                  onClick={() => {
+                    if (searchTerm) {
+                      onChange(String(cat.id));
+                      setIsOpen(false);
+                      setSearchTerm('');
+                    } else if (cat.hasChildren) {
+                      setActiveParentId(cat.id);
+                    } else {
+                      onChange(String(cat.id));
+                      setIsOpen(false);
+                    }
+                  }}
+                  style={{
+                    padding: '10px 12px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    backgroundColor: String(selectedId) === String(cat.id) ? '#EFF6FF' : 'transparent',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    borderBottom: '1px solid #F3F4F6',
+                    textAlign: 'left'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#EFF6FF'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = String(selectedId) === String(cat.id) ? '#EFF6FF' : 'transparent'}
+                >
+                  <span style={{ fontWeight: String(selectedId) === String(cat.id) ? 'bold' : 'normal', color: '#1F2937' }}>
+                    {cat.fullPath}
+                  </span>
+                  {!searchTerm && cat.hasChildren && (
+                    <span style={{ fontSize: '0.72rem', color: '#3B82F6', backgroundColor: '#DBEAFE', padding: '2px 6px', borderRadius: '10px', fontWeight: '600' }}>
+                      ver subcategorías »
+                    </span>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 // =================== MAIN PAGE ===================
 export default function MantenimientoPage() {
@@ -348,6 +601,7 @@ export default function MantenimientoPage() {
 
   // State
   const [tickets, setTickets] = useState([]);
+  const [categorias, setCategorias] = useState([]);
   const [stats, setStats] = useState({});
   const [tecnicosMT, setTecnicosMT] = useState([]);
   const [tecnicosST, setTecnicosST] = useState([]);
@@ -468,8 +722,7 @@ export default function MantenimientoPage() {
   const handlePrintMantenimientoPDF = async (ticket) => {
     if (!ticket) return;
     try {
-      let chkList = [];
-      try { chkList = typeof ticket.checklist_tareas === 'string' ? JSON.parse(ticket.checklist_tareas) : (ticket.checklist_tareas || []); } catch (e) { }
+      const chkList = parseChecklist(ticket.checklist_tareas);
       let chkStr = chkList.length > 0
         ? chkList.map(c => `• [${c.completada ? '✅ SI' : '❌ NO'}] ${c.texto}`).join('\n')
         : 'No se registraron ítems de checklist en esta orden.';
@@ -587,6 +840,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
       const res = await fetch(`/api/mantenimientos?${p}`);
       const data = await res.json();
       setTickets(data.mantenimientos || []);
+      setCategorias(data.categorias || []);
       setStats(data.stats || {});
       setTecnicosMT(data.tecnicosMT || []);
       setTecnicosST(data.tecnicosST || []);
@@ -595,6 +849,30 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
   }, [filtroEstado, filtroPrefijo, filtroTipo, filtroTecnico, filtroFechaDesde, filtroFechaHasta, busqueda]);
 
   useEffect(() => { loadTickets(); }, [loadTickets]);
+
+  // Auto-abrir en Modo Visita si se pasa el ID por la URL desde la pantalla central de Modo Visita (/visitas)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && tickets.length > 0 && !activeExecutionTicket) {
+      const params = new URLSearchParams(window.location.search);
+      const openTicketId = params.get('openTicket');
+      if (openTicketId) {
+        const found = tickets.find(t => String(t.id) === String(openTicketId));
+        if (found) {
+          openModoVisita(found);
+          window.history.replaceState({}, '', '/mantenimiento?tab=ejecucion');
+        } else {
+          fetch(`/api/mantenimientos/${openTicketId}`)
+            .then(r => r.json())
+            .then(d => {
+              if (d && d.mantenimiento) {
+                openModoVisita(d.mantenimiento);
+                window.history.replaceState({}, '', '/mantenimiento?tab=ejecucion');
+              }
+            }).catch(() => {});
+        }
+      }
+    }
+  }, [tickets, activeExecutionTicket]);
 
   // Load equipos and pdvs for form (best-effort, non-blocking)
   useEffect(() => {
@@ -676,7 +954,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
   // ===================== FUNCIONES MODO VISITA / EJECUCIÓN =====================
   const openModoVisita = (ticket) => {
     setActiveExecutionTicket(ticket);
-    const checkList = ticket.checklist_tareas ? JSON.parse(ticket.checklist_tareas) : [];
+    const checkList = parseChecklist(ticket.checklist_tareas);
     setExecutionData({
       solucion_aplicada: ticket.solucion_aplicada || '',
       observaciones: ticket.observaciones || '',
@@ -704,19 +982,33 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
   const guardarAvanceModoVisita = async () => {
     if (!activeExecutionTicket) return;
     try {
-      const res = await fetch(`/api/mantenimientos/${activeExecutionTicket.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accion: 'guardar_avance',
-          solucion_aplicada: executionData.solucion_aplicada,
-          observaciones: executionData.observaciones,
-          checklist_completado: executionData.checklist_completado
-        })
-      });
+      let res;
+      if (executionData.evidencias_cierre_files && executionData.evidencias_cierre_files.length > 0) {
+        const formData = new FormData();
+        formData.append('accion', 'guardar_avance');
+        if (executionData.solucion_aplicada !== undefined) formData.append('solucion_aplicada', executionData.solucion_aplicada);
+        if (executionData.observaciones !== undefined) formData.append('observaciones', executionData.observaciones);
+        if (executionData.checklist_completado) formData.append('checklist_completado', JSON.stringify(executionData.checklist_completado));
+        executionData.evidencias_cierre_files.forEach(f => formData.append('evidencias_cierre', f));
+        res = await fetch(`/api/mantenimientos/${activeExecutionTicket.id}`, { method: 'PATCH', body: formData });
+      } else {
+        res = await fetch(`/api/mantenimientos/${activeExecutionTicket.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accion: 'guardar_avance',
+            solucion_aplicada: executionData.solucion_aplicada,
+            observaciones: executionData.observaciones,
+            checklist_completado: executionData.checklist_completado
+          })
+        });
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      showToast('💾 Avance guardado correctamente en el servidor', 'success');
+      if (executionData.evidencias_cierre_files && executionData.evidencias_cierre_files.length > 0) {
+        setExecutionData(p => ({ ...p, evidencias_cierre_files: [] }));
+      }
+      showToast('💾 Avance y evidencias guardados correctamente en el servidor', 'success');
       loadTickets();
     } catch (e) { showToast(e.message, 'error'); }
   };
@@ -1386,9 +1678,18 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
             </div>
 
             <div>
-              <label style={labelStyle}>Evidencias Fotográficas (Recomendado)</label>
-              <input type="file" multiple accept="image/*" onChange={e => setEvidenciasFiles(e.target.files)} style={{ ...inputStyle, padding: '8px' }} />
-              <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#666' }}>Puedes seleccionar varias fotos. Esto ayudará al técnico a prepararse mejor.</p>
+              <label style={labelStyle}>Evidencias Fotográficas (Puedes seleccionar múltiples fotos a la vez)</label>
+              <input type="file" multiple accept="image/*" onChange={e => setEvidenciasFiles(Array.from(e.target.files))} style={{ ...inputStyle, padding: '8px' }} />
+              {evidenciasFiles && evidenciasFiles.length > 0 ? (
+                <div style={{ marginTop: '8px', padding: '10px 14px', background: '#DCFCE7', borderRadius: '10px', border: '1px solid #BBF7D0', fontSize: '0.82rem', color: '#166534' }}>
+                  <strong>✅ {evidenciasFiles.length} imagen(es) seleccionada(s) para cargar:</strong>
+                  <ul style={{ margin: '6px 0 0', paddingLeft: '18px', maxHeight: '90px', overflowY: 'auto' }}>
+                    {evidenciasFiles.map((f, i) => <li key={i}>{f.name}</li>)}
+                  </ul>
+                </div>
+              ) : (
+                <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#666' }}>💡 Tip: Selecciona varias fotos desde tu galería o PC para adjuntar todas las evidencias iniciales de una vez.</p>
+              )}
             </div>
 
             <button type="submit" disabled={formSubmitting} style={{ ...btnPrimary, alignSelf: 'flex-start', padding: '12px 28px', fontSize: '0.9rem' }}>
@@ -1512,8 +1813,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                   {tickets.filter(t => t.estado === 'En proceso' || (t.estado === 'Asignado' && (!currentUser?.id || t.tecnico_id === currentUser?.id || esJefe))).map(t => {
                     let evs = [];
                     try { evs = t.evidencias ? JSON.parse(t.evidencias) : []; } catch (e) { }
-                    let chk = [];
-                    try { chk = t.checklist_tareas ? JSON.parse(t.checklist_tareas) : []; } catch (e) { }
+                    const chk = parseChecklist(t.checklist_tareas);
                     return (
                       <div key={t.id} className="card" style={{ padding: '18px 22px', borderRadius: '14px', border: t.estado === 'En proceso' ? '2px solid #166534' : '1px solid #D97706', background: '#fff', boxShadow: '0 3px 10px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
@@ -1687,7 +1987,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                               style={{ width: '22px', height: '22px', accentColor: '#166534', cursor: 'pointer' }}
                             />
                             <span style={{ fontSize: '0.95rem', fontWeight: item.completada ? 700 : 500, color: item.completada ? '#166534' : '#2C1810', textDecoration: item.completada ? 'line-through' : 'none' }}>
-                              {item.texto}
+                              {item.texto || item.tarea || item.descripcion || item.nombre || (typeof item === 'string' ? item : '(Tarea sin texto)')}
                             </span>
                           </label>
                         ))}
@@ -1735,7 +2035,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
 
                       <div>
                         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#4A2518', marginBottom: '6px' }}>
-                          📷 Adjuntar Evidencias Fotográficas de Cierre
+                          📷 Adjuntar Evidencias Fotográficas de Cierre (Puedes seleccionar múltiples imágenes a la vez)
                         </label>
                         <input
                           type="file"
@@ -1744,9 +2044,16 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                           onChange={e => setExecutionData(p => ({ ...p, evidencias_cierre_files: Array.from(e.target.files) }))}
                           style={{ width: '100%', padding: '10px', background: '#F5ECE5', border: '1px dashed #6B3A2A', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer' }}
                         />
-                        {executionData.evidencias_cierre_files && executionData.evidencias_cierre_files.length > 0 && (
-                          <div style={{ marginTop: '8px', fontSize: '0.82rem', color: '#166534', fontWeight: 600 }}>
-                            ✅ {executionData.evidencias_cierre_files.length} foto(s) seleccionada(s) para cargar.
+                        {executionData.evidencias_cierre_files && executionData.evidencias_cierre_files.length > 0 ? (
+                          <div style={{ marginTop: '8px', padding: '10px 14px', background: '#DCFCE7', borderRadius: '10px', border: '1px solid #BBF7D0', fontSize: '0.82rem', color: '#166534' }}>
+                            <strong>✅ {executionData.evidencias_cierre_files.length} foto(s) seleccionada(s):</strong>
+                            <ul style={{ margin: '6px 0 0', paddingLeft: '18px', maxHeight: '90px', overflowY: 'auto' }}>
+                              {executionData.evidencias_cierre_files.map((f, i) => <li key={i}>{f.name}</li>)}
+                            </ul>
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: '6px', fontSize: '0.78rem', color: '#666', fontStyle: 'italic' }}>
+                            💡 Tip: Puedes seleccionar varias fotos a la vez para evidenciar todo el trabajo realizado.
                           </div>
                         )}
                       </div>
@@ -1871,7 +2178,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                       const obs = document.getElementById(`obs-${t.id}`)?.value;
                       if (!tec || !fecha) { showToast('Técnico y fecha programada son obligatorios', 'error'); return; }
                       setAccionModal({ open: true, tipo: 'asignar', ticketId: t.id, prefijo: t.prefijo });
-                      setAccionData({ tecnico_id: parseInt(tec), fecha_programada: fecha, prioridad: prio, observaciones_asignacion: obs });
+                      setAccionData({ tecnico_id: parseInt(tec), fecha_programada: fecha, prioridad: prio, observaciones_asignacion: obs, categoria_id: t.categoria_id || '' });
                     }}
                     style={{ ...btnPrimary, alignSelf: 'flex-start', padding: '10px 24px' }}>
                     ✅ Asignar Ticket {t.id}
@@ -2086,6 +2393,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
                       {[
                         { label: 'Área Registro', value: t.area_registro },
+                        { label: 'Categoría', value: t.categoria_nombre || (t.categoria_id ? `Categoría #${t.categoria_id}` : '—') },
                         { label: 'Área Hallazgo', value: t.area_hallazgo || '—' },
                         { label: 'Equipo', value: t.equipo_nombre || 'Locativo' },
                         { label: 'Fecha Evidencia', value: formatDate(t.fecha_evidencia) },
@@ -2142,7 +2450,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                     {/* Checklist */}
                     {t.checklist_tareas && (() => {
                       try {
-                        const chk = JSON.parse(t.checklist_tareas);
+                        const chk = parseChecklist(t.checklist_tareas);
                         if (!chk || chk.length === 0) return null;
                         return (
                           <div style={{ background: '#F0F9FF', borderRadius: '10px', padding: '14px', border: '1px solid #BAE6FD' }}>
@@ -2151,7 +2459,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                               {chk.map((tarea, i) => (
                                 <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#0F172A' }}>
                                   <input type="checkbox" checked={tarea.completada} disabled />
-                                  {tarea.texto}
+                                  {tarea.texto || tarea.tarea || (typeof tarea === 'string' ? tarea : '(Tarea sin texto)')}
                                 </label>
                               ))}
                             </div>
@@ -2205,16 +2513,17 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                             <button onClick={() => {
                               setAccionModal({ open: true, tipo: 'asignar', ticketId: t.id, prefijo: t.prefijo });
                               if (t.estado === 'Asignado') {
-                                const checkList = t.checklist_tareas ? JSON.parse(t.checklist_tareas) : [];
+                                const checkList = parseChecklist(t.checklist_tareas);
                                 setAccionData({
                                   tecnico_id: t.tecnico_id || '',
                                   fecha_programada: t.fecha_programada || '',
                                   prioridad: t.prioridad || '',
                                   observaciones_asignacion: t.observaciones_asignacion || '',
+                                  categoria_id: t.categoria_id || '',
                                   checklist_tareas: checkList
                                 });
                               } else {
-                                setAccionData({});
+                                setAccionData({ categoria_id: t.categoria_id || '' });
                               }
                             }} style={{ ...btnPrimary, fontSize: '0.82rem', background: t.estado === 'Asignado' ? '#D97706' : undefined }}>
                               {t.estado === 'Asignado' ? '🔄 Reasignar Técnico' : '👔 Asignar'}
@@ -2247,24 +2556,25 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
             <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {accionModal.tipo === 'finalizar' && (() => {
                 const targetTicket = tickets.find(t => t.id === accionModal.ticketId) || ticketModal.ticket || {};
-                const checkList = targetTicket.checklist_tareas ? JSON.parse(targetTicket.checklist_tareas) : [];
+                const checkList = parseChecklist(targetTicket.checklist_tareas);
+                const currentList = parseChecklist(accionData.checklist_completado || checkList);
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '65vh', overflowY: 'auto', paddingRight: '4px' }}>
-                    {checkList.length > 0 && (
+                    {currentList.length > 0 && (
                       <div style={{ background: '#F0F9FF', borderRadius: '10px', padding: '14px', border: '1px solid #BAE6FD' }}>
-                        <h5 style={{ margin: '0 0 10px', color: '#0369A1' }}>📋 Marcar Checklist de Tareas ({checkList.length})</h5>
+                        <h5 style={{ margin: '0 0 10px', color: '#0369A1' }}>📋 Marcar Checklist de Tareas ({currentList.length})</h5>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          {(accionData.checklist_completado || checkList).map((tarea, i) => (
+                          {currentList.map((tarea, i) => (
                             <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#0F172A', cursor: 'pointer' }}>
                               <input type="checkbox" checked={tarea.completada || false}
                                 onChange={(e) => {
-                                  const newChk = [...(accionData.checklist_completado || checkList)];
+                                  const newChk = [...currentList];
                                   newChk[i].completada = e.target.checked;
                                   setAccionData(p => ({ ...p, checklist_completado: newChk }));
                                 }}
                               />
                               <span style={{ textDecoration: tarea.completada ? 'line-through' : 'none', color: tarea.completada ? '#64748B' : '#0F172A' }}>
-                                {tarea.texto}
+                                {tarea.texto || tarea.tarea || (typeof tarea === 'string' ? tarea : '(Tarea sin texto)')}
                               </span>
                             </label>
                           ))}
@@ -2280,7 +2590,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                       <textarea rows={2} value={accionData.observaciones || ''} onChange={e => setAccionData(p => ({ ...p, observaciones: e.target.value }))} placeholder="Observaciones adicionales..." style={{ ...inputStyle, resize: 'vertical' }} />
                     </div>
                     <div>
-                      <label style={labelStyle}>📷 Adjuntar Evidencias / Fotos del Cierre</label>
+                      <label style={labelStyle}>📷 Adjuntar Evidencias / Fotos del Cierre (Puedes seleccionar múltiples imágenes a la vez)</label>
                       <input
                         type="file"
                         multiple
@@ -2288,9 +2598,16 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                         onChange={e => setAccionData(p => ({ ...p, evidencias_cierre_files: Array.from(e.target.files) }))}
                         style={{ ...inputStyle, padding: '8px', background: '#FAF6F0' }}
                       />
-                      {accionData.evidencias_cierre_files && accionData.evidencias_cierre_files.length > 0 && (
-                        <div style={{ fontSize: '0.78rem', color: '#166534', marginTop: '4px', fontWeight: 600 }}>
-                          ✓ {accionData.evidencias_cierre_files.length} archivo(s) seleccionado(s) para subir.
+                      {accionData.evidencias_cierre_files && accionData.evidencias_cierre_files.length > 0 ? (
+                        <div style={{ marginTop: '8px', padding: '10px 14px', background: '#DCFCE7', borderRadius: '10px', border: '1px solid #BBF7D0', fontSize: '0.82rem', color: '#166534' }}>
+                          <strong>✅ {accionData.evidencias_cierre_files.length} archivo(s) seleccionado(s):</strong>
+                          <ul style={{ margin: '6px 0 0', paddingLeft: '18px', maxHeight: '90px', overflowY: 'auto' }}>
+                            {accionData.evidencias_cierre_files.map((f, i) => <li key={i}>{f.name}</li>)}
+                          </ul>
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: '6px', fontSize: '0.78rem', color: '#666', fontStyle: 'italic' }}>
+                          💡 Tip: Puedes elegir varias fotos simultáneamente para adjuntar todas las evidencias del cierre.
                         </div>
                       )}
                     </div>
@@ -2323,6 +2640,15 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                       <option value="">Seleccionar técnico...</option>
                       {(accionModal.prefijo === 'ST' ? tecnicosST : tecnicosMT).map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
                     </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Categoría del Soporte / Ticket</label>
+                    <SearchableCategorySelect
+                      categories={categorias}
+                      selectedId={accionData.categoria_id || ''}
+                      onChange={(val) => setAccionData(p => ({ ...p, categoria_id: val }))}
+                      areaId={accionModal.prefijo === 'ST' ? 7 : 3}
+                    />
                   </div>
                   <div>
                     <label style={labelStyle}>Fecha Programada *</label>
@@ -2469,15 +2795,14 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                   <div style={{ borderTop: '1px dashed #E5D8CC', paddingTop: '10px' }}>
                     <strong style={{ color: '#6B3A2A', display: 'block', marginBottom: '6px' }}>📋 Checklist Verificado:</strong>
                     {(() => {
-                      let chkList = [];
-                      try { chkList = typeof approvalModalTicket.checklist_tareas === 'string' ? JSON.parse(approvalModalTicket.checklist_tareas) : (approvalModalTicket.checklist_tareas || []); } catch (e) { }
+                      const chkList = parseChecklist(approvalModalTicket.checklist_tareas);
                       if (chkList.length === 0) return <span style={{ color: '#888', fontStyle: 'italic', fontSize: '0.82rem' }}>Sin checklist.</span>;
                       return (
                         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
                           {chkList.map((chk, idx) => (
                             <li key={idx} style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: chk.completada ? '#F0FDF4' : '#FEF2F2', borderRadius: '6px', border: `1px solid ${chk.completada ? '#BBF7D0' : '#FECACA'}` }}>
                               <span>{chk.completada ? '✅' : '❌'}</span>
-                              <span style={{ fontWeight: chk.completada ? 600 : 400 }}>{chk.texto}</span>
+                              <span style={{ fontWeight: chk.completada ? 600 : 400 }}>{chk.texto || chk.tarea || (typeof chk === 'string' ? chk : '(Tarea sin texto)')}</span>
                             </li>
                           ))}
                         </ul>
@@ -2661,6 +2986,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
               </div>
               <div>
                 <p style={{ margin: '0 0 8px 0' }}><strong>Área Solicitante:</strong> {printTicketModal.area_registro || 'N/A'}</p>
+                <p style={{ margin: '0 0 8px 0' }}><strong>Categoría:</strong> {printTicketModal.categoria_nombre || (printTicketModal.categoria_id ? `Categoría #${printTicketModal.categoria_id}` : '—')}</p>
                 <p style={{ margin: '0 0 8px 0' }}><strong>Registrado por:</strong> {printTicketModal.usuario_registro_nombre || 'N/A'}</p>
                 <p style={{ margin: '0 0 8px 0' }}><strong>Fecha Registro:</strong> {formatDate(printTicketModal.fecha_registro)}</p>
                 <p style={{ margin: 0 }}><strong>Fecha Finalización:</strong> {printTicketModal.fecha_real_finalizacion ? formatDate(printTicketModal.fecha_real_finalizacion) : new Date().toLocaleString('es-ES')}</p>
@@ -2703,15 +3029,14 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
             <div style={{ marginBottom: '30px' }}>
               <h3 style={{ fontSize: '1.05rem', color: '#4A2518', borderBottom: '1px solid #E5D8CC', paddingBottom: '6px', marginBottom: '10px' }}>📋 Checklist de Actividades Ejecutadas</h3>
               {(() => {
-                let chkList = [];
-                try { chkList = typeof printTicketModal.checklist_tareas === 'string' ? JSON.parse(printTicketModal.checklist_tareas) : (printTicketModal.checklist_tareas || []); } catch (e) { }
+                const chkList = parseChecklist(printTicketModal.checklist_tareas);
                 if (chkList.length === 0) return <p style={{ fontSize: '0.9rem', color: '#6b7280', fontStyle: 'italic' }}>No se definieron ítems de checklist específicos para este ticket.</p>;
                 return (
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {chkList.map((chk, idx) => (
                       <li key={idx} style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 10px', background: chk.completada ? '#f0fdf4' : '#fef2f2', borderRadius: '6px', border: `1px solid ${chk.completada ? '#bbf7d0' : '#fecaca'}` }}>
                         <span>{chk.completada ? '✅ SI' : '❌ NO'}</span>
-                        <span style={{ fontWeight: chk.completada ? 600 : 400 }}>{chk.texto}</span>
+                        <span style={{ fontWeight: chk.completada ? 600 : 400 }}>{chk.texto || chk.tarea || (typeof chk === 'string' ? chk : '(Tarea sin texto)')}</span>
                       </li>
                     ))}
                   </ul>

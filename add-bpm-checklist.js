@@ -34,7 +34,9 @@ try {
       {
         nombre: 'Instalaciones y Edificaciones',
         filas: [
-          'Los techos, paredes están libres de humedades y completamente lisas, los pisos están en buen estado.',
+          'Los techos están libres de humedades, limpios y en buen estado.',
+          'Las paredes están completamente lisas, limpias y libres de humedades.',
+          'Los pisos están limpios, escurridos y en buen estado.',
           'Las partes altas (techos, tuberías y ductos de ventilación, campana, lamparas) están limpios, en buen estado y libres de goteo.',
           'Los puntos de higiene de manos están con recursos completos y en buenas condiciones'
         ]

@@ -44,6 +44,7 @@
 - Canal directo donde los **Puntos de Venta (PDVs)** o supervisores abren requerimientos técnicos o reportan incidencias en maquinaria, software, POS o infraestructura.
 - **Clasificación por Urgencia y Área**: El ticket se clasifica según su urgencia (`Urgente` vs `Revisar`) y se direcciona directamente al área competente (Mantenimiento, Sistemas, etc.).
 - **Ciclo de Vida y Gestión Operativa**: Los supervisores y jefes de área gestionan las solicitudes alternando sus estados (`Pendiente`, `Programada`, `Rechazada`). Con un solo clic se permite **programar una visita o auditoría correctiva en el calendario** directamente asociada a la solicitud y al PDV afectado.
+- **Categorización Jerárquica al Asignar / Reasignar**: El Jefe de Área (Mantenimiento, Sistemas, etc.) tiene la facultad de clasificar y reasignar la **Categoría / Subcategoría** técnica al momento de asignar o cambiar el técnico del ticket (`categoria_id`), reflejándose en la hoja de vida, reportes impresos y trazabilidad del servicio.
 
 ### 5. 📅 Calendario de Operaciones Inteligente y Prevención de Cruces
 - Agenda visual multinivel con vistas por Mes, Semana y Día para coordinar el despliegue del personal técnico y administrativo.
@@ -56,12 +57,14 @@
   - *Flujo Administrativo (Calidad, SST, VRH, Formación)*: Optimizado para inspección de cumplimiento de protocolos, normativas corporativas e higiene.
 - **Categorización Jerárquica por Subcategorías**: Cada visita permite seleccionar categorías en dos niveles (Padre → Subcategoría). Por ejemplo, en Mantenimiento se estructuran categorías como `SOPORTE GAS` (`Estufa`, `Plancha`, `Horno Rational`), `LINEA REFRIGERACION`, `INYECCION Y EXTRACCION`, `SOPORTE ELECTRICO`; en Sistemas se segrega por `POS`, `Hardware`, `Redes y Conectividad`, etc.
 - **Plantillas Dinámicas y Listas de Chequeo BPM**: Soporte nativo para formularios estandarizados corporativos (ejemplo: *DCM-F-DPR-25 Lista de chequeo BPM* con secciones como *Instalaciones y Edificaciones*, *Equipos y Utensilios*, *Personal Manipulador*). Cada pregunta permite evaluación visual por semáforo (`SÍ` en verde, `NO` en rojo, `N/A` en gris) junto con sus respectivas observaciones de hallazgo.
-- **Evidencias Comparativas (Antes / Después)**: Carga y comparación visual paralela de fotografías previas y posteriores a la intervención técnica, así como adjuntos documentales.
+- **Evidencias Múltiples de Inspección y Registro Comparativo**:
+  - *Galería Fotográfica Múltiple (Especial para Calidad / BPM)*: Permite cargar en lote múltiples fotografías (ej. 5 o más evidencias continuas) e incorporarlas directamente dentro de la tarjeta del checklist de evaluación o en el reporte general sin requerir división rígida Antes/Después. El sistema oculta de forma inteligente recuadros redundantes de carga cuando el checklist integrado está activo para mantener la interfaz limpia.
+  - *Evidencias Comparativas (Antes / Después)*: Para áreas técnicas (Mantenimiento y Sistemas), habilita la comparación paralela de la avería inicial (`Antes`) frente al resultado corregido (`Después`).
 - **Triple Firma Digital de Trazabilidad**: El cierre formal de la auditoría o visita técnica captura e integra firmas dibujadas en pantalla:
   1. *Firma del Técnico o Auxiliar* responsable de la labor.
   2. *Firma del Funcionario / Gerente del PDV* que recibe y valida el trabajo en el restaurante.
   3. *Aprobación y Firma del Jefe de Área* con sus comentarios formales de revisión.
-- **Autocierre de Agenda y Exportación en PDF**: Al firmar y finalizar una visita, la cita vinculada en el calendario se marca automáticamente con visto bueno (`✓`). Pulsando **"Exportar PDF"**, el sistema genera un documento formateado para impresión y archivo corporativo con todas las respuestas, fotos y firmas.
+- **Autocierre de Agenda, UX Modal y Exportación en PDF**: Las ventanas modales de alerta y confirmación cuentan con botones de cierre rápido (`×`) en el encabezado. Al firmar y finalizar una visita, la cita vinculada en el calendario se marca automáticamente con visto bueno (`✓`). Pulsando **"Exportar PDF"**, el sistema genera un documento formateado para impresión y archivo corporativo con todas las respuestas, fotos y firmas.
 
 ### 7. 📷 Fichas de Equipos, Mantenimiento Preventivo y Escáner QR
 - Escáner QR integrado que activa la cámara del celular o tablet para identificar al instante cualquier máquina o equipo en cocina, barra o cuarto frío.
