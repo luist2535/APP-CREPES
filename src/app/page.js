@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('admin123'); // Contraseña por defecto para cuentas de prueba
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -48,15 +48,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickLogin = (testEmail) => {
-    setEmail(testEmail);
-    setPassword('admin123');
-    setTimeout(() => {
-      const btn = document.getElementById('login-submit-btn');
-      if (btn) btn.click();
-    }, 100);
   };
 
   return (
@@ -150,55 +141,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Acceso Rápido de Prueba */}
-        <div className="quick-access-section">
-          <p className="quick-access-label">Acceso Rápido de Prueba (Contraseña: admin123)</p>
-          
-          <div className="quick-buttons-grid">
-            <button 
-              type="button" 
-              className="quick-btn"
-              onClick={() => handleQuickLogin('admin@crepesenpunto.com')}
-            >
-              👑 Admin
-            </button>
-            <button 
-              type="button" 
-              className="quick-btn"
-              onClick={() => handleQuickLogin('carlos@crepesenpunto.com')}
-            >
-              🔗 Coord. CTG
-            </button>
-            <button 
-              type="button" 
-              className="quick-btn"
-              onClick={() => handleQuickLogin('maria@crepesenpunto.com')}
-            >
-              📍 Coord. BAQ
-            </button>
-            <button 
-              type="button" 
-              className="quick-btn"
-              onClick={() => handleQuickLogin('ana@crepesenpunto.com')}
-            >
-              🛡️ SST
-            </button>
-            <button 
-              type="button" 
-              className="quick-btn"
-              onClick={() => handleQuickLogin('luis@crepesenpunto.com')}
-            >
-              🔧 Mantenimiento
-            </button>
-            <button 
-              type="button" 
-              className="quick-btn"
-              onClick={() => handleQuickLogin('sandra@crepesenpunto.com')}
-            >
-              ✓ Calidad
-            </button>
-          </div>
-        </div>
       </div>
 
       <style jsx global>{`

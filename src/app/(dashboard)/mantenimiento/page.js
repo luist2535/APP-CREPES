@@ -635,6 +635,7 @@ export default function MantenimientoPage() {
   const [activeExecutionTicket, setActiveExecutionTicket] = useState(null);
   const [executionData, setExecutionData] = useState({});
   const [printTicketModal, setPrintTicketModal] = useState(null);
+  const [equipoDetailsModal, setEquipoDetailsModal] = useState({ open: false, equipo: null, isConfirming: false });
   const [approvalModalTicket, setApprovalModalTicket] = useState(null);
   const [approvalData, setApprovalData] = useState({ firma_jefe: '', observaciones_aprobacion: '', motivo_devolucion: '' });
   const [openApprovalAccordion, setOpenApprovalAccordion] = useState('aprobar');
@@ -1207,6 +1208,32 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
     setIsScanning(false);
   };
 
+  const handleConsultarEquipo = async (equipoIdParaConsultar = null, isConfirmingParam = false) => {
+    const idToSearch = typeof equipoIdParaConsultar === 'string' ? equipoIdParaConsultar : formTicket.equipo_id;
+    if (!idToSearch || idToSearch.trim().length < 4) {
+      showToast('Ingresa al menos 4 caracteres del código o número para consultar.', 'error');
+      return;
+    }
+    showToast('Consultando equipo...', 'info');
+    try {
+      const res = await fetch(`/api/equipos?id=${encodeURIComponent(idToSearch.trim())}`);
+      const data = await res.json();
+      if (res.ok) {
+        if (data.equipo) {
+          setEquipoDetailsModal({ open: true, equipo: data.equipo, isConfirming: typeof equipoIdParaConsultar !== 'string' || isConfirmingParam });
+        }
+      } else {
+        if (data.equipos_sugeridos && data.equipos_sugeridos.length > 0) {
+          alert('⚠️ Se encontraron varios equipos. Sé más específico:\n\n' + data.equipos_sugeridos.map(eq => `• ${eq.id} - ${eq.nombre}`).join('\n'));
+        } else {
+          showToast(data.error || 'No se encontró el equipo.', 'error');
+        }
+      }
+    } catch (e) {
+      showToast('Error de conexión al consultar el equipo.', 'error');
+    }
+  };
+
   const addHallazgo = () => {
     setFormInspeccion(prev => ({
       ...prev,
@@ -1497,7 +1524,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                                 🛠️ Modo Visita
                               </button>
                             )}
-                            {t.estado === 'Por Aprobar' && (esJefe || isAdmin) && (
+                            {t.estado === 'Por Aprobar' && (esJefe || esAdmin) && (
                               <button onClick={() => setApprovalModalTicket(t)} style={{ background: '#4F46E5', color: '#fff', border: 'none', borderRadius: '8px', padding: '7px 14px', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                                 🔍 Evaluar y Aprobar
                               </button>
@@ -1512,7 +1539,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
 
               {/* Vista móvil: tarjetas exactas a input_file_1.png */}
               <div className="mobile-only-cards" style={{ display: 'none', flexDirection: 'column', gap: '12px' }}>
-                {tickets.map(t => <TicketCard key={t.id} ticket={t} onOpen={openTicket} onStartModoVisita={iniciarYAbriModoVisita} onOpenModoVisita={openModoVisita} onApprove={setApprovalModalTicket} esJefe={esJefe || isAdmin} />)}
+                {tickets.map(t => <TicketCard key={t.id} ticket={t} onOpen={openTicket} onStartModoVisita={iniciarYAbriModoVisita} onOpenModoVisita={openModoVisita} onApprove={setApprovalModalTicket} esJefe={esJefe || esAdmin} />)}
               </div>
 
               {/* ====== ACCESOS RÁPIDOS FOOTER DESKTOP EXACTO A input_file_0.png ====== */}
@@ -1625,7 +1652,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}>
                     <input type="radio" name="tipoElemento" value="locativo" checked={tipoElemento === 'locativo'} onChange={() => { setTipoElemento('locativo'); setFormTicket(p => ({ ...p, equipo_id: '' })); }} />
-                    🧱 Locativo (Sin sticker)
+                    🧱 Sin sticker
                   </label>
                 </div>
               </div>
@@ -1634,7 +1661,10 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                 <div>
                   <label style={labelStyle}>Equipo (Código o Escáner) *</label>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <input value={formTicket.equipo_id} onChange={e => setFormTicket(p => ({ ...p, equipo_id: e.target.value }))} placeholder="Ej: EQ-1002" style={{ ...inputStyle, flex: 1 }} required />
+                    <input value={formTicket.equipo_id} onChange={e => setFormTicket(p => ({ ...p, equipo_id: e.target.value }))} placeholder="Ej: EQ-1002 (o últimos 4 dígitos)" style={{ ...inputStyle, flex: 1 }} required />
+                    <button type="button" onClick={handleConsultarEquipo} style={{ padding: '0 12px', flexShrink: 0, borderRadius: '8px', border: '1px solid #D1D5DB', background: '#F3F4F6', color: '#374151', fontWeight: 'bold', cursor: 'pointer' }} title="Consultar Equipo">
+                      🔍 Consultar
+                    </button>
                     <button type="button" onClick={startCameraScan} style={{ ...btnSecondary, padding: '0 12px', flexShrink: 0 }} title="Escanear QR">
                       📷 Escanear
                     </button>
@@ -1679,7 +1709,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
 
             <div>
               <label style={labelStyle}>Evidencias Fotográficas (Puedes seleccionar múltiples fotos a la vez)</label>
-              <input type="file" multiple accept="image/*" onChange={e => setEvidenciasFiles(Array.from(e.target.files))} style={{ ...inputStyle, padding: '8px' }} />
+              <input type="file" multiple accept=".png,.jpg,.jpeg,image/png,image/jpeg" onChange={e => setEvidenciasFiles(Array.from(e.target.files))} style={{ ...inputStyle, padding: '8px' }} />
               {evidenciasFiles && evidenciasFiles.length > 0 ? (
                 <div style={{ marginTop: '8px', padding: '10px 14px', background: '#DCFCE7', borderRadius: '10px', border: '1px solid #BBF7D0', fontSize: '0.82rem', color: '#166534' }}>
                   <strong>✅ {evidenciasFiles.length} imagen(es) seleccionada(s) para cargar:</strong>
@@ -2040,7 +2070,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                         <input
                           type="file"
                           multiple
-                          accept="image/*"
+                          accept=".png,.jpg,.jpeg,image/png,image/jpeg"
                           onChange={e => setExecutionData(p => ({ ...p, evidencias_cierre_files: Array.from(e.target.files) }))}
                           style={{ width: '100%', padding: '10px', background: '#F5ECE5', border: '1px dashed #6B3A2A', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer' }}
                         />
@@ -2130,23 +2160,35 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                     <p style={{ margin: '0 0 8px 0', fontSize: '0.88rem', color: '#2C1810', fontWeight: 600 }}>📝 Descripción de la Solicitud:</p>
                     <p style={{ margin: 0, fontSize: '0.85rem', color: '#333', whiteSpace: 'pre-wrap' }}>{t.descripcion}</p>
                     {(t.equipo_nombre || t.area_hallazgo) && (
-                      <div style={{ fontSize: '0.78rem', color: '#666', marginTop: '8px', borderTop: '1px solid #E8DDD4', paddingTop: '6px' }}>
-                        📍 Elemento: <strong>{t.equipo_nombre ? `${t.equipo_nombre} (${t.equipo_marca || ''} ${t.equipo_modelo || ''})` : `Locativo - ${t.area_hallazgo}`}</strong>
+                      <div style={{ fontSize: '0.78rem', color: '#666', marginTop: '8px', borderTop: '1px solid #E8DDD4', paddingTop: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div>
+                          📍 Elemento: <strong>{t.equipo_nombre ? `${t.equipo_nombre}${t.equipo_marca || t.equipo_modelo ? ` (${[t.equipo_marca, t.equipo_modelo].filter(Boolean).join(' ')})` : ''}` : `Locativo - ${t.area_hallazgo}`}</strong>
+                        </div>
+                        {t.equipo_id && (
+                          <button onClick={() => handleConsultarEquipo(t.equipo_id, false)} style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', background: '#DBEAFE', color: '#1E40AF', border: '1px solid #BFDBFE', cursor: 'pointer', fontWeight: 'bold' }}>
+                            🔍 Ver Detalles
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
-                  {t.evidencias && JSON.parse(t.evidencias).length > 0 && (
-                    <div>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#4A2518', display: 'block', marginBottom: '6px' }}>📷 Evidencias fotográficas del problema:</span>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        {JSON.parse(t.evidencias).map((imgUrl, i) => (
-                          <a key={i} href={imgUrl} target="_blank" rel="noopener noreferrer">
-                            <img src={imgUrl} alt={`evidencia-${i}`} style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #ddd' }} />
-                          </a>
-                        ))}
+                  {t.evidencias && (() => {
+                    let evs = [];
+                    try { evs = typeof t.evidencias === 'string' ? JSON.parse(t.evidencias) : (t.evidencias || []); } catch (e) { }
+                    if (!Array.isArray(evs) || evs.length === 0) return null;
+                    return (
+                      <div>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#4A2518', display: 'block', marginBottom: '6px' }}>📷 Evidencias fotográficas del problema:</span>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {evs.map((imgUrl, i) => (
+                            <a key={i} href={imgUrl} target="_blank" rel="noopener noreferrer">
+                              <img src={imgUrl} alt={`evidencia-${i}`} style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #ddd' }} />
+                            </a>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px' }}>
                     <div>
                       <label style={labelStyle}>Técnico *</label>
@@ -2395,7 +2437,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                         { label: 'Área Registro', value: t.area_registro },
                         { label: 'Categoría', value: t.categoria_nombre || (t.categoria_id ? `Categoría #${t.categoria_id}` : '—') },
                         { label: 'Área Hallazgo', value: t.area_hallazgo || '—' },
-                        { label: 'Equipo', value: t.equipo_nombre || 'Locativo' },
+                        { label: 'Equipo', value: t.equipo_nombre || 'Locativo', action: t.equipo_id ? <button onClick={() => handleConsultarEquipo(t.equipo_id, false)} style={{ marginLeft: '6px', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: '#DBEAFE', color: '#1E40AF', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>Ver Detalles</button> : null },
                         { label: 'Fecha Evidencia', value: formatDate(t.fecha_evidencia) },
                         { label: 'Fecha Registro', value: formatDate(t.fecha_registro) },
                         { label: 'Fecha Programada', value: formatDate(t.fecha_programada) },
@@ -2408,7 +2450,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                       ].map(f => (
                         <div key={f.label} style={{ background: '#F8F4EE', borderRadius: '8px', padding: '10px 12px' }}>
                           <div style={{ fontSize: '0.68rem', color: '#888', fontWeight: 700, textTransform: 'uppercase', marginBottom: '3px' }}>{f.label}</div>
-                          <div style={{ fontSize: '0.85rem', color: '#2C1810', fontWeight: 600 }}>{f.value}</div>
+                          <div style={{ fontSize: '0.85rem', color: '#2C1810', fontWeight: 600, display: 'flex', alignItems: 'center' }}>{f.value} {f.action}</div>
                         </div>
                       ))}
                     </div>
@@ -2504,7 +2546,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                               🛠️ Abrir / Continuar (Modo Visita)
                             </button>
                           )}
-                          {t.estado === 'Por Aprobar' && (esJefe || isAdmin) && (
+                          {t.estado === 'Por Aprobar' && (esJefe || esAdmin) && (
                             <button onClick={() => { setTicketModal({ open: false, ticket: null, historial: [] }); setApprovalModalTicket(t); }} style={{ ...btnPrimary, fontSize: '0.85rem', background: '#4F46E5', padding: '10px 18px' }}>
                               🔍 Evaluar y Aprobar
                             </button>
@@ -2594,7 +2636,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                       <input
                         type="file"
                         multiple
-                        accept="image/*"
+                        accept=".png,.jpg,.jpeg,image/png,image/jpeg"
                         onChange={e => setAccionData(p => ({ ...p, evidencias_cierre_files: Array.from(e.target.files) }))}
                         style={{ ...inputStyle, padding: '8px', background: '#FAF6F0' }}
                       />
@@ -3073,7 +3115,6 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Firma de Recibido a Satisfacción</div>
               </div>
-
               <div style={{ textAlign: 'center' }}>
                 <div style={{ height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
                   {printTicketModal.firma_jefe ? (
@@ -3091,6 +3132,43 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
 
             <div style={{ textAlign: 'center', marginTop: '40px', fontSize: '0.72rem', color: '#9ca3af' }}>
               Documento generado automáticamente por Crepes en Punto — Sistema de Mantenimiento y Calidad.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ====== EQUIPO DETAILS MODAL ====== */}
+      {equipoDetailsModal.open && equipoDetailsModal.equipo && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 999999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div className="animate-slide-up" style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '450px', overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}>
+            <div style={{ background: '#2C1810', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, color: '#fff', fontSize: '1.1rem' }}>Detalles del Equipo</h3>
+              <button onClick={() => setEquipoDetailsModal({ open: false, equipo: null, isConfirming: false })} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '1.4rem', cursor: 'pointer' }}>×</button>
+            </div>
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div><strong style={{ color: '#6B3A2A' }}>Nombre:</strong> <span style={{ fontSize: '1.05rem', fontWeight: 'bold' }}>{equipoDetailsModal.equipo.nombre}</span></div>
+              <div><strong style={{ color: '#6B3A2A' }}>ID / Código:</strong> {equipoDetailsModal.equipo.id}</div>
+              {equipoDetailsModal.equipo.marca && <div><strong style={{ color: '#6B3A2A' }}>Marca:</strong> {equipoDetailsModal.equipo.marca}</div>}
+              {equipoDetailsModal.equipo.modelo && <div><strong style={{ color: '#6B3A2A' }}>Modelo:</strong> {equipoDetailsModal.equipo.modelo}</div>}
+              {equipoDetailsModal.equipo.serie && <div><strong style={{ color: '#6B3A2A' }}>Serie:</strong> {equipoDetailsModal.equipo.serie}</div>}
+              {equipoDetailsModal.equipo.pdv_nombre && <div><strong style={{ color: '#6B3A2A' }}>Punto de Venta:</strong> {equipoDetailsModal.equipo.pdv_nombre}</div>}
+            </div>
+            <div style={{ padding: '16px 20px', background: '#F9FAFB', borderTop: '1px solid #E5E7EB', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button onClick={() => setEquipoDetailsModal({ open: false, equipo: null, isConfirming: false })} style={{ ...btnSecondary, padding: '8px 16px' }}>
+                {equipoDetailsModal.isConfirming ? 'Cancelar' : 'Cerrar'}
+              </button>
+              {equipoDetailsModal.isConfirming && (
+                <button 
+                  onClick={() => {
+                    setFormTicket(p => ({ ...p, equipo_id: equipoDetailsModal.equipo.id }));
+                    setEquipoDetailsModal({ open: false, equipo: null, isConfirming: false });
+                    showToast(`✅ Equipo confirmado: ${equipoDetailsModal.equipo.nombre}`, 'success');
+                  }} 
+                  style={{ ...btnPrimary, padding: '8px 16px', background: '#166534' }}
+                >
+                  ✅ Confirmar este equipo
+                </button>
+              )}
             </div>
           </div>
         </div>

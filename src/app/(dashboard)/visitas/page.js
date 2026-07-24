@@ -1072,11 +1072,14 @@ const MatrixChecklistForm = ({
               let colNo = 0;
               let colNa = 0;
               if (template.secciones) {
-                template.secciones.forEach(sec => {
+                template.secciones.forEach((sec, sIdx) => {
                   if (sec.filas) {
                     sec.filas.forEach(fila => {
                       colTotal++;
-                      const val = answers[`${fila}__${col}`];
+                      let base = fila;
+                      if (template.secciones.length > 1) base = `${fila}__sec_${sIdx}`;
+                      const key = `${base}__${col}`;
+                      const val = answers[key] || answers[`${fila}__${col}`];
                       if (val === 'SI') colSi++;
                       else if (val === 'NO') colNo++;
                       else if (val === 'NA') colNa++;
@@ -1105,7 +1108,15 @@ const MatrixChecklistForm = ({
               if (sec.filas) {
                 sec.filas.forEach(fila => {
                   secTotal++;
-                  const val = answers[fila] || (template.columnas && template.columnas[0] ? answers[`${fila}__${template.columnas[0]}`] : null);
+                  let base = fila;
+                  if (template.secciones.length > 1) base = `${fila}__sec_${idx}`;
+                  let key = base;
+                  if (template?.tipo === 'matrix' && template.columnas && template.columnas.length > 0) {
+                    key = `${base}__${template.columnas[0]}`;
+                  }
+                  
+                  const val = answers[key] || answers[fila] || (template.columnas && template.columnas[0] ? answers[`${fila}__${template.columnas[0]}`] : null);
+                  
                   if (val === 'SI') secSi++;
                   else if (val === 'NO') secNo++;
                   else if (val === 'NA') secNa++;
@@ -1214,7 +1225,7 @@ const MatrixChecklistForm = ({
               <input
                 id="upload-evidencias-matrix"
                 type="file"
-                accept="image/*,application/pdf"
+                accept=".png,.jpg,.jpeg,image/png,image/jpeg,application/pdf"
                 multiple
                 onChange={onMultiFileUpload}
                 style={{ display: 'none' }}
@@ -3441,7 +3452,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                             📁 Subir Imagen QR
                             <input
                               type="file"
-                              accept="image/*"
+                              accept=".png,.jpg,.jpeg,image/png,image/jpeg"
                               style={{ display: 'none' }}
                               onChange={handleFileChangeEquipo}
                             />
@@ -3961,7 +3972,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                               <input
                                 id="exec-upload-evidencias-multi"
                                 type="file"
-                                accept="image/*,application/pdf"
+                                accept=".png,.jpg,.jpeg,image/png,image/jpeg,application/pdf"
                                 multiple
                                 onChange={handleMultiFileUpload}
                                 style={{ display: 'none' }}
@@ -4051,7 +4062,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                 <input
                                   id="exec-upload-antes"
                                   type="file"
-                                  accept="image/*"
+                                  accept=".png,.jpg,.jpeg,image/png,image/jpeg"
                                   onChange={(e) => handleFileUpload(e, 'antes', setAntesFile, setAntesUrl, setAntesUploading)}
                                   style={{ display: 'none' }}
                                 />
@@ -4081,7 +4092,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                 <input
                                   id="exec-upload-despues"
                                   type="file"
-                                  accept="image/*"
+                                  accept=".png,.jpg,.jpeg,image/png,image/jpeg"
                                   onChange={(e) => handleFileUpload(e, 'despues', setDespuesFile, setDespuesUrl, setDespuesUploading)}
                                   style={{ display: 'none' }}
                                 />
@@ -5153,7 +5164,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                               <input
                                 id="upload-evidencias-multi"
                                 type="file"
-                                accept="image/*,application/pdf"
+                                accept=".png,.jpg,.jpeg,image/png,image/jpeg,application/pdf"
                                 multiple
                                 onChange={handleMultiFileUpload}
                                 style={{ display: 'none' }}
@@ -5236,7 +5247,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                 <input
                                   id="upload-antes"
                                   type="file"
-                                  accept="image/*"
+                                  accept=".png,.jpg,.jpeg,image/png,image/jpeg"
                                   onChange={(e) => handleFileUpload(e, 'antes', setAntesFile, setAntesUrl, setAntesUploading)}
                                   style={{ display: 'none' }}
                                 />
@@ -5263,7 +5274,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                 <input
                                   id="upload-despues"
                                   type="file"
-                                  accept="image/*"
+                                  accept=".png,.jpg,.jpeg,image/png,image/jpeg"
                                   onChange={(e) => handleFileUpload(e, 'despues', setDespuesFile, setDespuesUrl, setDespuesUploading)}
                                   style={{ display: 'none' }}
                                 />
@@ -5848,7 +5859,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
               )}
 
               {/* Score Executive Banner for Quality Checklists */}
-              {(() => {
+              {modalTab === 'general' && (() => {
                 const score = calculateVisitScore(selectedVisit, plantillas);
                 if (!score) return null;
                 return (
@@ -6118,8 +6129,9 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
 
                         {(() => {
                           const ansData = safeParseAnswers(selectedVisit.datos_formulario);
-                          const evs = selectedVisit.evidencias || ansData?.evidencias_lista || [];
+                       const evs = selectedVisit.evidencias || ansData?.evidencias_lista || [];
                           if (!Array.isArray(evs) || evs.length === 0) return null;
+                          const getEvUrl = (ev) => ev.ruta_archivo || ev.url || '';
                           return (
                             <>
                               <div style={{ backgroundColor: '#2C1810', color: '#fff', padding: '5px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', borderBottom: '1.5px solid #2C1810', textAlign: 'center' }}>
@@ -6128,13 +6140,13 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                               <div style={{ padding: '12px', borderBottom: '1.5px solid #2C1810', backgroundColor: '#fff', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
                                 {evs.map((ev, idx) => (
                                   <div key={idx} style={{ border: '1px solid #ddd', borderRadius: '6px', padding: '6px', textAlign: 'center' }}>
-                                    {ev.url && (ev.url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || ev.url.includes('/uploads/')) ? (
-                                      <img src={ev.url} alt={`Evidencia ${idx + 1}`} style={{ width: '100%', height: '75px', objectFit: 'cover', borderRadius: '4px' }} />
+                                    {getEvUrl(ev) && (getEvUrl(ev).match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || getEvUrl(ev).includes('/uploads/')) ? (
+                                      <img src={getEvUrl(ev)} alt={`Evidencia ${idx + 1}`} style={{ width: '100%', height: '75px', objectFit: 'cover', borderRadius: '4px' }} />
                                     ) : (
                                       <div style={{ width: '100%', height: '75px', backgroundColor: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', borderRadius: '4px' }}>📄</div>
                                     )}
-                                    <div style={{ fontSize: '0.68rem', fontWeight: '600', color: '#333', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.nombre || ev.etiqueta || `Evidencia ${idx + 1}`}</div>
-                                    <a href={ev.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.65rem', color: '#0066cc', textDecoration: 'underline' }}>Ver archivo</a>
+                                    <div style={{ fontSize: '0.68rem', fontWeight: '600', color: '#333', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.nombre_archivo || ev.nombre || ev.etiqueta || `Evidencia ${idx + 1}`}</div>
+                                    <a href={getEvUrl(ev)} target="_blank" rel="noreferrer" style={{ fontSize: '0.65rem', color: '#0066cc', textDecoration: 'underline' }}>Ver archivo</a>
                                   </div>
                                 ))}
                               </div>
@@ -6248,6 +6260,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                     {(() => {
                       const ansData = safeParseAnswers(selectedVisit.datos_formulario);
                       const evs = selectedVisit.evidencias || ansData?.evidencias_lista || [];
+                      const getEvUrl = (ev) => ev.ruta_archivo || ev.url || '';
                       if (!Array.isArray(evs) || evs.length === 0) return null;
                       return (
                         <div className="visit-obs-section" style={{ marginTop: '16px' }}>
@@ -6255,9 +6268,9 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '12px', marginTop: '10px' }}>
                             {evs.map((ev, idx) => (
                               <div key={idx} style={{ border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px', backgroundColor: '#FFF', textAlign: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-                                {ev.url && (ev.url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || ev.url.includes('/uploads/')) ? (
+                                {getEvUrl(ev) && (getEvUrl(ev).match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || getEvUrl(ev).includes('/uploads/')) ? (
                                   <div style={{ width: '100%', height: '80px', borderRadius: '6px', overflow: 'hidden', marginBottom: '6px' }}>
-                                    <img src={ev.url} alt={ev.nombre || `Evidencia ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    <img src={getEvUrl(ev)} alt={ev.nombre_archivo || ev.nombre || `Evidencia ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                   </div>
                                 ) : (
                                   <div style={{ width: '100%', height: '80px', borderRadius: '6px', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', marginBottom: '6px' }}>
@@ -6404,31 +6417,35 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                     <span>📍</span> Sub-área: {col}
                                   </h5>
                                   <div className="responses-grid" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    {firstField.secciones.flatMap(sec => sec.filas).map((fila, fIdx) => {
-                                      const answer = selectedVisit.data[`${fila}__${col}`];
-                                      const obs = selectedVisit.data[`${fila}__${col}__obs`] || selectedVisit.data[`${fila}__${col}_obs`];
-                                      let colorClass = 'text-muted';
-                                      let emoji = '⚪';
-                                      if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
-                                      else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
-                                      else if (answer === 'NA') { colorClass = 'text-muted'; emoji = '🔘'; }
-
-                                      return (
-                                        <div key={fIdx} className="response-row" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '6px', borderBottom: '1px solid #e2e8f0' }}>
-                                          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                                            <span className="response-label" style={{ fontWeight: '500', color: '#334155' }}>{fila}</span>
-                                            <span className={`response-value ${colorClass}`} style={{ fontWeight: '700' }}>
-                                              {emoji} {answer || 'Sin responder'}
-                                            </span>
+                                    {firstField.secciones.flatMap((sec, sIdx) => 
+                                      sec.filas.map((fila, fIdx) => {
+                                        let base = fila;
+                                        if (firstField.secciones.length > 1) base = `${fila}__sec_${sIdx}`;
+                                        const answer = selectedVisit.data[`${base}__${col}`] || selectedVisit.data[`${fila}__${col}`];
+                                        const obs = selectedVisit.data[`${base}__${col}__obs`] || selectedVisit.data[`${base}__${col}_obs`] || selectedVisit.data[`${fila}__${col}__obs`] || selectedVisit.data[`${fila}__${col}_obs`];
+                                        let colorClass = 'text-muted';
+                                        let emoji = '⚪';
+                                        if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
+                                        else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
+                                        else if (answer === 'NA') { colorClass = 'text-muted'; emoji = '🔘'; }
+                                        
+                                        return (
+                                          <div key={`${sIdx}-${fIdx}`} className="response-row" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '6px', borderBottom: '1px solid #e2e8f0' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                              <span className="response-label" style={{ fontWeight: '500', color: '#334155' }}>{fila}</span>
+                                              <span className={`response-value ${colorClass}`} style={{ fontWeight: '700' }}>
+                                                {emoji} {answer || 'Sin responder'}
+                                              </span>
+                                            </div>
+                                            {obs && (
+                                              <span style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', paddingLeft: '8px', backgroundColor: '#ffffff', padding: '4px 8px', borderRadius: '4px', borderLeft: '3px solid #6B3A2A', marginTop: '2px' }}>
+                                                💬 {obs}
+                                              </span>
+                                            )}
                                           </div>
-                                          {obs && (
-                                            <span style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', paddingLeft: '8px', backgroundColor: '#ffffff', padding: '4px 8px', borderRadius: '4px', borderLeft: '3px solid #6B3A2A', marginTop: '2px' }}>
-                                              💬 {obs}
-                                            </span>
-                                          )}
-                                        </div>
-                                      );
-                                    })}
+                                        );
+                                      })
+                                    )}
                                   </div>
                                 </div>
                               ))}
@@ -6444,9 +6461,16 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                   </h5>
                                   <div className="responses-grid" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                     {sec.filas.map((fila, fIdx) => {
-                                      const defaultColKey = (firstField.tipo === 'matrix' && firstField.columnas && firstField.columnas[0]) ? `${fila}__${firstField.columnas[0]}` : fila;
-                                      const answer = selectedVisit.data[defaultColKey] || selectedVisit.data[fila] || selectedVisit.data[`${fila}__SATISFACTORIO`];
-                                      const obs = selectedVisit.data[`${defaultColKey}__obs`] || selectedVisit.data[`${fila}__obs`] || selectedVisit.data[`${fila}_obs`];
+                                      let base = fila;
+                                      if (firstField.secciones.length > 1) base = `${fila}__sec_${sIdx}`;
+                                      let defaultColKey = base;
+                                      if (firstField.tipo === 'matrix' && firstField.columnas && firstField.columnas[0]) {
+                                        defaultColKey = `${base}__${firstField.columnas[0]}`;
+                                      }
+                                      const fallbackColKey = (firstField.tipo === 'matrix' && firstField.columnas && firstField.columnas[0]) ? `${fila}__${firstField.columnas[0]}` : fila;
+                                      
+                                      const answer = selectedVisit.data[defaultColKey] || selectedVisit.data[base] || selectedVisit.data[fallbackColKey] || selectedVisit.data[fila] || selectedVisit.data[`${fila}__SATISFACTORIO`];
+                                      const obs = selectedVisit.data[`${defaultColKey}__obs`] || selectedVisit.data[`${base}__obs`] || selectedVisit.data[`${base}_obs`] || selectedVisit.data[`${fallbackColKey}__obs`] || selectedVisit.data[`${fila}__obs`] || selectedVisit.data[`${fila}_obs`];
                                       let colorClass = 'text-muted';
                                       let emoji = '⚪';
                                       if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
@@ -6547,6 +6571,24 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                             </a>
                           </div>
                         ))}
+                      </div>
+                    )}
+
+                    {selectedVisit.evidencias.some(e => e.etiqueta !== 'antes' && e.etiqueta !== 'despues' && e.etiqueta !== 'soporte') && (
+                      <div className="otras-evidencias-container" style={{ marginTop: '20px' }}>
+                        <h5 style={{ borderBottom: '2px solid #E2E8F0', paddingBottom: '8px', marginBottom: '12px', color: '#334155' }}>Otras Evidencias Fotográficas:</h5>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px' }}>
+                          {selectedVisit.evidencias.filter(e => e.etiqueta !== 'antes' && e.etiqueta !== 'despues' && e.etiqueta !== 'soporte').map((e, idx) => (
+                            <div key={e.id || idx} className="evidence-preview-card" style={{ flex: '1 1 200px', maxWidth: '250px', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px' }}>
+                              <span className="evidence-badge" style={{ backgroundColor: '#E2E8F0', color: '#475569', marginBottom: '10px', width: '100%', textAlign: 'center', boxSizing: 'border-box', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '4px 8px' }} title={e.etiqueta || e.nombre_archivo}>
+                                {(e.etiqueta || e.nombre_archivo || 'Evidencia').toUpperCase()}
+                              </span>
+                              <div className="img-container" style={{ width: '100%', display: 'flex', justifyContent: 'center', backgroundColor: '#F8FAFC', borderRadius: '8px', padding: '4px' }}>
+                                <img src={e.ruta_archivo} alt={e.etiqueta} className="img-evidence" style={{ maxWidth: '100%', height: '140px', objectFit: 'contain' }} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -7341,3 +7383,4 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
     </div>
   );
 }
+

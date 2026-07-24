@@ -631,7 +631,7 @@ export default function EquiposPage() {
                       <span>📁</span> Subir Foto (QR / Barras)
                       <input 
                         type="file" 
-                        accept="image/*" 
+                        accept=".png,.jpg,.jpeg,image/png,image/jpeg" 
                         capture="environment" 
                         onChange={handleFileChange} 
                         style={{ display: 'none' }}
@@ -851,32 +851,39 @@ export default function EquiposPage() {
                             <span className="history-item-user">Ejecutor: {m.auditor_nombre}</span>
                           </div>
                           {m.observaciones && <p className="history-item-obs">" {m.observaciones} "</p>}
-                          {m.evidencias && m.evidencias.length > 0 && (
-                            <div className="maint-attachments" style={{ marginTop: '8px', borderTop: '1px dashed var(--color-border-light)', paddingTop: '6px' }}>
-                              <span style={{ fontSize: '0.68rem', fontWeight: 'bold', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '4px', textAlign: 'left' }}>📄 Soportes y Facturas:</span>
-                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                {m.evidencias.map((ev, eidx) => (
-                                  <a 
-                                    key={eidx} 
-                                    href={ev.ruta_archivo} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="attachment-link"
-                                    style={{
-                                      fontSize: '0.7rem',
-                                      color: 'var(--color-primary)',
-                                      textDecoration: 'underline',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '3px'
-                                    }}
-                                  >
-                                    📎 {ev.nombre_archivo}
-                                  </a>
-                                ))}
+                          {(() => {
+                            let evList = m.evidencias;
+                            if (typeof evList === 'string') {
+                              try { evList = JSON.parse(evList); } catch(e) { evList = []; }
+                            }
+                            if (!Array.isArray(evList)) evList = [];
+                            return evList.length > 0 ? (
+                              <div className="maint-attachments" style={{ marginTop: '8px', borderTop: '1px dashed var(--color-border-light)', paddingTop: '6px' }}>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 'bold', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '4px', textAlign: 'left' }}>📄 Soportes y Facturas:</span>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                  {evList.map((ev, eidx) => (
+                                    <a 
+                                      key={eidx} 
+                                      href={ev.ruta_archivo} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="attachment-link"
+                                      style={{
+                                        fontSize: '0.7rem',
+                                        color: 'var(--color-primary)',
+                                        textDecoration: 'underline',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '3px'
+                                      }}
+                                    >
+                                      📎 {ev.nombre_archivo}
+                                    </a>
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            ) : null;
+                          })()}
                         </div>
                       ))}
                     </div>

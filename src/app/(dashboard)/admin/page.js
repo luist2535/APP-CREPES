@@ -119,7 +119,7 @@ function AdminContent() {
   // Form Fields - User
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
-  const [userPassword, setUserPassword] = useState('admin123');
+  const [userPassword, setUserPassword] = useState('');
   const [userRolId, setUserRolId] = useState('');
   const [userCiudadId, setUserCiudadId] = useState('');
   const [userPdvId, setUserPdvId] = useState('');
@@ -428,7 +428,7 @@ function AdminContent() {
     setEditingPdv(null);
     setUserName('');
     setUserEmail('');
-    setUserPassword('admin123');
+    setUserPassword('');
     setUserPdvId('');
     setPdvName('');
     setPdvCiudadId(ciudades.length > 0 ? String(ciudades[0].id) : '');
@@ -443,6 +443,7 @@ function AdminContent() {
     setEditingUser(user);
     setUserName(user.nombre);
     setUserEmail(user.email);
+    setUserPassword('');
     setUserRolId(String(user.rol_id));
     setUserCiudadId(user.ciudad_id ? String(user.ciudad_id) : '');
     setUserPdvId(user.pdv_id ? String(user.pdv_id) : '');
@@ -488,15 +489,25 @@ function AdminContent() {
     );
   };
 
-  const proceedDeleteUser = async (id) => {
+  const proceedDeleteUser = async (id, force = false) => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/admin?entity=user&id=${id}`, {
+      const res = await fetch(`/api/admin?entity=user&id=${id}${force ? '&force=true' : ''}`, {
         method: 'DELETE',
       });
       
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al eliminar usuario');
+      if (!res.ok) {
+        if (data.needsForceDelete) {
+          triggerConfirm(
+            '⚠️ Forzar Eliminación de Usuario',
+            'Este usuario tiene tareas, visitas o historial asociado. ¿Estás seguro de que deseas forzar su eliminación? (Se ocultará del sistema permanentemente sin destruir los registros históricos).',
+            () => proceedDeleteUser(id, true)
+          );
+          return;
+        }
+        throw new Error(data.error || 'Error al eliminar usuario');
+      }
       
       triggerAlert('Éxito', data.message || 'Usuario eliminado con éxito', 'success');
       loadAllData();
@@ -532,6 +543,9 @@ function AdminContent() {
             ciudad_id: userCiudadId ? parseInt(userCiudadId) : null,
             pdv_id: userPdvId ? parseInt(userPdvId) : null,
           };
+          if (userPassword) {
+            payloadData.password = userPassword;
+          }
         } else {
           payloadData = {
             nombre: userName,
@@ -682,8 +696,8 @@ function AdminContent() {
           
           {/* Left/Main Column: Data table list */}
           <div className="admin-list-col">
-            <div className="card shadow-md">
-              <div className="card-body px-0 py-0">
+            <div className="card shadow-md" style={{ overflow: 'visible' }}>
+              <div className="card-body px-0 py-0" style={{ overflow: 'visible' }}>
                                {activeTab === 'usuarios' && (
                   <div>
                     {/* Search & Filter Bar */}
@@ -1204,7 +1218,7 @@ function AdminContent() {
                             required
                           />
                         </div>
-                        {!editingUser && (
+                        {!editingUser ? (
                           <div className="form-group">
                             <label className="form-label" htmlFor="user-pass">Contraseña</label>
                             <input
@@ -1214,6 +1228,18 @@ function AdminContent() {
                               value={userPassword}
                               onChange={(e) => setUserPassword(e.target.value)}
                               required
+                            />
+                          </div>
+                        ) : (
+                          <div className="form-group">
+                            <label className="form-label" htmlFor="user-pass">Contraseña (dejar en blanco para mantener la actual)</label>
+                            <input
+                              id="user-pass"
+                              type="password"
+                              className="form-input"
+                              value={userPassword}
+                              onChange={(e) => setUserPassword(e.target.value)}
+                              placeholder="Nueva contraseña..."
                             />
                           </div>
                         )}
@@ -2109,7 +2135,7 @@ function AdminContent() {
         }
 
         .table-responsive {
-          overflow-x: auto;
+          overflow: visible;
         }
 
         .px-0 { padding-left: 0 !important; padding-right: 0 !important; }

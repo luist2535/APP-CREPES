@@ -17,6 +17,7 @@ export async function GET(request) {
       LEFT JOIN roles r ON u.rol_id = r.id
       LEFT JOIN ciudades c ON u.ciudad_id = c.id
       LEFT JOIN pdv p ON u.pdv_id = p.id
+      WHERE (u.deleted != 1 OR u.deleted IS NULL)
       ORDER BY u.nombre
     `).all();
 

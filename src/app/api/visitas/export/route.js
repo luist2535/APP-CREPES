@@ -48,16 +48,70 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Esta visita no posee un formulario checklist o campos configurados' }, { status: 400 });
     }
 
-    const templateConfig = JSON.parse(rawCampos)[0];
-    if (!templateConfig || !templateConfig.code) {
-      return NextResponse.json({ error: 'Código de plantilla no configurado' }, { status: 400 });
-    }
+    const templateConfig = JSON.parse(rawCampos)[0] || {};
+    const templateFileName = templateConfig.code ? `${templateConfig.code}.xlsx` : null;
+    const templatePath = templateFileName ? path.join(process.cwd(), 'public', 'templates', templateFileName) : null;
 
-    const templateFileName = `${templateConfig.code}.xlsx`;
-    const templatePath = path.join(process.cwd(), 'public', 'templates', templateFileName);
-
-    if (!fs.existsSync(templatePath)) {
-      return NextResponse.json({ error: `Plantilla original ${templateFileName} no encontrada en el servidor` }, { status: 404 });
+    if (!templateConfig.code || !fs.existsSync(templatePath)) {
+      // ---------------------------------------------------------
+      // FALLBACK: EXPORTACIÓN GENÉRICA
+      // ---------------------------------------------------------
+      const workbook = new Excel.Workbook();
+      const sheet = workbook.addWorksheet('Resultados de Visita');
+      
+      sheet.columns = [
+        { header: 'SECCIÓN', key: 'seccion', width: 25 },
+        { header: 'SUB-ÁREA', key: 'subarea', width: 20 },
+        { header: 'ÍTEM / PREGUNTA', key: 'item', width: 50 },
+        { header: 'RESPUESTA', key: 'respuesta', width: 15 },
+        { header: 'OBSERVACIONES', key: 'obs', width: 40 }
+      ];
+      
+      sheet.getRow(1).font = { bold: true };
+      
+      const answers = JSON.parse(visit.datos_formulario || '{}');
+      const hasSubTabs = templateConfig.tipo === 'matrix' && templateConfig.columnas && templateConfig.columnas.length > 0;
+      
+      if (templateConfig.secciones) {
+        templateConfig.secciones.forEach((sec, sIdx) => {
+          const secName = sec.nombre || 'General';
+          if (sec.filas) {
+            sec.filas.forEach((fila) => {
+              let base = fila;
+              if (templateConfig.secciones.length > 1) base = `${fila}__sec_${sIdx}`;
+              
+              if (hasSubTabs) {
+                 templateConfig.columnas.forEach((col) => {
+                    const answerKey = `${base}__${col}`;
+                    const fallbackKey = `${fila}__${col}`;
+                    const userAns = answers[answerKey] || answers[fallbackKey] || 'Sin responder';
+                    const userObs = answers[`${answerKey}__obs`] || answers[`${answerKey}_obs`] || answers[`${fallbackKey}__obs`] || answers[`${fallbackKey}_obs`] || '';
+                    sheet.addRow({ seccion: secName, subarea: col, item: fila, respuesta: userAns, obs: userObs });
+                 });
+              } else {
+                 let defaultColKey = base;
+                 if (templateConfig.tipo === 'matrix' && templateConfig.columnas && templateConfig.columnas[0]) {
+                    defaultColKey = `${base}__${templateConfig.columnas[0]}`;
+                 }
+                 const fallbackColKey = (templateConfig.tipo === 'matrix' && templateConfig.columnas && templateConfig.columnas[0]) ? `${fila}__${templateConfig.columnas[0]}` : fila;
+                 
+                 const userAns = answers[defaultColKey] || answers[base] || answers[fallbackColKey] || answers[fila] || 'Sin responder';
+                 const userObs = answers[`${defaultColKey}__obs`] || answers[`${base}__obs`] || answers[`${base}_obs`] || answers[`${fallbackColKey}__obs`] || answers[`${fila}__obs`] || answers[`${fila}_obs`] || '';
+                 sheet.addRow({ seccion: secName, subarea: 'N/A', item: fila, respuesta: userAns, obs: userObs });
+              }
+            });
+          }
+        });
+      }
+      
+      const buffer = await workbook.xlsx.writeBuffer();
+      return new NextResponse(buffer, {
+        status: 200,
+        headers: {
+          'Content-Disposition': `attachment; filename="Reporte_Generico_Visita_${visitId}.xlsx"`,
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }
+      });
     }
 
     // 4. Load Excel template
@@ -166,8 +220,13 @@ export async function GET(request) {
         if (isMatrix) {
           // Find answers for this item in each sub-area
           templateConfig.columnas.forEach((subArea) => {
-            const answerKey = `${itemName}__${subArea}`;
-            const userAns = answers[answerKey]; // 'SI', 'NO', or 'NA'
+            let userAns = answers[`${itemName}__${subArea}`]; 
+            if (!userAns && templateConfig.secciones) {
+               for(let i = 0; i < templateConfig.secciones.length; i++) {
+                  const k = `${itemName}__sec_${i}__${subArea}`;
+                  if (answers[k]) { userAns = answers[k]; break; }
+               }
+            }
             if (userAns) {
               // Find matching column in mapping
               const targetCol = colMappings.find(m => m.subArea === subArea && m.type === userAns);
@@ -179,7 +238,16 @@ export async function GET(request) {
           });
         } else {
           // Simple Checklist: find answer for this item
-          const userAns = answers[itemName]; // 'SI', 'NO', or 'NA'
+          let userAns = answers[itemName];
+          if (!userAns && templateConfig.secciones) {
+             for(let i = 0; i < templateConfig.secciones.length; i++) {
+                const k = `${itemName}__sec_${i}`;
+                if (answers[k]) { userAns = answers[k]; break; }
+                
+                const defaultColKey = (templateConfig.tipo === 'matrix' && templateConfig.columnas && templateConfig.columnas[0]) ? `${k}__${templateConfig.columnas[0]}` : null;
+                if (defaultColKey && answers[defaultColKey]) { userAns = answers[defaultColKey]; break; }
+             }
+          }
 
           if (userAns) {
             const targetCol = colMappings.find(m => m.subArea === 'EVALUACION' && m.type === userAns);
@@ -208,20 +276,29 @@ export async function GET(request) {
     let noAplica = 0;
 
     if (templateConfig.secciones) {
-      templateConfig.secciones.forEach(sec => {
+      templateConfig.secciones.forEach((sec, sIdx) => {
         if (sec.filas) {
           sec.filas.forEach(fila => {
+            let base = fila;
+            if (templateConfig.secciones.length > 1) base = `${fila}__sec_${sIdx}`;
+            
             if (isMatrix && templateConfig.columnas) {
               templateConfig.columnas.forEach(col => {
                 totalAspectos++;
-                const val = answers[`${fila}__${col}`];
+                const val = answers[`${base}__${col}`] || answers[`${fila}__${col}`];
                 if (val === 'SI') satisfactorios++;
                 else if (val === 'NO') noSatisfactorios++;
                 else if (val === 'NA') noAplica++;
               });
             } else {
               totalAspectos++;
-              const val = answers[fila] || (templateConfig.columnas && templateConfig.columnas[0] ? answers[`${fila}__${templateConfig.columnas[0]}`] : null);
+              let defaultColKey = base;
+              if (templateConfig.tipo === 'matrix' && templateConfig.columnas && templateConfig.columnas[0]) {
+                 defaultColKey = `${base}__${templateConfig.columnas[0]}`;
+              }
+              const fallbackColKey = (templateConfig.tipo === 'matrix' && templateConfig.columnas && templateConfig.columnas[0]) ? `${fila}__${templateConfig.columnas[0]}` : fila;
+              
+              const val = answers[defaultColKey] || answers[base] || answers[fallbackColKey] || answers[fila];
               if (val === 'SI') satisfactorios++;
               else if (val === 'NO') noSatisfactorios++;
               else if (val === 'NA') noAplica++;
@@ -366,16 +443,20 @@ export async function GET(request) {
     const auditorDateStr = `${visit.auditor_nombre || 'Auditor'} (${new Date(visit.fecha).toLocaleDateString('es-ES')})`;
 
     if (templateConfig && templateConfig.secciones) {
-      templateConfig.secciones.forEach((sec) => {
+      templateConfig.secciones.forEach((sec, sIdx) => {
         const secName = sec.nombre || 'General';
 
         if (sec.filas) {
           sec.filas.forEach((fila) => {
+            let base = fila;
+            if (templateConfig.secciones.length > 1) base = `${fila}__sec_${sIdx}`;
+
             if (hasSubTabs) {
               templateConfig.columnas.forEach((col) => {
-                const answerKey = `${fila}__${col}`;
-                const userAns = answers[answerKey] || 'Sin responder';
-                const userObs = answers[`${answerKey}__obs`] || answers[`${answerKey}_obs`] || '';
+                const answerKey = `${base}__${col}`;
+                const fallbackKey = `${fila}__${col}`;
+                const userAns = answers[answerKey] || answers[fallbackKey] || 'Sin responder';
+                const userObs = answers[`${answerKey}__obs`] || answers[`${answerKey}_obs`] || answers[`${fallbackKey}__obs`] || answers[`${fallbackKey}_obs`] || '';
 
                 if (userObs && String(userObs).trim() !== '') {
                   count++;
@@ -404,9 +485,14 @@ export async function GET(request) {
                 }
               });
             } else {
-              const defaultColKey = (templateConfig.tipo === 'matrix' && templateConfig.columnas && templateConfig.columnas[0]) ? `${fila}__${templateConfig.columnas[0]}` : fila;
-              const userAns = answers[defaultColKey] || answers[fila] || 'Sin responder';
-              const userObs = answers[`${defaultColKey}__obs`] || answers[`${fila}__obs`] || answers[`${fila}_obs`] || '';
+              let defaultColKey = base;
+              if (templateConfig.tipo === 'matrix' && templateConfig.columnas && templateConfig.columnas[0]) {
+                 defaultColKey = `${base}__${templateConfig.columnas[0]}`;
+              }
+              const fallbackColKey = (templateConfig.tipo === 'matrix' && templateConfig.columnas && templateConfig.columnas[0]) ? `${fila}__${templateConfig.columnas[0]}` : fila;
+              
+              const userAns = answers[defaultColKey] || answers[base] || answers[fallbackColKey] || answers[fila] || 'Sin responder';
+              const userObs = answers[`${defaultColKey}__obs`] || answers[`${base}__obs`] || answers[`${base}_obs`] || answers[`${fallbackColKey}__obs`] || answers[`${fila}__obs`] || answers[`${fila}_obs`] || '';
 
               if (userObs && String(userObs).trim() !== '') {
                 count++;

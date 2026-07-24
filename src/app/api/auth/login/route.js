@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 const { getDb } = require('@/lib/db');
 const { generateToken, comparePassword, getUserCustomPermissions } = require('@/lib/auth');
+const { logAudit } = require('@/lib/audit');
 
 export async function POST(request) {
   try {
@@ -23,6 +24,16 @@ export async function POST(request) {
     `).get(email);
     
     if (!user || !comparePassword(password, user.password_hash)) {
+      // Registrar intento de login fallido
+      logAudit({
+        usuario: email,
+        rol: 'Desconocido',
+        accion: 'Login Fallido',
+        modulo: 'Autenticación',
+        descripcion: 'Intento de inicio de sesión fallido. Credenciales incorrectas.',
+        registro_afectado: null,
+        request
+      });
       return NextResponse.json(
         { error: 'Credenciales incorrectas' },
         { status: 401 }
@@ -34,6 +45,17 @@ export async function POST(request) {
     
     // Actualizar último login
     db.prepare('UPDATE users SET ultimo_login = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
+
+    // Registrar inicio de sesión exitoso en audit
+    logAudit({
+      usuario: user.nombre,
+      rol: user.rol_nombre || 'Sin Rol',
+      accion: 'Login',
+      modulo: 'Autenticación',
+      descripcion: 'Inició sesión exitosamente en el sistema.',
+      registro_afectado: 'USR-' + user.id,
+      request
+    });
     
     const response = NextResponse.json({
       user: {

@@ -29,6 +29,8 @@
   - **Jefes de Área (Sistemas, Mantenimiento, etc.)**: Aprobación de auditorías, gestión y supervisión analítica de todas las intervenciones de su especialidad.
   - **Supervisores y Auxiliares Operativos (Sistemas, Mantenimiento, Calidad, SST, VRH, Formación)**: Ejecución en sitio de visitas técnicas y auditorías específicas para su división o especialidad.
   - **Puntos de Venta (PDVs)**: Cuentas específicas para cada restaurante o módulo de atención, permitiendo al personal en sitio reportar novedades y generar tickets o solicitudes de asistencia técnica en tiempo real.
+- **Gestión Segura de Usuarios y Soft Delete**: Eliminación simulada (lógica) de usuarios que preserva la integridad del historial operativo, liberando automáticamente el correo electrónico para permitir nuevos registros, todo bajo un marco de protección de integridad referencial.
+- **Auditoría Completa de Usuarios**: Registro automático e inmutable en la bitácora de auditoría de todas las acciones administrativas (creación de usuarios, modificación de datos, cambios de rol y activaciones/desactivaciones).
 - **Login Rápido para Pruebas**: Panel de autenticación con botones de autocompletado rápido para facilitar las pruebas en entornos de desarrollo (contraseña maestra de prueba: `admin123`).
 
 ### 2. 📊 Dashboard Ejecutivo en Tiempo Real & Trazabilidad Histórica
@@ -149,6 +151,8 @@ crepes-app/
 ├── migrate-db-2.js a 8.js      # Scripts del motor de migración evolutiva de base de datos
 ├── reset-passwords.js          # Utilidad para restaurar contraseñas de prueba a Bcrypt
 ├── run-all-migrations.js       # Ejecutor general en orden de todas las migraciones (1 a 8)
+├── scripts/
+│   └── wipe_db.js              # Script avanzado para limpieza segura de base de datos (pase a Producción)
 ├── iniciar_servidor.bat        # Script por lotes para encendido rápido del servidor en Windows
 ├── actualizar_servidor.bat     # Script de actualización de repositorio y dependencias
 ├── compartir_en_internet.bat   # Script para iniciar túnel seguro local hacia internet con Cloudflare
@@ -181,6 +185,11 @@ node run-all-migrations.js
 # 3. Instalar/verificar la plantilla corporativa de Lista de Chequeo BPM
 node add-bpm-checklist.js
 ```
+*(Opcional)* Para entornos de producción nuevos, si deseas limpiar todo el historial transaccional de pruebas preservando la configuración maestra (usuarios, equipos, pdvs), ejecuta el script de borrado seguro:
+```bash
+node scripts/wipe_db.js
+```
+
 *(Opcional)* Si deseas restablecer las contraseñas de todas las cuentas preconfiguradas a la clave maestra de prueba (`admin123`), ejecuta:
 ```bash
 node reset-passwords.js
