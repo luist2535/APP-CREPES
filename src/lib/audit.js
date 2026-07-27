@@ -46,8 +46,8 @@ function logAudit({ usuario, rol, accion, modulo, descripcion, registro_afectado
 
     const db = getDb();
     db.prepare(`
-      INSERT INTO audit_logs (usuario, rol, accion, modulo, descripcion, registro_afectado, ip, dispositivo)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO audit_logs (usuario, rol, accion, modulo, descripcion, registro_afectado, ip, dispositivo, fecha)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
     `).run(usuario, rol, accion, modulo, descripcion, registro_afectado, ip, dispositivo);
 
   } catch (err) {

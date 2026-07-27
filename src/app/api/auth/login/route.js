@@ -51,7 +51,7 @@ export async function POST(request) {
     const customPerms = getUserCustomPermissions(user.rol_id, db);
     
     // Actualizar último login
-    db.prepare('UPDATE users SET ultimo_login = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
+    db.prepare("UPDATE users SET ultimo_login = datetime('now', 'localtime') WHERE id = ?").run(user.id);
 
     // Registrar inicio de sesión exitoso en audit
     logAudit({
