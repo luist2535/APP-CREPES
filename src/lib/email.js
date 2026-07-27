@@ -5,6 +5,16 @@ const { getDb } = require('./db.js');
  * Sends a notification email asynchronously
  */
 async function sendNotificationEmail({ to, subject, html }) {
+  // ======= INTERRUPTOR DE CORREOS =======
+  // Cambiar a "true" cuando quieran volver a activar los correos.
+  // Mientras esté en "false", el sistema simulará el envío para no causar demoras por el firewall.
+  const CORREOS_ACTIVADOS = false;
+
+  if (!CORREOS_ACTIVADOS) {
+    console.log(`📨 [Correo Omitido] Envío desactivado temporalmente. Asunto: ${subject}`);
+    return true;
+  }
+
   console.log(`📨 [Notificación Correo] Intentando enviar a: ${to} | Asunto: ${subject}`);
   
   let host = process.env.SMTP_HOST || 'smtp.gmail.com';
