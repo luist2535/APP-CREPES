@@ -648,10 +648,53 @@ export default function DashboardLayout({ children }) {
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                   <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
-                {notifications.length >= 0 && (
+                {notifications.length > 0 && (
                   <span style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#EF4444', color: '#fff', borderRadius: '50%', width: '14px', height: '14px', fontSize: '0.55rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #3D2314' }}>
-                    {notifications.length > 0 ? notifications.length : 3} {/* Mockup shows 3 */}
+                    {notifications.length}
                   </span>
+                )}
+
+                {/* Mobile Dropdown Menu for Notifications */}
+                {notifMenuOpen && (
+                  <>
+                    <div onClick={(e) => { e.stopPropagation(); setNotifMenuOpen(false); }} style={{ position: 'fixed', inset: 0, zIndex: 9998, cursor: 'default' }} />
+                    <div style={{
+                      position: 'absolute', top: 'calc(100% + 15px)', right: '-60px',
+                      background: '#fff', borderRadius: '12px', border: '1px solid #E8DDD4',
+                      boxShadow: '0 8px 24px rgba(107,58,42,0.2)', width: '280px',
+                      zIndex: 9999, overflow: 'hidden', animation: 'dropDown 0.15s ease', cursor: 'default'
+                    }} onClick={(e) => e.stopPropagation()}>
+                      <div style={{ padding: '14px 16px', borderBottom: '1px solid #F0EAE1', background: '#FDFAF7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2C1810' }}>Notificaciones</div>
+                        <div style={{ fontSize: '0.65rem', color: '#6B3A2A', fontWeight: 600, cursor: 'pointer' }} onClick={() => setNotifications([])}>Marcar leídas</div>
+                      </div>
+                      <div style={{ maxHeight: '250px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                        {notifications.length === 0 ? (
+                          <div style={{ padding: '20px', textAlign: 'center', color: '#9CA3AF', fontSize: '0.75rem' }}>No tienes notificaciones nuevas.</div>
+                        ) : (
+                          notifications.map((notif, idx) => {
+                            const isWarning = notif.estado_color === 'yellow' || notif.estado_color === 'orange';
+                            const isCritical = notif.estado_color === 'red';
+                            const bgColor = isCritical ? '#EF4444' : isWarning ? '#EAB308' : '#22C55E';
+                            const timeString = new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            return (
+                              <div key={idx} className="notif-item" style={{ padding: '12px 16px', borderBottom: '1px solid #F9F7F5', cursor: 'pointer', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: bgColor, marginTop: '6px', flexShrink: 0 }}></div>
+                                <div>
+                                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2C1810', marginBottom: '2px' }}>Cambio de estado: {notif.ciudad_nombre}</div>
+                                  <div style={{ fontSize: '0.7rem', color: '#6B5B52' }}>El PDV <strong>{notif.pdv_nombre}</strong> pasó a <span style={{color: bgColor, fontWeight: 700}}>{notif.estado_nombre}</span>.</div>
+                                  <div style={{ fontSize: '0.65rem', color: '#9CA3AF', marginTop: '4px' }}>Hoy a las {timeString}</div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                      <div style={{ padding: '10px 16px', borderTop: '1px solid #F0EAE1', textAlign: 'center', background: '#F8F6F2' }}>
+                        <Link href="#" style={{ fontSize: '0.75rem', color: '#6B3A2A', fontWeight: 600, textDecoration: 'none' }}>Ver todas las notificaciones</Link>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative' }} onClick={() => { setProfileMenuOpen(prev => !prev); setNotifMenuOpen(false); }}>
