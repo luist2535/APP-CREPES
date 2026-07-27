@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -14,6 +14,17 @@ export default function LoginPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Verificar si hay errores en la URL (ej. desde Microsoft Login)
+  useEffect(() => {
+    const urlError = searchParams.get('error');
+    if (urlError) {
+      setError(urlError);
+      // Limpiar URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [searchParams]);
 
   // Verificar si el usuario ya inició sesión
   useEffect(() => {
@@ -217,6 +228,31 @@ export default function LoginPage() {
             {loading ? 'Procesando...' : (isForcingPasswordChange ? 'Guardar y Entrar' : 'Ingresar al Sistema')}
           </button>
         </form>
+
+        {!isForcingPasswordChange && (
+          <>
+            <div className="login-divider">
+              <span>O ingresa con</span>
+            </div>
+            <button
+              type="button"
+              className="microsoft-btn"
+              onClick={() => {
+                setLoading(true);
+                window.location.href = '/api/auth/microsoft';
+              }}
+              disabled={loading}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 21 21">
+                <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+              </svg>
+              Microsoft
+            </button>
+          </>
+        )}
 
       </div>
 
@@ -459,6 +495,61 @@ export default function LoginPage() {
           transform: translateY(-1px);
         }
 
+        .microsoft-btn {
+          width: 100%;
+          background: rgba(255, 255, 255, 0.9);
+          border: 1px solid rgba(0, 0, 0, 0.1);
+          color: #333;
+          padding: 13px;
+          border-radius: 14px;
+          font-size: 0.95rem;
+          font-weight: 600;
+          font-family: 'Outfit', sans-serif;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .microsoft-btn:hover:not(:disabled) {
+          background: #ffffff;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .microsoft-btn:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
+
+        .login-divider {
+          display: flex;
+          align-items: center;
+          text-align: center;
+          margin: 20px 0;
+          color: rgba(58, 30, 18, 0.5);
+          font-size: 0.85rem;
+          font-weight: 500;
+        }
+
+        .login-divider::before,
+        .login-divider::after {
+          content: '';
+          flex: 1;
+          border-bottom: 1px solid rgba(58, 30, 18, 0.15);
+        }
+
+        .login-divider not(:empty)::before {
+          margin-right: 15px;
+        }
+
+        .login-divider not(:empty)::after {
+          margin-left: 15px;
+        }
+
         .error-alert {
           background: rgba(220, 38, 38, 0.85);
           border: 1px solid rgba(255, 255, 255, 0.3);
@@ -479,5 +570,17 @@ export default function LoginPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#1a0f0a', color: '#fff' }}>
+        Cargando...
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }
