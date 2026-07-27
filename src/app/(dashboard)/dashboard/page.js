@@ -82,13 +82,7 @@ export default function DashboardPage() {
     );
   };
 
-  // Agenda Mock Data
-  const mockAgenda = [
-    { hora: '09:00', titulo: 'Visita de Calidad',        sub: 'POI Centro - Carrera 7 #11', badge: 'CALIDAD',        bColor: '#DCFCE7', bText: '#166534', dotColor: '#22C55E' },
-    { hora: '11:30', titulo: 'Revisión de Alianzas',     sub: 'POI Norte - Av. 19 #120',   badge: 'ALIANZAS',       bColor: '#DBEAFE', bText: '#1E40AF', dotColor: '#EAB308' },
-    { hora: '14:00', titulo: 'Mantenimiento Preventivo', sub: 'POI Sur - Calle 5 #50',     badge: 'MANTENIMIENTO',  bColor: '#FFEDD5', bText: '#9A3412', dotColor: '#EF4444' },
-    { hora: '16:30', titulo: 'Reunión de Seguimiento',   sub: 'Oficina Principal - Bogotá', badge: 'ADMINISTRACIÓN', bColor: '#F3E8FF', bText: '#6B21A8', dotColor: '#8B5CF6' },
-  ];
+  // Agenda data is fetched directly from data.agendaHoy
 
   // City Table Data - ensure coordinates and 3 specific coastal cities are shown
   const dbCities = data?.pdvPorCiudad || [];
@@ -329,22 +323,28 @@ export default function DashboardPage() {
           </div>
           <div className="card-content">
             <div className="agenda-timeline">
-              {mockAgenda.map((item, idx) => (
-                <div className="agenda-row" key={idx}>
-                  <div className="agenda-time">{item.hora}</div>
-                  <div className="agenda-dot-line">
-                    <span className="agenda-dot" style={{ background: item.dotColor }} />
-                    {idx < mockAgenda.length - 1 && <span className="agenda-line" />}
+              {data?.agendaHoy && data.agendaHoy.length > 0 ? (
+                data.agendaHoy.map((item, idx) => (
+                  <div className="agenda-row" key={idx}>
+                    <div className="agenda-time">{item.hora_inicio?.substring(0, 5) || '00:00'}</div>
+                    <div className="agenda-dot-line">
+                      <span className="agenda-dot" style={{ background: item.area_color || '#6B3A2A' }} />
+                      {idx < data.agendaHoy.length - 1 && <span className="agenda-line" />}
+                    </div>
+                    <div className="agenda-body">
+                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2C1810' }}>{item.titulo || 'Visita'}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#9CA3AF', marginTop: '2px' }}>{item.pdv_nombre} - {item.ciudad_nombre}</div>
+                    </div>
+                    <span className="agenda-badge" style={{ background: (item.area_color || '#6B3A2A') + '1A', color: item.area_color || '#6B3A2A' }}>
+                      {item.area_nombre?.toUpperCase() || 'GENERAL'}
+                    </span>
                   </div>
-                  <div className="agenda-body">
-                    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2C1810' }}>{item.titulo}</div>
-                    <div style={{ fontSize: '0.72rem', color: '#9CA3AF', marginTop: '2px' }}>{item.sub}</div>
-                  </div>
-                  <span className="agenda-badge" style={{ background: item.bColor, color: item.bText }}>
-                    {item.badge}
-                  </span>
+                ))
+              ) : (
+                <div style={{ textAlign: 'center', padding: '30px', color: '#9CA3AF', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                  No hay visitas o eventos programados para hoy.
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
