@@ -1220,14 +1220,19 @@ function AdminContent() {
                         </div>
                         {!editingUser ? (
                           <div className="form-group">
-                            <label className="form-label" htmlFor="user-pass">Contraseña</label>
+                            <label className="form-label" htmlFor="user-pass">
+                              Contraseña 
+                              <span style={{ fontSize: '0.8rem', color: 'var(--color-primary)', marginLeft: '8px' }}>
+                                (Si está en blanco, será <strong>crepes.2026</strong>)
+                              </span>
+                            </label>
                             <input
                               id="user-pass"
                               type="password"
                               className="form-input"
                               value={userPassword}
                               onChange={(e) => setUserPassword(e.target.value)}
-                              required
+                              placeholder="crepes.2026 (por defecto)"
                             />
                           </div>
                         ) : (

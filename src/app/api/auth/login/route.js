@@ -40,6 +40,13 @@ export async function POST(request) {
       );
     }
     
+    if (user.debe_cambiar_password === 1) {
+      return NextResponse.json({
+        requirePasswordChange: true,
+        message: 'Debe cambiar su contraseña por defecto'
+      });
+    }
+
     const token = generateToken(user);
     const customPerms = getUserCustomPermissions(user.rol_id, db);
     

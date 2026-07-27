@@ -15,9 +15,6 @@ echo [INFO] Este script descargará los últimos cambios subidos a GitHub
 echo        y recompilará la aplicación automáticamente.
 echo.
 
-:: Respaldo automatico de seguridad antes de actualizar
-call respaldar_base_datos.bat silent
-
 :: 0. Verificar si Git está instalado
 where git >nul 2>nul
 if %errorlevel% neq 0 goto git_missing

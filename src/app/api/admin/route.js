@@ -23,9 +23,12 @@ export async function POST(request) {
 
     if (entity === 'user') {
       const { nombre, email, password, rol_id, ciudad_id, pdv_id } = data;
-      if (!nombre || !email || !password || !rol_id) {
+      if (!nombre || !email || !rol_id) {
         return NextResponse.json({ error: 'Campos obligatorios faltantes para el usuario' }, { status: 400 });
       }
+      
+      const finalPassword = password || 'crepes.2026';
+      const debeCambiar = password ? 0 : 1;
       
       // Check if email already exists
       const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
@@ -33,11 +36,11 @@ export async function POST(request) {
         return NextResponse.json({ error: 'El correo electrónico ya está registrado' }, { status: 409 });
       }
 
-      const passwordHash = bcrypt.hashSync(password, 10);
+      const passwordHash = bcrypt.hashSync(finalPassword, 10);
       const result = db.prepare(`
-        INSERT INTO users (nombre, email, password_hash, rol_id, ciudad_id, pdv_id)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(nombre, email, passwordHash, parseInt(rol_id), ciudad_id ? parseInt(ciudad_id) : null, pdv_id ? parseInt(pdv_id) : null);
+        INSERT INTO users (nombre, email, password_hash, rol_id, ciudad_id, pdv_id, debe_cambiar_password)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(nombre, email, passwordHash, parseInt(rol_id), ciudad_id ? parseInt(ciudad_id) : null, pdv_id ? parseInt(pdv_id) : null, debeCambiar);
       
       const { logAudit } = require('@/lib/audit');
       logAudit({

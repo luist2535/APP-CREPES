@@ -12,9 +12,6 @@ echo   INICIANDO SERVIDOR Y VERIFICANDO ENTORNO (CREPES EN PUNTO)
 echo ========================================================================
 echo.
 
-:: Respaldo automatico de seguridad
-call respaldar_base_datos.bat silent
-
 :: 0. Verificar si Node.js está instalado en el servidor
 where node >nul 2>nul
 if %errorlevel% neq 0 goto node_missing

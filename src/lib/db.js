@@ -53,6 +53,7 @@ function getDb() {
 
     // Migraciones automáticas seguras (si la columna ya existe, SQLite ignorará o capturamos el error)
     try { db.exec('ALTER TABLE users ADD COLUMN deleted INTEGER DEFAULT 0'); } catch (e) {}
+    try { db.exec('ALTER TABLE users ADD COLUMN debe_cambiar_password INTEGER DEFAULT 0'); } catch (e) {}
     try { db.exec("UPDATE users SET email = email || '_deleted_' || id WHERE deleted = 1 AND email NOT LIKE '%_deleted_%'"); } catch (e) {}
     try { db.exec('ALTER TABLE visitas ADD COLUMN version_checklist INTEGER DEFAULT 1'); } catch (e) {}
     try { db.exec('ALTER TABLE visitas ADD COLUMN campos_personalizados TEXT'); } catch (e) {}
