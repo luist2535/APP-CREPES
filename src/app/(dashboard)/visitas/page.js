@@ -5203,22 +5203,21 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                           {evidenciasList.length > 0 ? (
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '14px', marginTop: '12px' }}>
                               {evidenciasList.map((ev, idx) => (
-                                <div key={ev.id || idx} style={{ backgroundColor: '#FFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveEvidencia(idx)}
-                                    style={{ position: 'absolute', top: '6px', right: '6px', background: '#EF4444', color: '#FFF', border: 'none', borderRadius: '50%', width: '22px', height: '22px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                    title="Eliminar evidencia"
-                                  >
-                                    ×
-                                  </button>
-                                  {ev.url && (ev.url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || ev.url.includes('/uploads/')) ? (
-                                         <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155', width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>
+                                <div key={ev.id || idx} style={{ backgroundColor: '#FFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px', display: 'flex', flexDirection: 'column', alignItems                                  {ev.url && (ev.url.match(/\\.(jpeg|jpg|gif|png|webp|bmp)$/i) || ev.url.includes('/uploads/')) ? (
+                                    <div style={{ width: '100%', height: '85px', borderRadius: '8px', overflow: 'hidden', marginBottom: '8px', backgroundColor: '#F1F5F9' }}>
+                                      <img src={ev.url} alt={`Evidencia ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    </div>
+                                  ) : (
+                                    <div style={{ width: '100%', height: '85px', borderRadius: '8px', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', marginBottom: '8px' }}>
+                                      📄
+                                    </div>
+                                  )}
+                                  <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155', width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>
                                     {ev.nombre || `Evidencia ${idx + 1}`}
                                   </span>
                                   <a href={ev.ruta_archivo || ev.url || '#'} onClick={(e) => { e.preventDefault(); const url = ev.ruta_archivo || ev.url || ''; if (url && (url.match(/\\.(jpeg|jpg|gif|png|webp|bmp)$/i) || url.includes('/uploads/'))) { const div = document.createElement('div'); div.style.position = 'fixed'; div.style.inset = '0'; div.style.backgroundColor = 'rgba(0,0,0,0.95)'; div.style.zIndex = '9999999'; div.style.display = 'flex'; div.style.flexDirection = 'column'; div.style.alignItems = 'center'; div.style.justifyContent = 'center'; const img = document.createElement('img'); img.src = url; img.style.maxWidth = '100%'; img.style.maxHeight = '85%'; img.style.objectFit = 'contain'; const closeBtn = document.createElement('button'); closeBtn.innerText = 'Cerrar Imagen'; closeBtn.style.marginTop = '20px'; closeBtn.style.padding = '12px 24px'; closeBtn.style.backgroundColor = '#fff'; closeBtn.style.color = '#000'; closeBtn.style.border = 'none'; closeBtn.style.borderRadius = '12px'; closeBtn.style.fontWeight = 'bold'; closeBtn.style.cursor = 'pointer'; closeBtn.onclick = () => document.body.removeChild(div); div.appendChild(img); div.appendChild(closeBtn); document.body.appendChild(div); } else if (url) { window.open(url, '_blank') || (window.location.href = url); } }} style={{ fontSize: '0.72rem', color: '#2563EB', textDecoration: 'underline', marginTop: '4px', cursor: 'pointer' }}>
                                     Ver archivo
-                                  </a>teElement('button'); closeBtn.innerText = 'Cerrar Imagen'; closeBtn.style.marginTop = '20px'; closeBtn.style.padding = '12px 24px'; closeBtn.style.backgroundColor = '#fff'; closeBtn.style.color = '#000'; closeBtn.style.border = 'none'; closeBtn.style.borderRadius = '12px'; closeBtn.style.fontWeight = 'bold'; closeBtn.style.cursor = 'pointer'; closeBtn.onclick = () => document.body.removeChild(div); div.appendChild(img); div.appendChild(closeBtn); document.body.appendChild(div); } else { window.open(url, '_blank') || (window.location.href = url); } }} style={{ fontSize: '0.72rem', color: '#2563EB', textDecoration: 'underline', marginTop: '4px', cursor: 'pointer' }}>
+                                  </a>lement('button'); closeBtn.innerText = 'Cerrar Imagen'; closeBtn.style.marginTop = '20px'; closeBtn.style.padding = '12px 24px'; closeBtn.style.backgroundColor = '#fff'; closeBtn.style.color = '#000'; closeBtn.style.border = 'none'; closeBtn.style.borderRadius = '12px'; closeBtn.style.fontWeight = 'bold'; closeBtn.style.cursor = 'pointer'; closeBtn.onclick = () => document.body.removeChild(div); div.appendChild(img); div.appendChild(closeBtn); document.body.appendChild(div); } else { window.open(url, '_blank') || (window.location.href = url); } }} style={{ fontSize: '0.72rem', color: '#2563EB', textDecoration: 'underline', marginTop: '4px', cursor: 'pointer' }}>
                                     Ver archivo
                                   </a>
                                 </div>
