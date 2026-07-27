@@ -9,11 +9,9 @@ echo.
 
 if not exist "database_backups" mkdir "database_backups"
 
-:: Obtener fecha y hora en formato estandar seguro sin importar el idioma de Windows
-for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set datetime=%%I
-set mydate=%datetime:~0,4%-%datetime:~4,2%-%datetime:~6,2%
-set mytime=%datetime:~8,2%-%datetime:~10,2%
-set backupname=database_backups\crepes_backup_%mydate%_%mytime%.db
+:: Obtener fecha y hora de forma segura usando powershell
+for /f "usebackq tokens=*" %%I in (`powershell -Command "Get-Date -Format 'yyyy-MM-dd_HH-mm'"`) do set dt=%%I
+set backupname=database_backups\crepes_backup_%dt%.db
 
 if exist "database\crepes.db" (
     copy /Y "database\crepes.db" "%backupname%" >nul
