@@ -9,15 +9,10 @@ echo.
 
 if not exist "database_backups" mkdir "database_backups"
 
-:: Obtener fecha y hora de forma segura usando powershell
-for /f "usebackq tokens=*" %%I in (`powershell -Command "Get-Date -Format 'yyyy-MM-dd_HH-mm'"`) do set dt=%%I
-set backupname=database_backups\crepes_backup_%dt%.db
-
 if exist "database\crepes.db" (
-    copy /Y "database\crepes.db" "%backupname%" >nul
+    powershell -Command "Copy-Item 'database\crepes.db' -Destination ('database_backups\crepes_backup_' + (Get-Date -Format 'yyyy-MM-dd_HH-mm') + '.db') -Force"
     color 0A
-    echo [EXITO] Se ha creado una copia de seguridad segura de tus datos.
-    echo Archivo guardado en: %backupname%
+    echo [EXITO] Se ha creado una copia de seguridad segura de tus datos en la carpeta database_backups.
 ) else (
     color 0C
     echo [ERROR] No se encontro la base de datos principal (database\crepes.db).
