@@ -562,7 +562,8 @@ export async function GET(request) {
     const buffer = await workbook.xlsx.writeBuffer();
 
     const verNum = visit.version_checklist || visit.plantilla_version || 1;
-    const fileName = `Visita_Calidad_${templateConfig.code}_v${verNum}_${visit.pdv_nombre.replace(/\s+/g, '_')}_${visit.fecha}.xlsx`;
+    const pdvLimpio = visit.pdv_nombre.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_');
+    const fileName = `Visita_Calidad_${templateConfig.code}_v${verNum}_${pdvLimpio}_${visit.fecha}.xlsx`;
 
     // 11. Guardar automáticamente en las carpetas y repositorio del servidor (Calidad)
     try {

@@ -40,7 +40,7 @@ echo  ¡Ese es tu link publico! Puedes copiarlo y compartirlo.
 echo ========================================================================
 echo.
 
-cloudflared.exe tunnel --url http://localhost:3000
+cloudflared.exe tunnel --url http://localhost:3000 --protocol http2
 if errorlevel 1 goto tunnel_error
 
 goto end
