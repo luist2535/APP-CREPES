@@ -456,6 +456,9 @@ const calculateVisitScore = (visit, plantillas) => {
             const hasMultiSec = firstField.secciones.length > 1;
             if (sec && Array.isArray(sec.filas)) {
               sec.filas.forEach(fila => {
+                const filaUpper = String(fila || '').trim().toUpperCase();
+                if (filaUpper === 'ASPECTO' || filaUpper === 'ASPECTOS' || filaUpper === '') return;
+                
                 colTotal++;
                 totalAspectos++;
                 const baseKey = hasMultiSec ? `${fila}__sec_${sIdx}` : fila;
@@ -493,6 +496,9 @@ const calculateVisitScore = (visit, plantillas) => {
           const hasMultiSec = firstField.secciones.length > 1;
           if (sec && Array.isArray(sec.filas)) {
             sec.filas.forEach(fila => {
+              const filaUpper = String(fila || '').trim().toUpperCase();
+              if (filaUpper === 'ASPECTO' || filaUpper === 'ASPECTOS' || filaUpper === '') return;
+              
               secTotal++;
               totalAspectos++;
               const baseKey = hasMultiSec ? `${fila}__sec_${idx}` : fila;
@@ -6418,7 +6424,10 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                   </h5>
                                   <div className="responses-grid" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                     {firstField.secciones.flatMap((sec, sIdx) => 
-                                      sec.filas.map((fila, fIdx) => {
+                                      sec.filas.filter(fila => {
+                                        const fUp = String(fila || '').trim().toUpperCase();
+                                        return fUp !== 'ASPECTO' && fUp !== 'ASPECTOS' && fUp !== '';
+                                      }).map((fila, fIdx) => {
                                         let base = fila;
                                         if (firstField.secciones.length > 1) base = `${fila}__sec_${sIdx}`;
                                         const answer = selectedVisit.data[`${base}__${col}`] || selectedVisit.data[`${fila}__${col}`];
@@ -6460,7 +6469,10 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                     <span>📁</span> {sec.nombre}
                                   </h5>
                                   <div className="responses-grid" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    {sec.filas.map((fila, fIdx) => {
+                                    {sec.filas.filter(fila => {
+                                      const fUp = String(fila || '').trim().toUpperCase();
+                                      return fUp !== 'ASPECTO' && fUp !== 'ASPECTOS' && fUp !== '';
+                                    }).map((fila, fIdx) => {
                                       let base = fila;
                                       if (firstField.secciones.length > 1) base = `${fila}__sec_${sIdx}`;
                                       let defaultColKey = base;
