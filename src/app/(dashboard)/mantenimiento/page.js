@@ -1358,33 +1358,46 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
         ))}
       </div>
 
-      {/* ====== ACCIONES EN CÍRCULO MÓVIL EXACTO A input_file_1.png ====== */}
-      <div className="mobile-only-cards" style={{ display: 'none', justifyContent: 'space-around', padding: '6px 8px 10px', borderBottom: '1px solid #E5D8CC' }}>
-        {[
-          { id: 'nuevo', label: 'Nuevo Ticket', icon: '+', activeBg: '#3D2314', activeColor: '#fff', bg: '#3D2314', color: '#fff' },
-          { id: 'inspeccion', label: 'Mis Tickets', icon: '📋', bg: '#F3EBE3', color: '#2C1810' },
-          { id: 'ejecucion', label: 'Modo Visita', icon: '📍', bg: '#F3EBE3', color: '#166534' },
-          { id: 'indicadores', label: 'Indicadores', icon: '📊', bg: '#F3EBE3', color: '#2C1810' },
-        ].map(item => (
-          <div
-            key={item.id}
-            onClick={() => setActiveTab(item.id)}
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
-          >
-            <div style={{
-              width: '48px', height: '48px', borderRadius: '50%', background: activeTab === item.id && item.id !== 'nuevo' ? '#4A2C20' : item.bg,
-              color: activeTab === item.id && item.id !== 'nuevo' ? '#fff' : item.color,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: item.icon === '+' ? '1.5rem' : '1.25rem',
-              fontWeight: 800, boxShadow: item.id === 'nuevo' || activeTab === item.id ? '0 4px 10px rgba(61,35,20,0.3)' : '0 2px 6px rgba(0,0,0,0.04)',
-              transition: 'all 0.2s ease'
-            }}>
-              {item.icon}
+      {/* ====== ACCIONES EN CÍRCULO MÓVIL (Dinámico según permisos) ====== */}
+      <div className="mobile-only-cards" style={{ display: 'none', gap: '16px', padding: '6px 8px 10px', borderBottom: '1px solid #E5D8CC', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        {tabs.map(item => {
+          const isNuevo = item.id === 'nuevo';
+          const isActive = activeTab === item.id;
+          const bg = isNuevo ? '#3D2314' : (isActive ? '#4A2C20' : '#F3EBE3');
+          const color = (isNuevo || isActive) ? '#fff' : '#2C1810';
+          
+          let icon = item.emoji;
+          if (item.id === 'nuevo') icon = '+';
+          if (item.id === 'ejecucion') icon = '📍';
+          if (item.id === 'inspeccion') icon = '📋';
+
+          let shortLabel = item.id.charAt(0).toUpperCase() + item.id.slice(1);
+          if (item.id === 'ejecucion') shortLabel = 'Modo Visita';
+          if (item.id === 'inspeccion') shortLabel = 'Mis Tickets';
+          if (item.id === 'nuevo') shortLabel = 'Nuevo Ticket';
+          if (item.id === 'asignacion') shortLabel = 'Asignación';
+
+          return (
+            <div
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer', minWidth: '65px' }}
+            >
+              <div style={{
+                width: '48px', height: '48px', borderRadius: '50%', background: bg,
+                color: color, display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                fontSize: isNuevo ? '1.5rem' : '1.25rem', fontWeight: 800, 
+                boxShadow: (isNuevo || isActive) ? '0 4px 10px rgba(61,35,20,0.3)' : '0 2px 6px rgba(0,0,0,0.04)',
+                transition: 'all 0.2s ease', flexShrink: 0
+              }}>
+                {icon}
+              </div>
+              <span style={{ fontSize: '0.68rem', fontWeight: isActive ? 800 : 600, color: isActive ? '#2C1810' : '#6B7280', textAlign: 'center', lineHeight: '1.1' }}>
+                {shortLabel}
+              </span>
             </div>
-            <span style={{ fontSize: '0.74rem', fontWeight: activeTab === item.id ? 800 : 600, color: activeTab === item.id ? '#2C1810' : '#6B7280' }}>
-              {item.label}
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ====== TAB: TABLERO ====== */}
