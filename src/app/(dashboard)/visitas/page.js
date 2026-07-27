@@ -4744,20 +4744,6 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                               {(() => {
                                 const score = calculateVisitScore(v, plantillas);
                                 if (!score) return <span className="text-muted" style={{ fontSize: '0.8rem' }}>—</span>;
-                                if (score.seccionesScores && score.seccionesScores.length > 0) {
-                                  return (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      {score.seccionesScores.map((sec, idx) => {
-                                        const nom = String(sec?.nombre || `Área ${idx + 1}`);
-                                        return (
-                                          <span key={idx} style={{ backgroundColor: sec?.badgeBg || score.badgeBg, color: sec?.badgeColor || score.badgeColor, fontWeight: '800', fontSize: '0.75rem', padding: '2px 8px', borderRadius: '12px', border: '1px solid currentColor', display: 'inline-block', whiteSpace: 'nowrap' }} title={`${nom}: ${sec?.satisfactorios || 0}/${(sec?.totalAspectos || 0) - (sec?.noAplica || 0)}`}>
-                                            {nom.length > 18 ? nom.slice(0, 18) + '...' : nom}: {sec?.porcentaje || 0}%
-                                          </span>
-                                        );
-                                      })}
-                                    </div>
-                                  );
-                                }
                                 return (
                                   <span style={{ backgroundColor: score.badgeBg, color: score.badgeColor, fontWeight: '800', fontSize: '0.8rem', padding: '4px 10px', borderRadius: '20px', border: '1px solid currentColor', display: 'inline-block', whiteSpace: 'nowrap' }}>
                                     {score.porcentaje}% ({score.satisfactorios}/{score.totalAspectos - score.noAplica})
@@ -5190,7 +5176,20 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                   cursor: 'pointer',
                                   display: 'flex',
                                   alignItems: 'center',
-                                     <div key={ev.id || idx} style={{ backgroundColor: '#FFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                  gap: '8px',
+                                  boxShadow: '0 2px 5px rgba(37,99,235,0.25)',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                {evidenciasUploading ? '⌛ Subiendo evidencias...' : '➕ Adjuntar Evidencias (Múltiple)'}
+                              </button>
+                            </div>
+                          </div>
+
+                          {evidenciasList.length > 0 ? (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '14px', marginTop: '12px' }}>
+                              {evidenciasList.map((ev, idx) => (
+                                <div key={ev.id || idx} style={{ backgroundColor: '#FFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                                   <button
                                     type="button"
                                     onClick={() => handleRemoveEvidencia(idx)}
@@ -5199,7 +5198,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                   >
                                     ×
                                   </button>
-                                  {ev.url && (ev.url.match(/\\.(jpeg|jpg|gif|png|webp|bmp)$/i) || ev.url.includes('/uploads/')) ? (
+                                  {ev.url && (ev.url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || ev.url.includes('/uploads/')) ? (
                                     <div style={{ width: '100%', height: '85px', borderRadius: '8px', overflow: 'hidden', marginBottom: '8px', backgroundColor: '#F1F5F9' }}>
                                       <img src={ev.url} alt={`Evidencia ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                     </div>
@@ -5211,7 +5210,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                   <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155', width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>
                                     {ev.nombre || `Evidencia ${idx + 1}`}
                                   </span>
-                                  <a href={ev.ruta_archivo || ev.url || '#'} onClick={(e) => { e.preventDefault(); const url = ev.ruta_archivo || ev.url || ''; if (url && (url.match(/\\.(jpeg|jpg|gif|png|webp|bmp)$/i) || url.includes('/uploads/'))) { const div = document.createElement('div'); div.style.position = 'fixed'; div.style.inset = '0'; div.style.backgroundColor = 'rgba(0,0,0,0.95)'; div.style.zIndex = '9999999'; div.style.display = 'flex'; div.style.flexDirection = 'column'; div.style.alignItems = 'center'; div.style.justifyContent = 'center'; const img = document.createElement('img'); img.src = url; img.style.maxWidth = '100%'; img.style.maxHeight = '85%'; img.style.objectFit = 'contain'; const closeBtn = document.createElement('button'); closeBtn.innerText = 'Cerrar Imagen'; closeBtn.style.marginTop = '20px'; closeBtn.style.padding = '12px 24px'; closeBtn.style.backgroundColor = '#fff'; closeBtn.style.color = '#000'; closeBtn.style.border = 'none'; closeBtn.style.borderRadius = '12px'; closeBtn.style.fontWeight = 'bold'; closeBtn.style.cursor = 'pointer'; closeBtn.onclick = () => document.body.removeChild(div); div.appendChild(img); div.appendChild(closeBtn); document.body.appendChild(div); } else if (url) { window.open(url, '_blank') || (window.location.href = url); } }} style={{ fontSize: '0.72rem', color: '#2563EB', textDecoration: 'underline', marginTop: '4px', cursor: 'pointer' }}>
+                                  <a href={ev.ruta_archivo || ev.url || '#'} onClick={(e) => { e.preventDefault(); const url = ev.ruta_archivo || ev.url || ''; if (url && (url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || url.includes('/uploads/'))) { const overlay = document.createElement('div'); overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:9999999;display:flex;flex-direction:column;align-items:center;justify-content:center'; const img = document.createElement('img'); img.src = url; img.style.cssText = 'max-width:100%;max-height:85%;object-fit:contain'; const btn = document.createElement('button'); btn.innerText = 'Cerrar Imagen'; btn.style.cssText = 'margin-top:20px;padding:12px 24px;background:#fff;color:#000;border:none;border-radius:12px;font-weight:bold;cursor:pointer'; btn.onclick = () => document.body.removeChild(overlay); overlay.appendChild(img); overlay.appendChild(btn); document.body.appendChild(overlay); } else if (url) { window.open(url, '_blank') || (window.location.href = url); } }} style={{ fontSize: '0.72rem', color: '#2563EB', textDecoration: 'underline', marginTop: '4px', cursor: 'pointer' }}>
                                     Ver archivo
                                   </a>
                                 </div>
@@ -6130,8 +6129,16 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                               <div style={{ backgroundColor: '#2C1810', color: '#fff', padding: '5px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', borderBottom: '1.5px solid #2C1810', textAlign: 'center' }}>
                                 EVIDENCIAS Y REGISTRO FOTOGRÁFICO ({evs.length})
                               </div>
-                              <div style={{ padding:                                     <div style={{ fontSize: '0.68rem', fontWeight: '600', color: '#333', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.nombre_archivo || ev.nombre || ev.etiqueta || `Evidencia ${idx + 1}`}</div>
-                                    <a href={ev.ruta_archivo || ev.url || '#'} onClick={(e) => { e.preventDefault(); const url = ev.ruta_archivo || ev.url || ''; if (url && (url.match(/\\.(jpeg|jpg|gif|png|webp|bmp)$/i) || url.includes('/uploads/'))) { const div = document.createElement('div'); div.style.position = 'fixed'; div.style.inset = '0'; div.style.backgroundColor = 'rgba(0,0,0,0.95)'; div.style.zIndex = '9999999'; div.style.display = 'flex'; div.style.flexDirection = 'column'; div.style.alignItems = 'center'; div.style.justifyContent = 'center'; const img = document.createElement('img'); img.src = url; img.style.maxWidth = '100%'; img.style.maxHeight = '85%'; img.style.objectFit = 'contain'; const closeBtn = document.createElement('button'); closeBtn.innerText = 'Cerrar Imagen'; closeBtn.style.marginTop = '20px'; closeBtn.style.padding = '12px 24px'; closeBtn.style.backgroundColor = '#fff'; closeBtn.style.color = '#000'; closeBtn.style.border = 'none'; closeBtn.style.borderRadius = '12px'; closeBtn.style.fontWeight = 'bold'; closeBtn.style.cursor = 'pointer'; closeBtn.onclick = () => document.body.removeChild(div); div.appendChild(img); div.appendChild(closeBtn); document.body.appendChild(div); } else if (url) { window.open(url, '_blank') || (window.location.href = url); } }} style={{ fontSize: '0.65rem', color: '#0066cc', textDecoration: 'underline', cursor: 'pointer' }}>Ver archivo</a>Index = '9999999'; div.style.display = 'flex'; div.style.flexDirection = 'column'; div.style.alignItems = 'center'; div.style.justifyContent = 'center'; const img = document.createElement('img'); img.src = url; img.style.maxWidth = '100%'; img.style.maxHeight = '85%'; img.style.objectFit = 'contain'; const closeBtn = document.createElement('button'); closeBtn.innerText = 'Cerrar Imagen'; closeBtn.style.marginTop = '20px'; closeBtn.style.padding = '12px 24px'; closeBtn.style.backgroundColor = '#fff'; closeBtn.style.color = '#000'; closeBtn.style.border = 'none'; closeBtn.style.borderRadius = '12px'; closeBtn.style.fontWeight = 'bold'; closeBtn.style.cursor = 'pointer'; closeBtn.onclick = () => document.body.removeChild(div); div.appendChild(img); div.appendChild(closeBtn); document.body.appendChild(div); } else { window.open(url, '_blank') || (window.location.href = url); } }} style={{ fontSize: '0.65rem', color: '#0066cc', textDecoration: 'underline', cursor: 'pointer' }}>Ver archivo</a>
+                              <div style={{ padding: '12px', borderBottom: '1.5px solid #2C1810', backgroundColor: '#fff', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
+                                {evs.map((ev, idx) => (
+                                  <div key={idx} style={{ border: '1px solid #ddd', borderRadius: '6px', padding: '6px', textAlign: 'center' }}>
+                                    {getEvUrl(ev) && (getEvUrl(ev).match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || getEvUrl(ev).includes('/uploads/')) ? (
+                                      <img src={getEvUrl(ev)} alt={`Evidencia ${idx + 1}`} style={{ width: '100%', height: '75px', objectFit: 'cover', borderRadius: '4px' }} />
+                                    ) : (
+                                      <div style={{ width: '100%', height: '75px', backgroundColor: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', borderRadius: '4px' }}>📄</div>
+                                    )}
+                                    <div style={{ fontSize: '0.68rem', fontWeight: '600', color: '#333', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.nombre_archivo || ev.nombre || ev.etiqueta || `Evidencia ${idx + 1}`}</div>
+                                    <a href={getEvUrl(ev)} onClick={(e) => { e.preventDefault(); const url = getEvUrl(ev); if (url && (url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || url.includes('/uploads/'))) { const overlay = document.createElement('div'); overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:9999999;display:flex;flex-direction:column;align-items:center;justify-content:center'; const img = document.createElement('img'); img.src = url; img.style.cssText = 'max-width:100%;max-height:85%;object-fit:contain'; const btn = document.createElement('button'); btn.innerText = 'Cerrar Imagen'; btn.style.cssText = 'margin-top:20px;padding:12px 24px;background:#fff;color:#000;border:none;border-radius:12px;font-weight:bold;cursor:pointer'; btn.onclick = () => document.body.removeChild(overlay); overlay.appendChild(img); overlay.appendChild(btn); document.body.appendChild(overlay); } else if (url) { window.open(url, '_blank') || (window.location.href = url); } }} style={{ fontSize: '0.65rem', color: '#0066cc', textDecoration: 'underline', cursor: 'pointer' }}>Ver archivo</a>
                                   </div>
                                 ))}
                               </div>
@@ -6252,8 +6259,18 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                           <h4 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>📸 Evidencias Fotográficas y Archivos Adjuntos ({evs.length})</h4>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '12px', marginTop: '10px' }}>
                             {evs.map((ev, idx) => (
-                              <div key={idx} style={{ border: '1px solid #E2E8F0', borde                                <div style={{ fontSize: '0.72rem', fontWeight: '600', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.nombre || ev.etiqueta || `Evidencia ${idx + 1}`}</div>
-                                <a href={ev.ruta_archivo || ev.url || '#'} onClick={(e) => { e.preventDefault(); const url = ev.ruta_archivo || ev.url || ''; if (url && (url.match(/\\.(jpeg|jpg|gif|png|webp|bmp)$/i) || url.includes('/uploads/'))) { const div = document.createElement('div'); div.style.position = 'fixed'; div.style.inset = '0'; div.style.backgroundColor = 'rgba(0,0,0,0.95)'; div.style.zIndex = '9999999'; div.style.display = 'flex'; div.style.flexDirection = 'column'; div.style.alignItems = 'center'; div.style.justifyContent = 'center'; const img = document.createElement('img'); img.src = url; img.style.maxWidth = '100%'; img.style.maxHeight = '85%'; img.style.objectFit = 'contain'; const closeBtn = document.createElement('button'); closeBtn.innerText = 'Cerrar Imagen'; closeBtn.style.marginTop = '20px'; closeBtn.style.padding = '12px 24px'; closeBtn.style.backgroundColor = '#fff'; closeBtn.style.color = '#000'; closeBtn.style.border = 'none'; closeBtn.style.borderRadius = '12px'; closeBtn.style.fontWeight = 'bold'; closeBtn.style.cursor = 'pointer'; closeBtn.onclick = () => document.body.removeChild(div); div.appendChild(img); div.appendChild(closeBtn); document.body.appendChild(div); } else if (url) { window.open(url, '_blank') || (window.location.href = url); } }} style={{ fontSize: '0.7rem', color: '#2563EB', textDecoration: 'underline', display: 'block', marginTop: '4px', cursor: 'pointer' }}>Ver archivo</a>ex = '9999999'; div.style.display = 'flex'; div.style.flexDirection = 'column'; div.style.alignItems = 'center'; div.style.justifyContent = 'center'; const img = document.createElement('img'); img.src = url; img.style.maxWidth = '100%'; img.style.maxHeight = '85%'; img.style.objectFit = 'contain'; const closeBtn = document.createElement('button'); closeBtn.innerText = 'Cerrar Imagen'; closeBtn.style.marginTop = '20px'; closeBtn.style.padding = '12px 24px'; closeBtn.style.backgroundColor = '#fff'; closeBtn.style.color = '#000'; closeBtn.style.border = 'none'; closeBtn.style.borderRadius = '12px'; closeBtn.style.fontWeight = 'bold'; closeBtn.style.cursor = 'pointer'; closeBtn.onclick = () => document.body.removeChild(div); div.appendChild(img); div.appendChild(closeBtn); document.body.appendChild(div); } else { window.open(url, '_blank') || (window.location.href = url); } }} style={{ fontSize: '0.7rem', color: '#2563EB', textDecoration: 'underline', display: 'block', marginTop: '4px', cursor: 'pointer' }}>Ver archivo</a>
+                              <div key={idx} style={{ border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px', backgroundColor: '#FFF', textAlign: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                                {getEvUrl(ev) && (getEvUrl(ev).match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || getEvUrl(ev).includes('/uploads/')) ? (
+                                  <div style={{ width: '100%', height: '80px', borderRadius: '6px', overflow: 'hidden', marginBottom: '6px' }}>
+                                    <img src={getEvUrl(ev)} alt={ev.nombre || `Evidencia ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  </div>
+                                ) : (
+                                  <div style={{ width: '100%', height: '80px', borderRadius: '6px', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', marginBottom: '6px' }}>
+                                    📄
+                                  </div>
+                                )}
+                                <div style={{ fontSize: '0.72rem', fontWeight: '600', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.nombre || ev.etiqueta || `Evidencia ${idx + 1}`}</div>
+                                <a href={getEvUrl(ev)} onClick={(e) => { e.preventDefault(); const url = getEvUrl(ev); if (url && (url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || url.includes('/uploads/'))) { const overlay = document.createElement('div'); overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:9999999;display:flex;flex-direction:column;align-items:center;justify-content:center'; const img = document.createElement('img'); img.src = url; img.style.cssText = 'max-width:100%;max-height:85%;object-fit:contain'; const btn = document.createElement('button'); btn.innerText = 'Cerrar Imagen'; btn.style.cssText = 'margin-top:20px;padding:12px 24px;background:#fff;color:#000;border:none;border-radius:12px;font-weight:bold;cursor:pointer'; btn.onclick = () => document.body.removeChild(overlay); overlay.appendChild(img); overlay.appendChild(btn); document.body.appendChild(overlay); } else if (url) { window.open(url, '_blank') || (window.location.href = url); } }} style={{ fontSize: '0.7rem', color: '#2563EB', textDecoration: 'underline', display: 'block', marginTop: '4px', cursor: 'pointer' }}>Ver archivo</a>
                               </div>
                             ))}
                           </div>
