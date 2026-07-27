@@ -41,6 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 # SQLite WAL and temp files
+*.db
 *.db-wal
 *.db-shm
 *.db-journal
