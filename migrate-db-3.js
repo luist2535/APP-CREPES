@@ -86,6 +86,7 @@ try {
   }
 
   // 6. Insertar usuarios de prueba para estos roles
+  /*
   const testUsers = [
     { nombre: 'Jefe de Sistemas', email: 'jefe_sistemas@crepesenpunto.com', rol_id: 9 },
     { nombre: 'Auxiliar de Sistemas', email: 'aux_sistemas@crepesenpunto.com', rol_id: 16 },
@@ -109,6 +110,7 @@ try {
       console.error(`Error al crear usuario ${u.nombre}:`, e);
     }
   }
+  */
 
   // 7. Crear un tipo de visita para Sistemas y su plantilla
   try {
