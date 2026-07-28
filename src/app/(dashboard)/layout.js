@@ -417,7 +417,7 @@ export default function DashboardLayout({ children }) {
           <div className="sidebar-logo" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             {!logoError ? (
               <img 
-                src="/logo_crepes_waffles.svg" 
+                src="/images/logo-crepes-round-brown.png" 
                 alt="Logo" 
                 onError={() => setLogoError(true)} 
                 style={{ width: '100%', height: '100%', objectFit: 'contain' }}
