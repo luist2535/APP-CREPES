@@ -109,7 +109,7 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Entidad no reconocida' }, { status: 400 });
   } catch (error) {
     console.error('Admin POST error:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
 
@@ -226,7 +226,7 @@ export async function PUT(request) {
     return NextResponse.json({ error: 'Entidad o acción no reconocida' }, { status: 400 });
   } catch (error) {
     console.error('Admin PUT error:', error);
-    return NextResponse.json({ error: 'Error del servidor' }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
 
@@ -314,6 +314,6 @@ export async function DELETE(request) {
     return NextResponse.json({ error: 'Entidad no reconocida' }, { status: 400 });
   } catch (error) {
     console.error('Admin DELETE error:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }

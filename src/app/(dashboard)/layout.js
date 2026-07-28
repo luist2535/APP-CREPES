@@ -1,8 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+
+// =============================================
+// CONFIGURACIÓN DE TIMEOUT POR INACTIVIDAD
+// =============================================
+const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;  // 10 minutos de inactividad para cerrar sesión
+const WARNING_BEFORE_MS = 2 * 60 * 1000;        // Mostrar aviso 2 minutos antes del cierre
 
 export default function DashboardLayout({ children }) {
   const [user, setUser] = useState(null);
@@ -12,8 +18,104 @@ export default function DashboardLayout({ children }) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [notifMenuOpen, setNotifMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [showSessionWarning, setShowSessionWarning] = useState(false);
+  const [sessionCountdown, setSessionCountdown] = useState(0);
   const router = useRouter();
   const pathname = usePathname();
+
+  // Refs para los timers de inactividad
+  const inactivityTimerRef = useRef(null);
+  const warningTimerRef = useRef(null);
+  const countdownIntervalRef = useRef(null);
+  const isLoggingOutRef = useRef(false);
+
+  const handleLogout = useCallback(async () => {
+    if (isLoggingOutRef.current) return;
+    isLoggingOutRef.current = true;
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      localStorage.removeItem('user');
+      router.push('/');
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      isLoggingOutRef.current = false;
+    }
+  }, [router]);
+
+  // --- Sistema de cierre automático por inactividad ---
+  const clearAllTimers = useCallback(() => {
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+  }, []);
+
+  const resetInactivityTimer = useCallback(() => {
+    if (!user) return;
+    clearAllTimers();
+    setShowSessionWarning(false);
+
+    // Timer para mostrar el aviso (28 min)
+    warningTimerRef.current = setTimeout(() => {
+      setShowSessionWarning(true);
+      setSessionCountdown(Math.floor(WARNING_BEFORE_MS / 1000));
+      // Countdown visual
+      countdownIntervalRef.current = setInterval(() => {
+        setSessionCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(countdownIntervalRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }, INACTIVITY_TIMEOUT_MS - WARNING_BEFORE_MS);
+
+    // Timer para cerrar la sesión (30 min)
+    inactivityTimerRef.current = setTimeout(() => {
+      clearAllTimers();
+      setShowSessionWarning(false);
+      handleLogout();
+    }, INACTIVITY_TIMEOUT_MS);
+  }, [user, clearAllTimers, handleLogout]);
+
+  const handleExtendSession = useCallback(() => {
+    setShowSessionWarning(false);
+    resetInactivityTimer();
+  }, [resetInactivityTimer]);
+
+  // Registrar eventos de actividad del usuario
+  useEffect(() => {
+    if (!user) return;
+
+    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'];
+
+    // Throttle para no reiniciar el timer en cada pixel de movimiento
+    let lastActivity = Date.now();
+    const throttledReset = () => {
+      const now = Date.now();
+      if (now - lastActivity > 30000) { // Solo reiniciar si pasaron 30s desde la última actividad registrada
+        lastActivity = now;
+        if (!showSessionWarning) {
+          resetInactivityTimer();
+        }
+      }
+    };
+
+    activityEvents.forEach(event => {
+      window.addEventListener(event, throttledReset, { passive: true });
+    });
+
+    // Iniciar el primer timer
+    resetInactivityTimer();
+
+    return () => {
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, throttledReset);
+      });
+      clearAllTimers();
+    };
+  }, [user, showSessionWarning, resetInactivityTimer, clearAllTimers]);
 
   useEffect(() => {
     async function checkAuth() {
@@ -44,16 +146,6 @@ export default function DashboardLayout({ children }) {
     }
     checkAuth();
   }, [router]);
-
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      localStorage.removeItem('user');
-      router.push('/');
-    } catch (err) {
-      console.error('Logout error:', err);
-    }
-  };
 
   if (loading) {
     return (
@@ -1011,6 +1103,93 @@ export default function DashboardLayout({ children }) {
 
 
       `}</style>
+
+      {/* Modal de Advertencia de Inactividad */}
+      {showSessionWarning && (
+        <div className="inactivity-modal-overlay">
+          <div className="inactivity-modal">
+            <div className="inactivity-modal-icon">⚠️</div>
+            <h3>Tu sesión está a punto de expirar</h3>
+            <p>Por seguridad, tu sesión se cerrará automáticamente en <strong>{sessionCountdown}</strong> segundos por inactividad.</p>
+            <div className="inactivity-modal-actions">
+              <button className="btn-secondary" onClick={handleLogout}>Cerrar Sesión</button>
+              <button className="btn-primary" onClick={handleExtendSession}>Continuar Trabajando</button>
+            </div>
+          </div>
+          <style jsx>{`
+            .inactivity-modal-overlay {
+              position: fixed;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              background-color: rgba(0, 0, 0, 0.6);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              z-index: 10000;
+              backdrop-filter: blur(4px);
+            }
+            .inactivity-modal {
+              background: white;
+              padding: 30px;
+              border-radius: 16px;
+              width: 90%;
+              max-width: 400px;
+              text-align: center;
+              box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+              animation: slideUp 0.3s ease-out;
+            }
+            @keyframes slideUp {
+              from { opacity: 0; transform: translateY(20px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            .inactivity-modal-icon {
+              font-size: 48px;
+              margin-bottom: 15px;
+            }
+            .inactivity-modal h3 {
+              color: var(--color-primary-dark);
+              margin: 0 0 10px 0;
+              font-family: 'Outfit', sans-serif;
+            }
+            .inactivity-modal p {
+              color: #4b5563;
+              margin: 0 0 25px 0;
+              font-size: 0.95rem;
+              line-height: 1.5;
+            }
+            .inactivity-modal-actions {
+              display: flex;
+              gap: 12px;
+              justify-content: center;
+            }
+            .btn-primary, .btn-secondary {
+              padding: 10px 20px;
+              border-radius: 8px;
+              font-weight: 600;
+              font-size: 0.9rem;
+              cursor: pointer;
+              transition: all 0.2s;
+              border: none;
+            }
+            .btn-primary {
+              background-color: var(--color-primary);
+              color: white;
+            }
+            .btn-primary:hover {
+              background-color: var(--color-primary-dark);
+            }
+            .btn-secondary {
+              background-color: #f3f4f6;
+              color: #4b5563;
+            }
+            .btn-secondary:hover {
+              background-color: #e5e7eb;
+            }
+          `}</style>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,12 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'crepes-en-punto-secret-key-2024-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error("CRITICAL ERROR: JWT_SECRET environment variable is not set. Authentication will fail.");
+  // Uncomment the following line in strict production:
+  // throw new Error("JWT_SECRET environment variable is not set.");
+}
 const JWT_EXPIRES_IN = '24h';
 
 function generateToken(user) {

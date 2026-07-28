@@ -3,6 +3,7 @@ const { getDb } = require('@/lib/db');
 const { generateToken, comparePassword, getUserCustomPermissions } = require('@/lib/auth');
 const bcrypt = require('bcryptjs');
 const { logAudit } = require('@/lib/audit');
+const { validatePassword } = require('@/lib/security');
 
 export async function POST(request) {
   try {
@@ -28,6 +29,12 @@ export async function POST(request) {
     if (user.debe_cambiar_password !== 1) {
       return NextResponse.json({ error: 'Este usuario no requiere cambio de contraseña' }, { status: 400 });
     }
+
+    const pwValidation = validatePassword(newPassword);
+    if (!pwValidation.valid) {
+      return NextResponse.json({ error: pwValidation.message }, { status: 400 });
+    }
+
 
     // Hash the new password
     const newHash = bcrypt.hashSync(newPassword, 10);
@@ -78,7 +85,7 @@ export async function POST(request) {
       httpOnly: true,
       secure: false, 
       sameSite: 'lax',
-      maxAge: 86400, 
+      maxAge: 28800, // 8 hours 
       path: '/',
     });
     

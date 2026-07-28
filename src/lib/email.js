@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const { getDb } = require('./db.js');
+const { decrypt } = require('./security');
 
 /**
  * Sends a notification email asynchronously
@@ -29,7 +30,7 @@ async function sendNotificationEmail({ to, subject, html }) {
       if (row.clave === 'smtp_host') host = row.valor;
       if (row.clave === 'smtp_port') port = parseInt(row.valor);
       if (row.clave === 'smtp_user') user = row.valor;
-      if (row.clave === 'smtp_pass') pass = row.valor;
+      if (row.clave === 'smtp_pass') pass = decrypt(row.valor);
     });
   } catch (e) {
     console.log("ℹ️ Tabla configuraciones no encontrada o vacía, usando env fallback.");

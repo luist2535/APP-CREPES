@@ -19,6 +19,8 @@ function getDb() {
     db = new Database(DB_PATH);
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
+    db.pragma('secure_delete = ON'); // Sobreescribe los datos borrados con ceros
+    db.pragma('trusted_schema = OFF'); // Evita ejecución de funciones en esquemas no confiables
 
     db.exec(`
       CREATE TABLE IF NOT EXISTS roles_permisos_adicionales (

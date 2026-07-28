@@ -115,7 +115,7 @@ export async function GET(request) {
       httpOnly: true,
       secure: false, // Permitir conexiones locales HTTP en red local
       sameSite: 'lax',
-      maxAge: 86400, // 24 hours
+      maxAge: 28800, // 8 hours
       path: '/',
     });
     

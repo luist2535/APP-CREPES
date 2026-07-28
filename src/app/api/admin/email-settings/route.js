@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { encrypt, decrypt } from '@/lib/security';
 
 export async function GET(request) {
   try {
@@ -21,7 +22,11 @@ export async function GET(request) {
 
     configRows.forEach((row) => {
       if (row.clave in settings) {
-        settings[row.clave] = row.valor;
+        if (row.clave === 'smtp_pass') {
+          settings[row.clave] = decrypt(row.valor);
+        } else {
+          settings[row.clave] = row.valor;
+        }
       }
     });
 
@@ -53,7 +58,7 @@ export async function POST(request) {
     stmt.run('smtp_port', String(smtp_port));
     stmt.run('smtp_user', smtp_user);
     if (smtp_pass !== undefined && smtp_pass !== null) {
-      stmt.run('smtp_pass', smtp_pass);
+      stmt.run('smtp_pass', encrypt(smtp_pass));
     }
 
     return NextResponse.json({ success: true, message: 'Configuración de correo actualizada correctamente.' });
