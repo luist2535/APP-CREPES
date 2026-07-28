@@ -1101,7 +1101,79 @@ export default function DashboardLayout({ children }) {
           }
         }
 
+        }
 
+        /* --- Estilos para el Modal de Inactividad --- */
+        .inactivity-modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: rgba(0, 0, 0, 0.6);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10000;
+          backdrop-filter: blur(4px);
+        }
+        .inactivity-modal {
+          background: white;
+          padding: 30px;
+          border-radius: 16px;
+          width: 90%;
+          max-width: 400px;
+          text-align: center;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+          animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .inactivity-modal-icon {
+          font-size: 48px;
+          margin-bottom: 15px;
+        }
+        .inactivity-modal h3 {
+          color: var(--color-primary-dark);
+          margin: 0 0 10px 0;
+          font-family: 'Outfit', sans-serif;
+        }
+        .inactivity-modal p {
+          color: #4b5563;
+          margin: 0 0 25px 0;
+          font-size: 0.95rem;
+          line-height: 1.5;
+        }
+        .inactivity-modal-actions {
+          display: flex;
+          gap: 12px;
+          justify-content: center;
+        }
+        .btn-primary, .btn-secondary {
+          padding: 10px 20px;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 0.9rem;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: none;
+        }
+        .btn-primary {
+          background-color: var(--color-primary);
+          color: white;
+        }
+        .btn-primary:hover {
+          background-color: var(--color-primary-dark);
+        }
+        .btn-secondary {
+          background-color: #f3f4f6;
+          color: #4b5563;
+        }
+        .btn-secondary:hover {
+          background-color: #e5e7eb;
+        }
       `}</style>
 
       {/* Modal de Advertencia de Inactividad */}
@@ -1116,78 +1188,6 @@ export default function DashboardLayout({ children }) {
               <button className="btn-primary" onClick={handleExtendSession}>Continuar Trabajando</button>
             </div>
           </div>
-          <style jsx>{`
-            .inactivity-modal-overlay {
-              position: fixed;
-              top: 0;
-              left: 0;
-              right: 0;
-              bottom: 0;
-              background-color: rgba(0, 0, 0, 0.6);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              z-index: 10000;
-              backdrop-filter: blur(4px);
-            }
-            .inactivity-modal {
-              background: white;
-              padding: 30px;
-              border-radius: 16px;
-              width: 90%;
-              max-width: 400px;
-              text-align: center;
-              box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-              animation: slideUp 0.3s ease-out;
-            }
-            @keyframes slideUp {
-              from { opacity: 0; transform: translateY(20px); }
-              to { opacity: 1; transform: translateY(0); }
-            }
-            .inactivity-modal-icon {
-              font-size: 48px;
-              margin-bottom: 15px;
-            }
-            .inactivity-modal h3 {
-              color: var(--color-primary-dark);
-              margin: 0 0 10px 0;
-              font-family: 'Outfit', sans-serif;
-            }
-            .inactivity-modal p {
-              color: #4b5563;
-              margin: 0 0 25px 0;
-              font-size: 0.95rem;
-              line-height: 1.5;
-            }
-            .inactivity-modal-actions {
-              display: flex;
-              gap: 12px;
-              justify-content: center;
-            }
-            .btn-primary, .btn-secondary {
-              padding: 10px 20px;
-              border-radius: 8px;
-              font-weight: 600;
-              font-size: 0.9rem;
-              cursor: pointer;
-              transition: all 0.2s;
-              border: none;
-            }
-            .btn-primary {
-              background-color: var(--color-primary);
-              color: white;
-            }
-            .btn-primary:hover {
-              background-color: var(--color-primary-dark);
-            }
-            .btn-secondary {
-              background-color: #f3f4f6;
-              color: #4b5563;
-            }
-            .btn-secondary:hover {
-              background-color: #e5e7eb;
-            }
-          `}</style>
         </div>
       )}
     </div>
