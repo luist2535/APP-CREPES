@@ -5955,7 +5955,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                           <tbody>
                             <tr>
                               <td style={{ width: '22%', borderRight: '1.5px solid #2C1810', padding: '8px', textAlign: 'center', verticalAlign: 'middle', backgroundColor: '#faf6f2' }}>
-                                <img src="/logo.png" alt="Logo" style={{ maxHeight: '42px', objectFit: 'contain', display: 'block', margin: '0 auto 4px auto' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                                <img src="/logo_crepes_waffles.svg" alt="Logo" style={{ maxHeight: '42px', objectFit: 'contain', display: 'block', margin: '0 auto 4px auto' }} onError={(e) => { e.target.style.display = 'none'; }} />
                                 <div style={{ fontSize: '0.58rem', fontWeight: 'bold', color: '#4A2518' }}>CREPES CARIBE S.A</div>
                               </td>
                               <td style={{ width: '56%', borderRight: '1.5px solid #2C1810', padding: '8px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', fontSize: '1.05rem', color: '#4A2518', fontFamily: 'serif' }}>
