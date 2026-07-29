@@ -108,7 +108,7 @@ export async function POST(request) {
     
     response.cookies.set('auth-token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // true en producción (HTTPS), false en local (HTTP)
+      secure: request.url.startsWith('https://') || request.headers.get('x-forwarded-proto') === 'https',
       sameSite: 'lax',
       maxAge: 28800, // 8 hours
       path: '/',
