@@ -264,9 +264,8 @@ function LoginForm() {
           align-items: center;
           justify-content: center;
           padding: 20px;
-          /* Fondo: carga la foto del restaurante Cartagena (fondo-login.jpg) con una capa sutil de contraste para que resalte mucho más clara y luminosa */
-          background: linear-gradient(135deg, rgba(30, 15, 8, 0.22) 0%, rgba(15, 8, 4, 0.35) 100%),
-                      url('/images/fondo-login.jpg') no-repeat center center / cover;
+          /* Fondo: carga la foto del restaurante (fondo-login.jpeg) sin filtros adicionales para que se vea tal cual es */
+          background: url('/images/fondo-login.jpeg') no-repeat center center / cover;
           background-color: #1a0f0a;
           font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
         }
