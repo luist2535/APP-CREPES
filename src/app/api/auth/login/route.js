@@ -108,7 +108,7 @@ export async function POST(request) {
     
     response.cookies.set('auth-token', token, {
       httpOnly: true,
-      secure: false, // Permitir conexiones locales HTTP en red local
+      secure: process.env.NODE_ENV === 'production', // true en producción (HTTPS), false en local (HTTP)
       sameSite: 'lax',
       maxAge: 28800, // 8 hours
       path: '/',

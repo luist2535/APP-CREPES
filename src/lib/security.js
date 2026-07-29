@@ -15,8 +15,7 @@ const ALGORITHM = 'aes-256-gcm';
 function encrypt(text) {
   if (!text) return text;
   if (!ENCRYPTION_KEY) {
-    console.warn('WARNING: ENCRYPTION_KEY is not set. Data is NOT being encrypted.');
-    return text;
+    throw new Error('CRITICAL SECURITY ERROR: La variable ENCRYPTION_KEY no está configurada en las variables de entorno. El cifrado es obligatorio.');
   }
 
   try {
