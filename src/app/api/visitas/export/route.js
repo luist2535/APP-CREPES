@@ -138,14 +138,47 @@ export async function GET(request) {
       }
     });
 
-    // 6. Map Columns for SI, NO, NA and sub-areas
+    // 6. Map Columns for SI, NO, NA, 1-5 (BPM scale) and sub-areas
     const isMatrix = templateConfig.tipo === 'matrix';
 
-    // Find column mapping from sheet
-    const colMappings = []; // Array of { subArea: string, type: 'SI'|'NO'|'NA'|'OBSERVACIONES', colNumber: number }
+    // Helper: detect if a header value is a valid answer type (SI/NO/NA or numeric 1-5 or N/A)
+    const VALID_ANSWER_TYPES = new Set(['SI', 'NO', 'NA', 'N/A', '1', '2', '3', '4', '5']);
+    const normalizeHeaderType = (raw) => {
+      const t = String(raw || '').trim().toUpperCase();
+      if (t === 'N/A') return 'NA';
+      return t;
+    };
 
-    if (isMatrix) {
-      // Matrix: CONOS, REPOSTERÍA, etc. are on Row 5, and SI, NO, NA headers on Row 6 or 7
+    // Detect BPM (1-5 scale) from template columns
+    const isBPMScale = Array.isArray(templateConfig.columnas) &&
+      templateConfig.columnas.some(c => {
+        const u = String(c || '').toUpperCase();
+        return u === 'SATISFACTORIO' || u === 'NA' || u === 'N/A' || ['1','2','3','4','5'].includes(u);
+      });
+
+    // Find column mapping from sheet
+    // Array of { subArea: string, type: 'SI'|'NO'|'NA'|'1'|'2'|'3'|'4'|'5'|'OBSERVACIONES', colNumber: number }
+    const colMappings = [];
+
+    // Scan rows 5-7 for headers — supports both classic (SI/NO/NA) and BPM (1-5/NA/OBSERVACIONES)
+    const scanColHeaders = (startCol, endCol, subAreaName) => {
+      for (let c = startCol; c <= endCol; c++) {
+        // Try rows 7 → 6 → 5 for the header label
+        const h7 = sheet.getRow(7).getCell(c).value || '';
+        const h6 = sheet.getRow(6).getCell(c).value || '';
+        const h5 = sheet.getRow(5).getCell(c).value || '';
+        const raw = h7 || h6 || h5;
+        const type = normalizeHeaderType(raw);
+        if (VALID_ANSWER_TYPES.has(type)) {
+          colMappings.push({ subArea: subAreaName, type, colNumber: c });
+        } else if (type.includes('OBSERVAC')) {
+          colMappings.push({ subArea: subAreaName, type: 'OBSERVACIONES', colNumber: c });
+        }
+      }
+    };
+
+    if (isMatrix && !isBPMScale) {
+      // Classic matrix: sub-areas in Row 5 (CONOS, REPOSTERÍA, etc.), SI/NO/NA in rows 6-7
       const row5 = sheet.getRow(5);
       const subAreas = [];
       row5.eachCell({ includeEmpty: true }, (cell, colNumber) => {
@@ -156,103 +189,116 @@ export async function GET(request) {
           }
         }
       });
-
       subAreas.forEach((sa, idx) => {
         const endCol = idx < subAreas.length - 1 ? subAreas[idx + 1].startCol - 1 : sheet.columnCount;
-        for (let c = sa.startCol; c <= endCol; c++) {
-          const headerText6 = sheet.getRow(6).getCell(c).value || '';
-          const headerText7 = sheet.getRow(7).getCell(c).value || '';
-          const type = String(headerText7 || headerText6).trim().toUpperCase();
-          if (type === 'SI' || type === 'NO' || type === 'NA') {
-            colMappings.push({
-              subArea: sa.name,
-              type,
-              colNumber: c
-            });
-          }
-        }
+        scanColHeaders(sa.startCol, endCol, sa.name);
       });
     } else {
-      // Simple Checklist: SI, NO, NA, OBSERVACIONES columns
-      for (let c = 3; c <= Math.min(sheet.columnCount, 15); c++) {
-        const headerText6 = sheet.getRow(6).getCell(c).value || '';
-        const headerText7 = sheet.getRow(7).getCell(c).value || '';
-        const type = String(headerText7 || headerText6).trim().toUpperCase();
-        if (type === 'SI' || type === 'NO' || type === 'NA') {
-          colMappings.push({
-            subArea: 'EVALUACION',
-            type,
-            colNumber: c
-          });
-        } else if (type.includes('OBSERVAC') || String(headerText6).trim().toUpperCase().includes('OBSERVAC')) {
-          colMappings.push({
-            subArea: 'EVALUACION',
-            type: 'OBSERVACIONES',
-            colNumber: c
-          });
-        }
-      }
+      // Simple checklist or BPM: scan columns 2-20 for SI/NO/NA/1-5/OBSERVACIONES headers
+      scanColHeaders(2, Math.min(sheet.columnCount, 20), 'EVALUACION');
     }
 
     // 7. Write answers to checklist rows
     let commentRowIndex = -1;
 
-    for (let r = 8; r <= sheet.rowCount; r++) {
+    // Helper: Normalize strings for robust comparison (removes accents, extra spaces, lowercase)
+    const normalizeString = (str) => {
+      if (!str) return '';
+      return String(str)
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
+
+    const normalizedAnswers = {};
+    for (const key in answers) {
+      normalizedAnswers[normalizeString(key)] = answers[key];
+    }
+    const getAns = (k) => normalizedAnswers[normalizeString(k)];
+
+    // Helper: resolve answer and observation for an item
+    const resolveAns = (itemName, subArea) => {
+      const multiSec = templateConfig.secciones && templateConfig.secciones.length > 1;
+      let ans = '';
+      let obs = '';
+
+      if (subArea) {
+        // Matrix with sub-areas
+        ans = getAns(`${itemName}__${subArea}`) || '';
+        obs = getAns(`${itemName}__${subArea}__obs`) || getAns(`${itemName}__${subArea}_obs`) || '';
+        if (!ans && multiSec) {
+          for (let i = 0; i < templateConfig.secciones.length; i++) {
+            const k = `${itemName}__sec_${i}__${subArea}`;
+            if (getAns(k)) { ans = getAns(k); obs = getAns(`${k}__obs`) || getAns(`${k}_obs`) || obs; break; }
+          }
+        }
+      } else {
+        // Simple checklist
+        ans = getAns(itemName) || '';
+        obs = getAns(`${itemName}__obs`) || getAns(`${itemName}_obs`) || '';
+        if (!ans && templateConfig.secciones) {
+          for (let i = 0; i < templateConfig.secciones.length; i++) {
+            const k = `${itemName}__sec_${i}`;
+            if (getAns(k)) { ans = getAns(k); obs = getAns(`${k}__obs`) || getAns(`${k}_obs`) || obs; break; }
+            // Also try with first column key (matrix-as-checklist)
+            const colKey = templateConfig.columnas && templateConfig.columnas[0] ? `${k}__${templateConfig.columnas[0]}` : null;
+            if (colKey && getAns(colKey)) { ans = getAns(colKey); obs = getAns(`${colKey}__obs`) || getAns(`${colKey}_obs`) || obs; break; }
+          }
+        }
+        // Fallback: also check first column key without section index
+        if (!ans && templateConfig.columnas && templateConfig.columnas[0]) {
+          const colKey = `${itemName}__${templateConfig.columnas[0]}`;
+          if (getAns(colKey)) { ans = getAns(colKey); obs = getAns(`${colKey}__obs`) || getAns(`${colKey}_obs`) || obs; }
+        }
+      }
+
+      return { ans: String(ans || '').trim(), obs: String(obs || '').trim() };
+    };
+
+    for (let r = 6; r <= sheet.rowCount; r++) {
       const cellA = sheet.getRow(r).getCell(1);
       const cellB = sheet.getRow(r).getCell(2);
 
       const valA = cellA.value ? String(cellA.value).trim() : '';
       const valB = cellB.value ? String(cellB.value).trim() : '';
 
-      if (valA === 'COMENTARIOS:' || valA.startsWith('COMENTARIOS') || valA.includes('Observaciones')) {
+      if (valA === 'COMENTARIOS:' || valA.startsWith('COMENTARIOS') || valA.includes('Observaciones adicionales')) {
         commentRowIndex = r;
       }
 
       if (valA === 'TOTAL' || valA === 'PARA DILIGENCIAMIENTO' || valA === 'CÓDIGO:' || valA.includes('Responsable')) {
-        // End of items rows
         break;
       }
 
-      if (valB !== '' && valB !== 'TOTAL' && valB !== '% POR AREA') {
+      if (valB !== '' && valB !== 'TOTAL' && valB !== '% POR AREA' && valB !== 'ASPECTO' && valB !== 'ASPECTOS') {
         const itemName = valB;
 
-        // Process answers based on type
-        if (isMatrix) {
-          // Find answers for this item in each sub-area
+        if (isMatrix && !isBPMScale) {
+          // Classic matrix: write X for each sub-area in the correct SI/NO/NA column
           templateConfig.columnas.forEach((subArea) => {
-            let userAns = answers[`${itemName}__${subArea}`]; 
-            if (!userAns && templateConfig.secciones) {
-               for(let i = 0; i < templateConfig.secciones.length; i++) {
-                  const k = `${itemName}__sec_${i}__${subArea}`;
-                  if (answers[k]) { userAns = answers[k]; break; }
-               }
-            }
+            const { ans: userAns } = resolveAns(itemName, subArea);
             if (userAns) {
-              // Find matching column in mapping
-              const targetCol = colMappings.find(m => m.subArea === subArea && m.type === userAns);
-              if (targetCol) {
-                // Write 'X' in that cell
-                sheet.getRow(r).getCell(targetCol.colNumber).value = 'X';
-              }
+              const targetCol = colMappings.find(m => m.subArea === subArea && m.type === userAns.toUpperCase());
+              if (targetCol) sheet.getRow(r).getCell(targetCol.colNumber).value = 'X';
             }
           });
         } else {
-          // Simple Checklist: find answer for this item
-          let userAns = answers[itemName];
-          if (!userAns && templateConfig.secciones) {
-             for(let i = 0; i < templateConfig.secciones.length; i++) {
-                const k = `${itemName}__sec_${i}`;
-                if (answers[k]) { userAns = answers[k]; break; }
-                
-                const defaultColKey = (templateConfig.tipo === 'matrix' && templateConfig.columnas && templateConfig.columnas[0]) ? `${k}__${templateConfig.columnas[0]}` : null;
-                if (defaultColKey && answers[defaultColKey]) { userAns = answers[defaultColKey]; break; }
-             }
+          // Simple checklist OR BPM (1-5 scale)
+          const { ans: userAns, obs: userObs } = resolveAns(itemName, isBPMScale && templateConfig.columnas && templateConfig.columnas[0] && !['1','2','3','4','5','NA','N/A','SATISFACTORIO','OBSERVACIONES'].includes(String(templateConfig.columnas[0]).toUpperCase()) ? templateConfig.columnas[0] : null);
+
+          // Write X in the matched numeric/SI/NO/NA column
+          if (userAns) {
+            const normalizedAns = userAns === 'N/A' ? 'NA' : userAns.toUpperCase();
+            const targetCol = colMappings.find(m => m.subArea === 'EVALUACION' && m.type === normalizedAns);
+            if (targetCol) sheet.getRow(r).getCell(targetCol.colNumber).value = 'X';
           }
 
-          if (userAns) {
-            const targetCol = colMappings.find(m => m.subArea === 'EVALUACION' && m.type === userAns);
-            if (targetCol) {
-              sheet.getRow(r).getCell(targetCol.colNumber).value = 'X';
+          // Write observation text in the OBSERVACIONES column
+          if (userObs) {
+            const obsCol = colMappings.find(m => m.subArea === 'EVALUACION' && m.type === 'OBSERVACIONES');
+            if (obsCol) {
+              sheet.getRow(r).getCell(obsCol.colNumber).value = userObs;
             }
           }
         }
@@ -270,10 +316,14 @@ export async function GET(request) {
     }
 
     // Calculate Quality Checklist Score
+    // For BPM (1-5 scale): compute sumPuntaje and count respondidos to get average
+    // For classic (SI/NO): compute satisfactorios vs noSatisfactorios
     let totalAspectos = 0;
-    let satisfactorios = 0;
-    let noSatisfactorios = 0;
+    let satisfactorios = 0;  // SI responses OR numeric responses >= 1
+    let noSatisfactorios = 0; // NO responses
     let noAplica = 0;
+    let sumPuntaje = 0;       // Sum of numeric scores (BPM scale 1-5)
+    let respondidosBPM = 0;  // Count of items with a numeric answer (for BPM average)
 
     if (templateConfig.secciones) {
       templateConfig.secciones.forEach((sec, sIdx) => {
@@ -281,27 +331,44 @@ export async function GET(request) {
           sec.filas.forEach(fila => {
             let base = fila;
             if (templateConfig.secciones.length > 1) base = `${fila}__sec_${sIdx}`;
-            
-            if (isMatrix && templateConfig.columnas) {
+
+            if (isBPMScale) {
+              // BPM: single answer per row (the numeric value 1-5 or NA)
+              const colKey = templateConfig.columnas && templateConfig.columnas[0] ? `${base}__${templateConfig.columnas[0]}` : base;
+              const val = answers[colKey] || answers[base] || answers[fila] || '';
+              const vStr = String(val).trim().toUpperCase();
+              totalAspectos++;
+              if (vStr === 'NA' || vStr === 'N/A') {
+                noAplica++;
+              } else {
+                const num = parseInt(vStr, 10);
+                if (!isNaN(num) && num >= 1 && num <= 5) {
+                  respondidosBPM++;
+                  sumPuntaje += num;
+                  satisfactorios++; // count any numeric answer as "responded"
+                }
+              }
+            } else if (isMatrix && templateConfig.columnas) {
               templateConfig.columnas.forEach(col => {
                 totalAspectos++;
                 const val = answers[`${base}__${col}`] || answers[`${fila}__${col}`];
-                if (val === 'SI') satisfactorios++;
-                else if (val === 'NO') noSatisfactorios++;
-                else if (val === 'NA') noAplica++;
+                const vUp = String(val || '').trim().toUpperCase();
+                if (vUp === 'SI') satisfactorios++;
+                else if (vUp === 'NO') noSatisfactorios++;
+                else if (vUp === 'NA' || vUp === 'N/A') noAplica++;
               });
             } else {
               totalAspectos++;
               let defaultColKey = base;
               if (templateConfig.tipo === 'matrix' && templateConfig.columnas && templateConfig.columnas[0]) {
-                 defaultColKey = `${base}__${templateConfig.columnas[0]}`;
+                defaultColKey = `${base}__${templateConfig.columnas[0]}`;
               }
               const fallbackColKey = (templateConfig.tipo === 'matrix' && templateConfig.columnas && templateConfig.columnas[0]) ? `${fila}__${templateConfig.columnas[0]}` : fila;
-              
               const val = answers[defaultColKey] || answers[base] || answers[fallbackColKey] || answers[fila];
-              if (val === 'SI') satisfactorios++;
-              else if (val === 'NO') noSatisfactorios++;
-              else if (val === 'NA') noAplica++;
+              const vUp = String(val || '').trim().toUpperCase();
+              if (vUp === 'SI') satisfactorios++;
+              else if (vUp === 'NO') noSatisfactorios++;
+              else if (vUp === 'NA' || vUp === 'N/A') noAplica++;
             }
           });
         }
@@ -309,12 +376,16 @@ export async function GET(request) {
     }
 
     const denominador = totalAspectos - noAplica;
-    const calificacionPorcentaje = denominador > 0 ? Math.round((satisfactorios / denominador) * 100) : (totalAspectos > 0 ? 100 : 0);
+    // For BPM: use avg score out of 5 → percentage. For classic: satisfactorios / denominador
+    const promedioBPM = respondidosBPM > 0 ? (sumPuntaje / respondidosBPM) : 0;
+    const calificacionPorcentaje = isBPMScale
+      ? (respondidosBPM > 0 ? Math.round((promedioBPM / 5) * 100) : 0)
+      : (denominador > 0 ? Math.round((satisfactorios / denominador) * 100) : (totalAspectos > 0 ? 100 : 0));
 
-    // Populate score table cells on main worksheet (only in the bottom scoring summary section)
-    for (let r = 15; r <= sheet.rowCount; r++) {
+    // Populate score table cells on main worksheet (summary section at the bottom)
+    for (let r = 12; r <= sheet.rowCount; r++) {
       const row = sheet.getRow(r);
-      let masters = [];
+      const masters = [];
       for (let c = 1; c <= sheet.columnCount; c++) {
         const cell = row.getCell(c);
         if (!cell.isMerged || cell.master === cell) {
@@ -335,38 +406,44 @@ export async function GET(request) {
         const vUp = m.val.toUpperCase();
 
         if (vUp.includes('TOTAL ASPECTOS')) {
-          if (masters[i + 1]) {
-            masters[i + 1].cell.value = totalAspectos;
-          }
+          if (masters[i + 1]) masters[i + 1].cell.value = totalAspectos;
           if (masters[i + 2] && !masters[i + 2].val.toUpperCase().includes('CALIFICAC') && !masters[i + 2].val.toUpperCase().includes('RECOMEND')) {
             masters[i + 2].cell.value = `${totalAspectos > 0 ? 100 : 0}%`;
           }
+        } else if (isBPMScale && (vUp.includes('PROMEDIO') || vUp === 'PUNTAJE' || vUp.includes('PUNTAJE PROM'))) {
+          // BPM: show average score
+          if (masters[i + 1]) masters[i + 1].cell.value = promedioBPM > 0 ? promedioBPM.toFixed(1) : '-';
         } else if (vUp === 'SATISFACTORIO:' || vUp === 'SATISFACTORIO' || vUp === 'SATISFACTORIO ') {
-          if (masters[i + 1]) {
-            masters[i + 1].cell.value = satisfactorios;
+          if (isBPMScale) {
+            // For BPM, "SATISFACTORIO" row shows count of responded items and avg score
+            if (masters[i + 1]) masters[i + 1].cell.value = respondidosBPM;
+            if (masters[i + 2] && !masters[i + 2].val.toUpperCase().includes('RECOMEND') && !masters[i + 2].val.toUpperCase().includes('SATISF')) {
+              masters[i + 2].cell.value = promedioBPM > 0 ? `Prom: ${promedioBPM.toFixed(1)}/5` : '-';
+            }
+          } else {
+            if (masters[i + 1]) masters[i + 1].cell.value = satisfactorios;
+            if (masters[i + 2] && !masters[i + 2].val.toUpperCase().includes('RECOMEND') && !masters[i + 2].val.toUpperCase().includes('SATISF')) {
+              masters[i + 2].cell.value = `${totalAspectos > 0 ? Math.round((satisfactorios / totalAspectos) * 100) : 0}%`;
+            }
           }
-          if (masters[i + 2] && !masters[i + 2].val.toUpperCase().includes('RECOMEND') && !masters[i + 2].val.toUpperCase().includes('SATISF')) {
-            masters[i + 2].cell.value = `${totalAspectos > 0 ? Math.round((satisfactorios / totalAspectos) * 100) : 0}%`;
-          }
-        } else if (vUp.includes('NO SATISF')) {
-          if (masters[i + 1]) {
-            masters[i + 1].cell.value = noSatisfactorios;
-          }
+        } else if (!isBPMScale && vUp.includes('NO SATISF')) {
+          if (masters[i + 1]) masters[i + 1].cell.value = noSatisfactorios;
           if (masters[i + 2] && !masters[i + 2].val.toUpperCase().includes('RECOMEND') && !masters[i + 2].val.toUpperCase().includes('APLICA')) {
             masters[i + 2].cell.value = `${totalAspectos > 0 ? Math.round((noSatisfactorios / totalAspectos) * 100) : 0}%`;
           }
-        } else if (vUp === 'NO APLICA:' || vUp === 'NO APLICA' || vUp === 'NO APLICA ') {
-          if (masters[i + 1]) {
-            masters[i + 1].cell.value = noAplica;
-          }
+        } else if (vUp === 'NO APLICA:' || vUp === 'NO APLICA' || vUp === 'NO APLICA ' || vUp === 'N/A:' || vUp === 'NA:') {
+          if (masters[i + 1]) masters[i + 1].cell.value = noAplica;
           if (masters[i + 2] && !masters[i + 2].val.toUpperCase().includes('RECOMEND')) {
             masters[i + 2].cell.value = `${totalAspectos > 0 ? Math.round((noAplica / totalAspectos) * 100) : 0}%`;
           }
-        } else if (vUp.includes('CALIFICAC')) {
+        } else if (vUp.includes('CALIFICAC') || vUp.includes('% CALIFICAC') || vUp === 'RESULTADO') {
+          const scoreLabel = isBPMScale
+            ? `${calificacionPorcentaje}% (Prom ${promedioBPM.toFixed(1)}/5)`
+            : `${calificacionPorcentaje}%`;
           if (masters[i + 1] && !masters[i + 1].val.toUpperCase().includes('RECOMEND')) {
-            masters[i + 1].cell.value = `${calificacionPorcentaje}%`;
+            masters[i + 1].cell.value = scoreLabel;
           } else {
-            m.cell.value = `CALIFICACIÓN= ${calificacionPorcentaje}%`;
+            m.cell.value = `CALIFICACIÓN= ${scoreLabel}`;
           }
         }
       }
@@ -442,6 +519,16 @@ export async function GET(request) {
     let count = 0;
     const auditorDateStr = `${visit.auditor_nombre || 'Auditor'} (${new Date(visit.fecha).toLocaleDateString('es-ES')})`;
 
+    // Helper: label for answer value in the observations summary
+    const labelAns = (val) => {
+      const v = String(val || '').trim().toUpperCase();
+      if (v === 'SI') return '🟢 CUMPLE';
+      if (v === 'NO') return '❌ NO CUMPLE';
+      if (v === 'NA' || v === 'N/A') return '🔘 N/A';
+      if (['1','2','3','4','5'].includes(v)) return `⭐ Puntaje: ${v}/5`;
+      return val || 'Sin responder';
+    };
+
     if (templateConfig && templateConfig.secciones) {
       templateConfig.secciones.forEach((sec, sIdx) => {
         const secName = sec.nombre || 'General';
@@ -452,10 +539,11 @@ export async function GET(request) {
             if (templateConfig.secciones.length > 1) base = `${fila}__sec_${sIdx}`;
 
             if (hasSubTabs) {
+              // Classic matrix with real sub-area tabs
               templateConfig.columnas.forEach((col) => {
                 const answerKey = `${base}__${col}`;
                 const fallbackKey = `${fila}__${col}`;
-                const userAns = answers[answerKey] || answers[fallbackKey] || 'Sin responder';
+                const userAns = answers[answerKey] || answers[fallbackKey] || '';
                 const userObs = answers[`${answerKey}__obs`] || answers[`${answerKey}_obs`] || answers[`${fallbackKey}__obs`] || answers[`${fallbackKey}_obs`] || '';
 
                 if (userObs && String(userObs).trim() !== '') {
@@ -465,11 +553,10 @@ export async function GET(request) {
                     seccion: secName,
                     subarea: col,
                     item: fila,
-                    estado: userAns === 'SI' ? '🟢 CUMPLE' : (userAns === 'NO' ? '❌ NO CUMPLE' : (userAns === 'NA' ? '🔘 N/A' : userAns)),
+                    estado: labelAns(userAns),
                     obs: String(userObs).trim(),
                     auditor: auditorDateStr
                   });
-
                   newRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
                     cell.font = { name: 'Arial', size: 10, color: { argb: 'FF334155' } };
                     cell.border = {
@@ -485,13 +572,14 @@ export async function GET(request) {
                 }
               });
             } else {
+              // Simple checklist or BPM (1-5): one answer + obs per row
               let defaultColKey = base;
               if (templateConfig.tipo === 'matrix' && templateConfig.columnas && templateConfig.columnas[0]) {
-                 defaultColKey = `${base}__${templateConfig.columnas[0]}`;
+                defaultColKey = `${base}__${templateConfig.columnas[0]}`;
               }
               const fallbackColKey = (templateConfig.tipo === 'matrix' && templateConfig.columnas && templateConfig.columnas[0]) ? `${fila}__${templateConfig.columnas[0]}` : fila;
-              
-              const userAns = answers[defaultColKey] || answers[base] || answers[fallbackColKey] || answers[fila] || 'Sin responder';
+
+              const userAns = answers[defaultColKey] || answers[base] || answers[fallbackColKey] || answers[fila] || '';
               const userObs = answers[`${defaultColKey}__obs`] || answers[`${base}__obs`] || answers[`${base}_obs`] || answers[`${fallbackColKey}__obs`] || answers[`${fila}__obs`] || answers[`${fila}_obs`] || '';
 
               if (userObs && String(userObs).trim() !== '') {
@@ -500,11 +588,10 @@ export async function GET(request) {
                   num: count,
                   seccion: secName,
                   item: fila,
-                  estado: userAns === 'SI' ? '🟢 CUMPLE' : (userAns === 'NO' ? '❌ NO CUMPLE' : (userAns === 'NA' ? '🔘 N/A' : userAns)),
+                  estado: labelAns(userAns),
                   obs: String(userObs).trim(),
                   auditor: auditorDateStr
                 });
-
                 newRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
                   cell.font = { name: 'Arial', size: 10, color: { argb: 'FF334155' } };
                   cell.border = {

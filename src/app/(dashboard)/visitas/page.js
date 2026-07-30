@@ -445,6 +445,12 @@ const calculateVisitScore = (visit, plantillas) => {
       return cStr.includes('SATISFACTORIO') || cStr.includes('OBSERVACION') || cStr === 'NA' || cStr === 'N/A';
     });
 
+    // Detect BPM scale (1-5) from template columns
+    const isBPMScaleGlobal = Array.isArray(firstField.columnas) && firstField.columnas.some(c => {
+      const u = String(c || '').toUpperCase();
+      return u === 'SATISFACTORIO' || u === 'NA' || u === 'N/A' || ['1','2','3','4','5'].includes(u);
+    });
+
     if (Array.isArray(firstField.secciones)) {
       if (hasSubareaTabs && Array.isArray(firstField.columnas)) {
         firstField.columnas.forEach((col, idx) => {
@@ -463,9 +469,10 @@ const calculateVisitScore = (visit, plantillas) => {
                 totalAspectos++;
                 const baseKey = hasMultiSec ? `${fila}__sec_${sIdx}` : fila;
                 const val = data[`${baseKey}__${col}`] || data[`${fila}__${col}`];
-                if (val === 'SI') { colSi++; satisfactorios++; }
-                else if (val === 'NO') { colNo++; noSatisfactorios++; }
-                else if (val === 'NA') { colNa++; noAplica++; }
+                const vUp = String(val || '').trim().toUpperCase();
+                if (vUp === 'SI') { colSi++; satisfactorios++; }
+                else if (vUp === 'NO') { colNo++; noSatisfactorios++; }
+                else if (vUp === 'NA' || vUp === 'N/A') { colNa++; noAplica++; }
               });
             }
           });
@@ -488,11 +495,16 @@ const calculateVisitScore = (visit, plantillas) => {
           });
         });
       } else {
+        let sumPuntajeBPM = 0;
+        let respondidosBPM = 0;
+
         firstField.secciones.forEach((sec, idx) => {
           let secTotal = 0;
           let secSi = 0;
           let secNo = 0;
           let secNa = 0;
+          let secSumBPM = 0;
+          let secRespondidosBPM = 0;
           const hasMultiSec = firstField.secciones.length > 1;
           if (sec && Array.isArray(sec.filas)) {
             sec.filas.forEach(fila => {
@@ -502,14 +514,35 @@ const calculateVisitScore = (visit, plantillas) => {
               secTotal++;
               totalAspectos++;
               const baseKey = hasMultiSec ? `${fila}__sec_${idx}` : fila;
-              const val = data[baseKey] || data[fila] || (Array.isArray(firstField.columnas) && firstField.columnas[0] ? (data[`${baseKey}__${firstField.columnas[0]}`] || data[`${fila}__${firstField.columnas[0]}`]) : null);
-              if (val === 'SI') { secSi++; satisfactorios++; }
-              else if (val === 'NO') { secNo++; noSatisfactorios++; }
-              else if (val === 'NA') { secNa++; noAplica++; }
+              const colKey = Array.isArray(firstField.columnas) && firstField.columnas[0] ? `${baseKey}__${firstField.columnas[0]}` : null;
+              const val = (colKey ? (data[colKey] || data[`${fila}__${firstField.columnas[0]}`]) : null) || data[baseKey] || data[fila];
+              const vUp = String(val || '').trim().toUpperCase();
+
+              if (isBPMScaleGlobal) {
+                if (vUp === 'NA' || vUp === 'N/A') { secNa++; noAplica++; }
+                else {
+                  const num = parseInt(vUp, 10);
+                  if (!isNaN(num) && num >= 1 && num <= 5) {
+                    secSumBPM += num; secRespondidosBPM++;
+                    sumPuntajeBPM += num; respondidosBPM++;
+                    secSi++; satisfactorios++;
+                  }
+                }
+              } else {
+                if (vUp === 'SI') { secSi++; satisfactorios++; }
+                else if (vUp === 'NO') { secNo++; noSatisfactorios++; }
+                else if (vUp === 'NA' || vUp === 'N/A') { secNa++; noAplica++; }
+              }
             });
           }
-          const secDenom = secTotal - secNa;
-          const secPor = secDenom > 0 ? Math.round((secSi / secDenom) * 100) : (secSi > 0 ? 100 : 0);
+
+          let secPor;
+          if (isBPMScaleGlobal) {
+            secPor = secRespondidosBPM > 0 ? Math.round((secSumBPM / secRespondidosBPM / 5) * 100) : 0;
+          } else {
+            const secDenom = secTotal - secNa;
+            secPor = secDenom > 0 ? Math.round((secSi / secDenom) * 100) : (secSi > 0 ? 100 : 0);
+          }
           let badgeCol = '#15803D';
           let badgeBgCol = '#DCFCE7';
           if (secPor < 70) { badgeCol = '#991B1B'; badgeBgCol = '#FEE2E2'; }
@@ -523,9 +556,36 @@ const calculateVisitScore = (visit, plantillas) => {
             noAplica: secNa,
             porcentaje: secPor,
             badgeColor: badgeCol,
-            badgeBg: badgeBgCol
+            badgeBg: badgeBgCol,
+            promedioBPM: secRespondidosBPM > 0 ? (secSumBPM / secRespondidosBPM).toFixed(1) : null,
+            isBPMScale: isBPMScaleGlobal
           });
         });
+
+        if (isBPMScaleGlobal) {
+          const promGlobal = respondidosBPM > 0 ? sumPuntajeBPM / respondidosBPM : 0;
+          const porcentaje = respondidosBPM > 0 ? Math.round((promGlobal / 5) * 100) : 0;
+          let badgeColor = '#15803D';
+          let badgeBg = '#DCFCE7';
+          let stars = '⭐⭐⭐⭐⭐';
+          if (porcentaje < 70) { badgeColor = '#991B1B'; badgeBg = '#FEE2E2'; stars = '⭐⭐'; }
+          else if (porcentaje < 90) { badgeColor = '#92400E'; badgeBg = '#FEF3C7'; stars = '⭐⭐⭐⭐'; }
+          return {
+            totalAspectos,
+            satisfactorios: respondidosBPM,
+            noSatisfactorios: 0,
+            noAplica,
+            evaluados: respondidosBPM + noAplica,
+            porcentaje,
+            promedioBPM: respondidosBPM > 0 ? (sumPuntajeBPM / respondidosBPM).toFixed(1) : null,
+            isBPMScale: true,
+            badgeColor,
+            badgeBg,
+            stars,
+            seccionesScores,
+            isChecklist: true
+          };
+        }
       }
     }
 
@@ -780,13 +840,31 @@ const MatrixChecklistForm = ({
   const safeColumnas = Array.isArray(template?.columnas) ? template.columnas : [];
   const safeSecciones = Array.isArray(template?.secciones) ? template.secciones : [];
 
-  const hasSubareaTabs = safeColumnas.length > 0 &&
+  // Detect BPM (1-5 scale):
+  // 1) By template code (DCM-F-DPR-25 is the BPM checklist)
+  // 2) By template name containing 'BPM'
+  // 3) By columns containing 'SATISFACTORIO', 'NA', 'N/A', or numbers 1-5
+  const BPM_CODES = ['DCM-F-DPR-25'];
+  const isBPMScale = (
+    (template?.code && BPM_CODES.includes(String(template.code).toUpperCase())) ||
+    (template?.nombre && String(template.nombre).toUpperCase().includes('BPM')) ||
+    (safeColumnas.length > 0 && safeColumnas.some(c => {
+      const u = String(c || '').toUpperCase();
+      return u === 'SATISFACTORIO' || u === 'NA' || u === 'N/A' || ['1','2','3','4','5'].includes(u);
+    }))
+  );
+
+  const hasSubareaTabs = !isBPMScale && safeColumnas.length > 0 &&
     !safeColumnas.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
 
   const getAnswerKey = (fila, sec, sIdx) => {
     let base = fila;
     if (safeSecciones.length > 1 && sec !== undefined) {
       base = `${fila}__sec_${sIdx}`;
+    }
+    // BPM: answer stored directly on base key (no column suffix needed)
+    if (isBPMScale) {
+      return base;
     }
     if (hasSubareaTabs) {
       return `${base}__${activeTab}`;
@@ -799,13 +877,161 @@ const MatrixChecklistForm = ({
 
   const handleRadioChange = (key, val, fila) => {
     onChange(key, val);
-    if (!hasSubareaTabs && safeSecciones.length <= 1 && key !== fila) {
+    if (!hasSubareaTabs && !isBPMScale && safeSecciones.length <= 1 && key !== fila) {
       onChange(fila, val);
     }
   };
 
+  // BPM numeric score buttons config
+  const BPM_LEVELS = [
+    { value: '1', label: '1', color: '#c62828', bg: '#ffebee', title: '1 - Muy deficiente' },
+    { value: '2', label: '2', color: '#e65100', bg: '#fff3e0', title: '2 - Deficiente' },
+    { value: '3', label: '3', color: '#f9a825', bg: '#fffde7', title: '3 - Regular' },
+    { value: '4', label: '4', color: '#2e7d32', bg: '#e8f5e9', title: '4 - Bueno' },
+    { value: '5', label: '5', color: '#1565c0', bg: '#e3f2fd', title: '5 - Excelente' },
+    { value: 'NA', label: 'N/A', color: '#616161', bg: '#f5f5f5', title: 'No aplica' },
+  ];
+
+
   return (
     <div className="matrix-checklist-container" style={{ width: '100%', margin: '0 auto' }}>
+      <style>{`
+        /* BPM Responsive Styles */
+        .bpm-header-desktop { display: flex; align-items: center; gap: 10px; }
+        .bpm-header-mobile { display: none; }
+        .bpm-header-container { background-color: #f8fafc; border-bottom-color: #e2e8f0; }
+        .bpm-col-headers-desktop { display: flex; gap: 6px; padding-right: 4px; }
+        .bpm-col-headers-mobile { display: none; }
+        
+        .bpm-item-container {
+          display: flex;
+          flex-direction: row;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: space-between;
+        }
+        .bpm-item-text {
+          flex: 1;
+          padding-right: 15px;
+          font-size: 0.85rem;
+          font-weight: 500;
+          color: #334155;
+          line-height: 1.3;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+        }
+        .bpm-icon-mobile { display: none; }
+        .bpm-item-buttons {
+          display: flex;
+          gap: 6px;
+          flex-shrink: 0;
+          padding-right: 4px;
+        }
+        .bpm-item-buttons button {
+          width: 30px;
+          height: 30px;
+          font-size: 0.82rem;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          padding: 0;
+        }
+        .bpm-item-buttons button.bpm-btn-na {
+          width: 38px;
+          font-size: 0.65rem;
+        }
+        .bpm-item-input-container {
+          width: 100%;
+          margin-top: 8px;
+          order: 3;
+        }
+        .bpm-item-input-container input {
+          width: 100%;
+          padding: 6px 12px;
+          font-size: 0.78rem;
+          border-radius: 8px;
+          border: 1px solid #e2e8f0;
+          background-color: #f8fafc;
+          outline: none;
+          color: #334155;
+          transition: all 0.15s ease;
+        }
+        .bpm-item-input-container input:focus {
+          border-color: #6B3A2A;
+        }
+
+        @media (max-width: 768px) {
+          .bpm-header-desktop { display: none; }
+          .bpm-header-mobile { display: flex; align-items: center; gap: 10px; }
+          .bpm-header-container.is-bpm { background-color: #f5f3ff !important; border-bottom-color: #ede9fe !important; }
+          
+          .bpm-col-headers-desktop { display: none; }
+          .bpm-col-headers-mobile { display: flex; gap: 8px; width: 100%; flex-wrap: nowrap; }
+
+          .bpm-item-container {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+            flex-wrap: nowrap;
+          }
+          .bpm-item-text {
+            width: 100%;
+            padding-right: 0;
+            font-size: 0.9rem;
+            color: #1e293b;
+            line-height: 1.4;
+            order: 1;
+          }
+          .bpm-icon-mobile {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background-color: #f3e8ff;
+            border-radius: 6px;
+            color: #8b5cf6;
+            flex-shrink: 0;
+          }
+          .bpm-item-input-container {
+            margin-top: 0;
+            order: 2;
+          }
+          .bpm-item-input-container input {
+            padding: 10px 14px;
+            font-size: 0.85rem;
+          }
+          .bpm-item-input-container input:focus {
+            border-color: #8b5cf6;
+          }
+          .bpm-item-buttons {
+            width: 100%;
+            order: 3;
+            gap: 8px;
+            padding-right: 0;
+          }
+          .bpm-item-buttons button {
+            flex: 1;
+            height: 38px;
+            font-size: 0.9rem;
+            box-shadow: none !important;
+          }
+          .bpm-item-buttons button.bpm-btn-na {
+            flex: 0 0 auto;
+            min-width: 50px;
+            font-size: 0.9rem;
+          }
+          /* Override selected button backgrounds for mobile to be white */
+          .bpm-item-buttons button.mobile-selected {
+            background-color: #ffffff !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important;
+          }
+        }
+      `}</style>
       {/* Scrollable sub-area tabs (only when checklist has actual sub-areas) */}
       {hasSubareaTabs && (
         <div className="matrix-tabs-header" style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '20px', borderBottom: '2px solid #E8DDD4', justifyContent: 'flex-start', flexWrap: 'nowrap' }}>
@@ -871,7 +1097,7 @@ const MatrixChecklistForm = ({
 
               {/* Accordion Header */}
               <div
-                className="section-header-bar"
+                className={`section-header-bar ${isBPMScale ? 'bpm-header-container is-bpm' : ''}`}
                 onClick={() => toggleSection(sIdx)}
                 style={{
                   display: 'flex',
@@ -885,7 +1111,8 @@ const MatrixChecklistForm = ({
                   transition: 'background-color 0.15s'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {/* Desktop View (and fallback for non-BPM mobile) */}
+                <div className={isBPMScale ? 'bpm-header-desktop' : ''} style={!isBPMScale ? { display: 'flex', alignItems: 'center', gap: '10px' } : {}}>
                   <span style={{ fontSize: '0.8rem', color: '#6B3A2A', fontWeight: 'bold' }}>
                     {isCollapsed ? '▶' : '▼'}
                   </span>
@@ -893,6 +1120,35 @@ const MatrixChecklistForm = ({
                     {sec?.nombre || `Sección ${sIdx + 1}`}
                   </h5>
                 </div>
+                
+                {/* Mobile View (BPM only) */}
+                {isBPMScale && (
+                  <>
+                    <div className="bpm-header-mobile">
+                      <span style={{ color: '#7c3aed', display: 'flex', alignItems: 'center' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+                          <path d="M9 22v-4h6v4"></path>
+                          <path d="M8 6h.01"></path>
+                          <path d="M16 6h.01"></path>
+                          <path d="M12 6h.01"></path>
+                          <path d="M12 10h.01"></path>
+                          <path d="M12 14h.01"></path>
+                          <path d="M16 10h.01"></path>
+                          <path d="M16 14h.01"></path>
+                          <path d="M8 10h.01"></path>
+                          <path d="M8 14h.01"></path>
+                        </svg>
+                      </span>
+                      <h5 style={{ margin: 0, color: '#6d28d9', fontSize: '0.88rem', fontWeight: '800', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                        {sec?.nombre || `Sección ${sIdx + 1}`}
+                      </h5>
+                    </div>
+                    <span className="bpm-header-mobile" style={{ color: '#6d28d9', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                      {isCollapsed ? '▼' : '▲'}
+                    </span>
+                  </>
+                )}
               </div>
 
               {/* Column Headers + Rows (when not collapsed) */}
@@ -900,14 +1156,32 @@ const MatrixChecklistForm = ({
                 <div className="section-content animate-fade-in">
 
                   {/* Column Headers Badge Row */}
-                  <div className="section-column-headers" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 18px 8px', backgroundColor: '#ffffff', borderBottom: '1px solid #f1f5f9' }}>
+                  <div className="section-column-headers" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', backgroundColor: '#ffffff', borderBottom: '1px solid #f1f5f9' }}>
                     <div style={{ flex: 1 }}></div>
-                    <div style={{ display: 'flex', width: '150px', justifyContent: 'space-between', paddingRight: '4px' }}>
-                      <span style={{ backgroundColor: '#d4edda', color: '#155724', padding: '2px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700', width: '42px', textAlign: 'center' }}>SÍ</span>
-                      <span style={{ backgroundColor: '#f8d7da', color: '#721c24', padding: '2px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700', width: '42px', textAlign: 'center' }}>NO</span>
-                      <span style={{ backgroundColor: '#e2e3e5', color: '#383d41', padding: '2px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700', width: '42px', textAlign: 'center' }}>N/A</span>
-                    </div>
+                    {isBPMScale ? (
+                      <>
+                        {/* Desktop View */}
+                        <div className="bpm-col-headers-desktop">
+                          {BPM_LEVELS.map(lvl => (
+                            <span key={lvl.value} style={{ backgroundColor: lvl.bg, color: lvl.color, padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: '700', minWidth: '34px', textAlign: 'center' }}>{lvl.label}</span>
+                          ))}
+                        </div>
+                        {/* Mobile View */}
+                        <div className="bpm-col-headers-mobile">
+                          {BPM_LEVELS.map(lvl => (
+                            <span key={lvl.value} style={{ backgroundColor: lvl.bg, color: lvl.color, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '12px', fontSize: '0.85rem', fontWeight: '700', flex: lvl.value === 'NA' ? '0 0 auto' : '1', minWidth: lvl.value === 'NA' ? '50px' : '36px', height: '32px' }}>{lvl.label}</span>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ display: 'flex', width: '150px', justifyContent: 'space-between', paddingRight: '4px' }}>
+                        <span style={{ backgroundColor: '#d4edda', color: '#155724', padding: '2px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700', width: '42px', textAlign: 'center' }}>SÍ</span>
+                        <span style={{ backgroundColor: '#f8d7da', color: '#721c24', padding: '2px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700', width: '42px', textAlign: 'center' }}>NO</span>
+                        <span style={{ backgroundColor: '#e2e3e5', color: '#383d41', padding: '2px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700', width: '42px', textAlign: 'center' }}>N/A</span>
+                      </div>
+                    )}
                   </div>
+
 
                   {/* Item Rows */}
                   <div className="section-rows">
@@ -916,121 +1190,175 @@ const MatrixChecklistForm = ({
                       const currentValue = answers ? (answers[answerKey] !== undefined ? answers[answerKey] : (!hasSubareaTabs && safeSecciones.length <= 1 ? (answers[fila] || '') : '')) : '';
 
                       return (
-                        <div key={fIdx} className="checklist-row-item" style={{ display: 'flex', flexDirection: 'column', padding: '12px 18px', borderBottom: fIdx === safeFilas.length - 1 ? 'none' : '1px solid #f1f5f9', transition: 'background-color 0.15s' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: '500', color: '#334155', flex: '1', lineHeight: '1.3', paddingRight: '15px' }}>{fila}</span>
-
-                            <div className="radio-buttons-group" style={{ display: 'flex', width: '150px', justifyContent: 'space-between', flexShrink: 0, paddingRight: '4px' }}>
-
-                              {/* SÍ Radio Button */}
-                              <div style={{ width: '42px', display: 'flex', justifyContent: 'center' }}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRadioChange(answerKey, currentValue === 'SI' ? '' : 'SI', fila)}
-                                  title="Sí: Cumple"
-                                  style={{
-                                    width: '24px',
-                                    height: '24px',
-                                    borderRadius: '50%',
-                                    border: currentValue === 'SI' ? '2px solid #2e7d32' : '2px solid #cbd5e1',
-                                    backgroundColor: currentValue === 'SI' ? '#e8f5e9' : '#ffffff',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s ease',
-                                    padding: 0
-                                  }}
-                                >
-                                  {currentValue === 'SI' && (
-                                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#2e7d32', display: 'block' }}></span>
-                                  )}
-                                </button>
+                        <div key={fIdx} className="checklist-row-item" style={{ display: 'flex', flexDirection: 'column', padding: '16px 18px', borderBottom: fIdx === safeFilas.length - 1 ? 'none' : '1px solid #f1f5f9', transition: 'background-color 0.15s', gap: isBPMScale ? '12px' : '0' }}>
+                          {isBPMScale ? (
+                            <div className="bpm-item-container">
+                              <div className="bpm-item-text">
+                                <span>{fila}</span>
+                                <span className="bpm-icon-mobile">
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    <polyline points="10 9 9 9 8 9"></polyline>
+                                  </svg>
+                                </span>
                               </div>
-
-                              {/* NO Radio Button */}
-                              <div style={{ width: '42px', display: 'flex', justifyContent: 'center' }}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRadioChange(answerKey, currentValue === 'NO' ? '' : 'NO', fila)}
-                                  title="NO: No cumple"
-                                  style={{
-                                    width: '24px',
-                                    height: '24px',
-                                    borderRadius: '50%',
-                                    border: currentValue === 'NO' ? '2px solid #c62828' : '2px solid #cbd5e1',
-                                    backgroundColor: currentValue === 'NO' ? '#ffebee' : '#ffffff',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s ease',
-                                    padding: 0
-                                  }}
-                                >
-                                  {currentValue === 'NO' && (
-                                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#c62828', display: 'block' }}></span>
-                                  )}
-                                </button>
+                              <div className="bpm-item-buttons">
+                                {BPM_LEVELS.map(lvl => {
+                                  const isSelected = currentValue === lvl.value;
+                                  return (
+                                    <button
+                                      key={lvl.value}
+                                      type="button"
+                                      className={`${lvl.value === 'NA' ? 'bpm-btn-na' : ''} ${isSelected ? 'mobile-selected' : ''}`}
+                                      onClick={() => handleRadioChange(answerKey, isSelected ? '' : lvl.value, fila)}
+                                      title={lvl.title}
+                                      style={{
+                                        border: isSelected ? `2px solid ${lvl.color}` : '2px solid #cbd5e1',
+                                        backgroundColor: isSelected ? lvl.bg : '#ffffff',
+                                        color: isSelected ? lvl.color : '#94a3b8',
+                                        boxShadow: isSelected ? `0 0 0 3px ${lvl.bg}` : 'none'
+                                      }}
+                                    >
+                                      {lvl.label}
+                                    </button>
+                                  );
+                                })}
                               </div>
-
-                              {/* N/A Radio Button */}
-                              <div style={{ width: '42px', display: 'flex', justifyContent: 'center' }}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRadioChange(answerKey, currentValue === 'NA' ? '' : 'NA', fila)}
-                                  title="N/A: No aplica"
-                                  style={{
-                                    width: '24px',
-                                    height: '24px',
-                                    borderRadius: '50%',
-                                    border: currentValue === 'NA' ? '2px solid #616161' : '2px solid #cbd5e1',
-                                    backgroundColor: currentValue === 'NA' ? '#f5f5f5' : '#ffffff',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s ease',
-                                    padding: 0
+                              <div className="bpm-item-input-container">
+                                <input
+                                  type="text"
+                                  placeholder="💬 Observación o hallazgo para este ítem (opcional)..."
+                                  value={answers ? (answers[`${answerKey}__obs`] !== undefined ? answers[`${answerKey}__obs`] : (!hasSubareaTabs && safeSecciones.length <= 1 ? (answers[`${fila}__obs`] || '') : '')) : ''}
+                                  onChange={(e) => {
+                                    onChange(`${answerKey}__obs`, e.target.value);
+                                    if (!hasSubareaTabs && safeSecciones.length <= 1 && `${answerKey}__obs` !== `${fila}__obs`) {
+                                      onChange(`${fila}__obs`, e.target.value);
+                                    }
                                   }}
-                                >
-                                  {currentValue === 'NA' && (
-                                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#616161', display: 'block' }}></span>
-                                  )}
-                                </button>
+                                />
                               </div>
-
                             </div>
-                          </div>
+                          ) : (
+                            <>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                <span style={{ fontSize: '0.85rem', fontWeight: '500', color: '#334155', flex: '1', lineHeight: '1.3', paddingRight: '15px' }}>{fila}</span>
 
-                          {/* Campo de observación independiente para cada ítem */}
-                          <div style={{ marginTop: '8px', width: '100%' }}>
-                            <input
-                              type="text"
-                              placeholder="💬 Observación o hallazgo para este ítem (opcional)..."
-                              value={answers ? (answers[`${answerKey}__obs`] !== undefined ? answers[`${answerKey}__obs`] : (!hasSubareaTabs && safeSecciones.length <= 1 ? (answers[`${fila}__obs`] || '') : '')) : ''}
-                              onChange={(e) => {
-                                onChange(`${answerKey}__obs`, e.target.value);
-                                if (!hasSubareaTabs && safeSecciones.length <= 1 && `${answerKey}__obs` !== `${fila}__obs`) {
-                                  onChange(`${fila}__obs`, e.target.value);
-                                }
-                              }}
-                              style={{
-                                width: '100%',
-                                padding: '6px 12px',
-                                fontSize: '0.78rem',
-                                borderRadius: '8px',
-                                border: '1px solid #e2e8f0',
-                                backgroundColor: '#f8fafc',
-                                outline: 'none',
-                                color: '#334155',
-                                transition: 'all 0.15s ease'
-                              }}
-                              onFocus={(e) => e.target.style.borderColor = '#6B3A2A'}
-                              onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                            />
-                          </div>
+                                {/* Classic SÍ / NO / N/A Radio Buttons */}
+                                <div className="radio-buttons-group" style={{ display: 'flex', width: '150px', justifyContent: 'space-between', flexShrink: 0, paddingRight: '4px' }}>
+                                  
+                                  {/* SÍ Radio Button */}
+                                  <div style={{ width: '42px', display: 'flex', justifyContent: 'center' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRadioChange(answerKey, currentValue === 'SI' ? '' : 'SI', fila)}
+                                      title="Sí: Cumple"
+                                      style={{
+                                        width: '24px',
+                                        height: '24px',
+                                        borderRadius: '50%',
+                                        border: currentValue === 'SI' ? '2px solid #2e7d32' : '2px solid #cbd5e1',
+                                        backgroundColor: currentValue === 'SI' ? '#e8f5e9' : '#ffffff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease',
+                                        padding: 0
+                                      }}
+                                    >
+                                      {currentValue === 'SI' && (
+                                        <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#2e7d32', display: 'block' }}></span>
+                                      )}
+                                    </button>
+                                  </div>
 
+                                  {/* NO Radio Button */}
+                                  <div style={{ width: '42px', display: 'flex', justifyContent: 'center' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRadioChange(answerKey, currentValue === 'NO' ? '' : 'NO', fila)}
+                                      title="NO: No cumple"
+                                      style={{
+                                        width: '24px',
+                                        height: '24px',
+                                        borderRadius: '50%',
+                                        border: currentValue === 'NO' ? '2px solid #c62828' : '2px solid #cbd5e1',
+                                        backgroundColor: currentValue === 'NO' ? '#ffebee' : '#ffffff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease',
+                                        padding: 0
+                                      }}
+                                    >
+                                      {currentValue === 'NO' && (
+                                        <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#c62828', display: 'block' }}></span>
+                                      )}
+                                    </button>
+                                  </div>
+
+                                  {/* N/A Radio Button */}
+                                  <div style={{ width: '42px', display: 'flex', justifyContent: 'center' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRadioChange(answerKey, currentValue === 'NA' ? '' : 'NA', fila)}
+                                      title="N/A: No aplica"
+                                      style={{
+                                        width: '24px',
+                                        height: '24px',
+                                        borderRadius: '50%',
+                                        border: currentValue === 'NA' ? '2px solid #616161' : '2px solid #cbd5e1',
+                                        backgroundColor: currentValue === 'NA' ? '#f5f5f5' : '#ffffff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease',
+                                        padding: 0
+                                      }}
+                                    >
+                                      {currentValue === 'NA' && (
+                                        <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#616161', display: 'block' }}></span>
+                                      )}
+                                    </button>
+                                  </div>
+
+                                </div>
+                              </div>
+
+                              {/* Campo de observación independiente para cada ítem */}
+                              <div style={{ marginTop: '8px', width: '100%' }}>
+                                <input
+                                  type="text"
+                                  placeholder="💬 Observación o hallazgo para este ítem (opcional)..."
+                                  value={answers ? (answers[`${answerKey}__obs`] !== undefined ? answers[`${answerKey}__obs`] : (!hasSubareaTabs && safeSecciones.length <= 1 ? (answers[`${fila}__obs`] || '') : '')) : ''}
+                                  onChange={(e) => {
+                                    onChange(`${answerKey}__obs`, e.target.value);
+                                    if (!hasSubareaTabs && safeSecciones.length <= 1 && `${answerKey}__obs` !== `${fila}__obs`) {
+                                      onChange(`${fila}__obs`, e.target.value);
+                                    }
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '6px 12px',
+                                    fontSize: '0.78rem',
+                                    borderRadius: '8px',
+                                    border: '1px solid #e2e8f0',
+                                    backgroundColor: '#f8fafc',
+                                    outline: 'none',
+                                    color: '#334155',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  onFocus={(e) => e.target.style.borderColor = '#6B3A2A'}
+                                  onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                                />
+                              </div>
+                            </>
+                          )}
                         </div>
                       );
                     })}
@@ -1043,26 +1371,38 @@ const MatrixChecklistForm = ({
       </div>
 
       {/* Legend Bar */}
-      <div className="legend-bar" style={{ display: 'flex', justifyContent: 'center', gap: '24px', padding: '12px 20px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', marginTop: '24px', flexWrap: 'wrap', fontSize: '0.82rem', color: '#4b5563', fontWeight: '600' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #2e7d32', backgroundColor: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#2e7d32' }}></span>
-          </span>
-          <span>Sí: Cumple</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #c62828', backgroundColor: '#ffebee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#c62828' }}></span>
-          </span>
-          <span>NO: No cumple</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #616161', backgroundColor: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#616161' }}></span>
-          </span>
-          <span>N/A: No aplica</span>
-        </div>
+      <div className="legend-bar" style={{ display: 'flex', justifyContent: 'center', gap: '16px', padding: '12px 20px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', marginTop: '24px', flexWrap: 'wrap', fontSize: '0.82rem', color: '#4b5563', fontWeight: '600' }}>
+        {isBPMScale ? (
+          BPM_LEVELS.map(lvl => (
+            <div key={lvl.value} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: '20px', height: '20px', borderRadius: '6px', border: `2px solid ${lvl.color}`, backgroundColor: lvl.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.72rem', fontWeight: '700', color: lvl.color }}>{lvl.label}</span>
+              <span style={{ fontSize: '0.75rem' }}>{lvl.title}</span>
+            </div>
+          ))
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #2e7d32', backgroundColor: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#2e7d32' }}></span>
+              </span>
+              <span>Sí: Cumple</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #c62828', backgroundColor: '#ffebee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#c62828' }}></span>
+              </span>
+              <span>NO: No cumple</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #616161', backgroundColor: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#616161' }}></span>
+              </span>
+              <span>N/A: No aplica</span>
+            </div>
+          </>
+        )}
       </div>
+
 
       {/* Live Score Summary Card */}
       {(() => {
@@ -1074,9 +1414,11 @@ const MatrixChecklistForm = ({
             // El checklist está dividido por columnas/áreas (Ej: Helados, Conos, Bebidas, etc.)
             template.columnas.forEach((col) => {
               let colTotal = 0;
-              let colSi = 0;
+              let colSi = 0; 
               let colNo = 0;
               let colNa = 0;
+              let colPuntos = 0;
+              let isBPM = false;
               if (template.secciones) {
                 template.secciones.forEach((sec, sIdx) => {
                   if (sec.filas) {
@@ -1088,19 +1430,29 @@ const MatrixChecklistForm = ({
                       const val = answers[key] || answers[`${fila}__${col}`];
                       if (val === 'SI') colSi++;
                       else if (val === 'NO') colNo++;
-                      else if (val === 'NA') colNa++;
+                      else if (val === 'NA' || val === 'N/A') colNa++;
+                      else if (['1','2','3','4','5'].includes(val)) {
+                        isBPM = true;
+                        colSi++; // count as answered
+                        colPuntos += parseInt(val);
+                      }
                     });
                   }
                 });
               }
-              const denom = colTotal - colNa;
-              const por = denom > 0 ? Math.round((colSi / denom) * 100) : (colSi > 0 ? 100 : 0);
+              let denom = colTotal - colNa;
+              let maxPoints = isBPM ? denom * 5 : denom;
+              let scoreValue = isBPM ? colPuntos : colSi;
+              const por = maxPoints > 0 ? Math.round((scoreValue / maxPoints) * 100) : (scoreValue > 0 ? 100 : 0);
               liveCategorias.push({
                 nombre: col,
                 total: colTotal,
                 si: colSi,
                 no: colNo,
                 na: colNa,
+                puntos: colPuntos,
+                maxPoints: maxPoints,
+                isBPM: isBPM,
                 porcentaje: por
               });
             });
@@ -1111,6 +1463,8 @@ const MatrixChecklistForm = ({
               let secSi = 0;
               let secNo = 0;
               let secNa = 0;
+              let secPuntos = 0;
+              let isBPM = false;
               if (sec.filas) {
                 sec.filas.forEach(fila => {
                   secTotal++;
@@ -1125,17 +1479,27 @@ const MatrixChecklistForm = ({
                   
                   if (val === 'SI') secSi++;
                   else if (val === 'NO') secNo++;
-                  else if (val === 'NA') secNa++;
+                  else if (val === 'NA' || val === 'N/A') secNa++;
+                  else if (['1','2','3','4','5'].includes(val)) {
+                    isBPM = true;
+                    secSi++; // count as answered
+                    secPuntos += parseInt(val);
+                  }
                 });
               }
-              const denom = secTotal - secNa;
-              const por = denom > 0 ? Math.round((secSi / denom) * 100) : (secSi > 0 ? 100 : 0);
+              let denom = secTotal - secNa;
+              let maxPoints = isBPM ? denom * 5 : denom;
+              let scoreValue = isBPM ? secPuntos : secSi;
+              const por = maxPoints > 0 ? Math.round((scoreValue / maxPoints) * 100) : (scoreValue > 0 ? 100 : 0);
               liveCategorias.push({
                 nombre: sec.nombre || `Formato / Área ${idx + 1}`,
                 total: secTotal,
                 si: secSi,
                 no: secNo,
                 na: secNa,
+                puntos: secPuntos,
+                maxPoints: maxPoints,
+                isBPM: isBPM,
                 porcentaje: por
               });
             });
@@ -1186,12 +1550,12 @@ const MatrixChecklistForm = ({
                         <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#1e293b', marginTop: '2px' }}>{cat.total}</div>
                       </div>
                       <div style={{ backgroundColor: '#f0fdf4', padding: '10px 4px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                        <div style={{ fontSize: '0.7rem', color: '#166534', fontWeight: '700', textTransform: 'uppercase' }}>Cumple</div>
-                        <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#15803d', marginTop: '2px' }}>{cat.si}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#166534', fontWeight: '700', textTransform: 'uppercase' }}>{cat.isBPM ? 'Puntos' : 'Cumple'}</div>
+                        <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#15803d', marginTop: '2px' }}>{cat.isBPM ? cat.puntos : cat.si}</div>
                       </div>
-                      <div style={{ backgroundColor: '#fef2f2', padding: '10px 4px', borderRadius: '8px', border: '1px solid #fecaca' }}>
-                        <div style={{ fontSize: '0.7rem', color: '#991b1b', fontWeight: '700', textTransform: 'uppercase' }}>No Cumple</div>
-                        <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#dc2626', marginTop: '2px' }}>{cat.no}</div>
+                      <div style={{ backgroundColor: cat.isBPM ? '#fefce8' : '#fef2f2', padding: '10px 4px', borderRadius: '8px', border: cat.isBPM ? '1px solid #fef08a' : '1px solid #fecaca' }}>
+                        <div style={{ fontSize: '0.7rem', color: cat.isBPM ? '#854d0e' : '#991b1b', fontWeight: '700', textTransform: 'uppercase' }}>{cat.isBPM ? 'Max Pts' : 'No Cumple'}</div>
+                        <div style={{ fontSize: '1.15rem', fontWeight: '800', color: cat.isBPM ? '#a16207' : '#dc2626', marginTop: '2px' }}>{cat.isBPM ? cat.maxPoints : cat.no}</div>
                       </div>
                       <div style={{ backgroundColor: '#f1f5f9', padding: '10px 4px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
                         <div style={{ fontSize: '0.7rem', color: '#475569', fontWeight: '700', textTransform: 'uppercase' }}>N/A</div>
@@ -3570,7 +3934,11 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                         if (firstField && (firstField.tipo === 'matrix' || firstField.tipo === 'simple_checklist')) {
                           return (
                             <MatrixChecklistForm
-                              template={firstField}
+                              template={{
+                                ...firstField,
+                                code: firstField.code || activePlantilla?.code || activePlantilla?.codigo || '',
+                                nombre: firstField.nombre || activePlantilla?.nombre || ''
+                              }}
                               answers={formAnswers}
                               onChange={handleInputChange}
                               activeTab={activeMatrixTab}
