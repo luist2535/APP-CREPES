@@ -448,7 +448,7 @@ const calculateVisitScore = (visit, plantillas) => {
     // Detect BPM scale (1-5) from template columns
     const isBPMScaleGlobal = Array.isArray(firstField.columnas) && firstField.columnas.some(c => {
       const u = String(c || '').toUpperCase();
-      return u === 'SATISFACTORIO' || u === 'NA' || u === 'N/A' || ['1','2','3','4','5'].includes(u);
+      return u === 'SATISFACTORIO' || ['1','2','3','4','5'].includes(u);
     });
 
     if (Array.isArray(firstField.secciones)) {
@@ -850,7 +850,7 @@ const MatrixChecklistForm = ({
     (template?.nombre && String(template.nombre).toUpperCase().includes('BPM')) ||
     (safeColumnas.length > 0 && safeColumnas.some(c => {
       const u = String(c || '').toUpperCase();
-      return u === 'SATISFACTORIO' || u === 'NA' || u === 'N/A' || ['1','2','3','4','5'].includes(u);
+      return u === 'SATISFACTORIO' || ['1','2','3','4','5'].includes(u);
     }))
   );
 

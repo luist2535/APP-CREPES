@@ -153,7 +153,7 @@ export async function GET(request) {
     const isBPMScale = Array.isArray(templateConfig.columnas) &&
       templateConfig.columnas.some(c => {
         const u = String(c || '').toUpperCase();
-        return u === 'SATISFACTORIO' || u === 'NA' || u === 'N/A' || ['1','2','3','4','5'].includes(u);
+        return u === 'SATISFACTORIO' || ['1','2','3','4','5'].includes(u);
       });
 
     // Find column mapping from sheet
@@ -211,51 +211,71 @@ export async function GET(request) {
         .trim();
     };
 
+    // Helper: get answer by key (normalized)
     const normalizedAnswers = {};
     for (const key in answers) {
       normalizedAnswers[normalizeString(key)] = answers[key];
     }
     const getAns = (k) => normalizedAnswers[normalizeString(k)];
 
-    // Helper: resolve answer and observation for an item
-    const resolveAns = (itemName, subArea) => {
-      const multiSec = templateConfig.secciones && templateConfig.secciones.length > 1;
+    // Helper: resolve answer and observation for a plantilla fila item
+    // Uses the stored plantilla key (fila name + optional sec index), NOT the Excel cell text
+    const resolveAnsByFila = (fila, sIdx, multiSec) => {
+      const base = multiSec ? `${fila}__sec_${sIdx}` : fila;
       let ans = '';
       let obs = '';
 
-      if (subArea) {
-        // Matrix with sub-areas
-        ans = getAns(`${itemName}__${subArea}`) || '';
-        obs = getAns(`${itemName}__${subArea}__obs`) || getAns(`${itemName}__${subArea}_obs`) || '';
-        if (!ans && multiSec) {
-          for (let i = 0; i < templateConfig.secciones.length; i++) {
-            const k = `${itemName}__sec_${i}__${subArea}`;
-            if (getAns(k)) { ans = getAns(k); obs = getAns(`${k}__obs`) || getAns(`${k}_obs`) || obs; break; }
-          }
+      if (isBPMScale) {
+        // BPM: answer stored directly on base key (no column suffix)
+        ans = getAns(base) || getAns(fila) || '';
+        // Also try with first column key in case it was stored that way
+        if (!ans && templateConfig.columnas && templateConfig.columnas[0] &&
+            !['1','2','3','4','5','NA','N/A','SATISFACTORIO','OBSERVACIONES'].includes(String(templateConfig.columnas[0]).toUpperCase())) {
+          ans = getAns(`${base}__${templateConfig.columnas[0]}`) || getAns(`${fila}__${templateConfig.columnas[0]}`) || '';
         }
+        obs = getAns(`${base}__obs`) || getAns(`${base}_obs`) || getAns(`${fila}__obs`) || getAns(`${fila}_obs`) || '';
+      } else if (isMatrix && templateConfig.columnas && templateConfig.columnas[0]) {
+        // Matrix-as-checklist: try with column suffix
+        const colKey = `${base}__${templateConfig.columnas[0]}`;
+        const fallColKey = `${fila}__${templateConfig.columnas[0]}`;
+        ans = getAns(colKey) || getAns(base) || getAns(fallColKey) || getAns(fila) || '';
+        obs = getAns(`${colKey}__obs`) || getAns(`${colKey}_obs`) || getAns(`${base}__obs`) || getAns(`${base}_obs`) || getAns(`${fila}__obs`) || '';
       } else {
-        // Simple checklist
-        ans = getAns(itemName) || '';
-        obs = getAns(`${itemName}__obs`) || getAns(`${itemName}_obs`) || '';
-        if (!ans && templateConfig.secciones) {
-          for (let i = 0; i < templateConfig.secciones.length; i++) {
-            const k = `${itemName}__sec_${i}`;
-            if (getAns(k)) { ans = getAns(k); obs = getAns(`${k}__obs`) || getAns(`${k}_obs`) || obs; break; }
-            // Also try with first column key (matrix-as-checklist)
-            const colKey = templateConfig.columnas && templateConfig.columnas[0] ? `${k}__${templateConfig.columnas[0]}` : null;
-            if (colKey && getAns(colKey)) { ans = getAns(colKey); obs = getAns(`${colKey}__obs`) || getAns(`${colKey}_obs`) || obs; break; }
-          }
-        }
-        // Fallback: also check first column key without section index
-        if (!ans && templateConfig.columnas && templateConfig.columnas[0]) {
-          const colKey = `${itemName}__${templateConfig.columnas[0]}`;
-          if (getAns(colKey)) { ans = getAns(colKey); obs = getAns(`${colKey}__obs`) || getAns(`${colKey}_obs`) || obs; }
-        }
+        ans = getAns(base) || getAns(fila) || '';
+        obs = getAns(`${base}__obs`) || getAns(`${base}_obs`) || getAns(`${fila}__obs`) || getAns(`${fila}_obs`) || '';
       }
 
       return { ans: String(ans || '').trim(), obs: String(obs || '').trim() };
     };
 
+    // Pre-build section names set (for Excel header row detection) and plantilla item list
+    const multiSec = templateConfig.secciones && templateConfig.secciones.length > 1;
+    const sectionNames = new Set();
+    const plantillaItems = [];
+    if (templateConfig.secciones) {
+      templateConfig.secciones.forEach((sec, sIdx) => {
+        if (sec.nombre) sectionNames.add(normalizeString(sec.nombre));
+        if (sec.filas) {
+          sec.filas.forEach(fila => {
+            const filaUpper = String(fila || '').trim().toUpperCase();
+            if (filaUpper === 'ASPECTO' || filaUpper === 'ASPECTOS' || filaUpper === '') return;
+            plantillaItems.push({ fila, sIdx });
+          });
+        }
+      });
+    }
+
+    // --- STRATEGY: Template-driven positional filling ---
+    // Pre-scan the Excel to identify which rows are checklist items (data rows),
+    // skipping headers, section headers, and footer rows.
+    // Then fill them in the same order as the plantilla secciones/filas.
+
+    // Step A: collect candidate data row numbers from the Excel
+    const SKIP_B_VALUES = new Set(['TOTAL', '% POR AREA', 'ASPECTO', 'ASPECTOS', 'OBSERVACIONES', 'NA', 'N/A']);
+    const STOP_A_VALUES = ['TOTAL', 'PARA DILIGENCIAMIENTO', 'CÓDIGO:', 'Responsable', 'COMENTARIOS'];
+    const SECTION_HEADER_RE = /^[A-ZÁÉÍÓÚÑÜ\s]{4,}$/; // all-caps 4+ chars → section header
+
+    const dataRowNumbers = [];
     for (let r = 6; r <= sheet.rowCount; r++) {
       const cellA = sheet.getRow(r).getCell(1);
       const cellB = sheet.getRow(r).getCell(2);
@@ -263,46 +283,126 @@ export async function GET(request) {
       const valA = cellA.value ? String(cellA.value).trim() : '';
       const valB = cellB.value ? String(cellB.value).trim() : '';
 
+      // Detect comment/stop rows
       if (valA === 'COMENTARIOS:' || valA.startsWith('COMENTARIOS') || valA.includes('Observaciones adicionales')) {
         commentRowIndex = r;
       }
+      if (STOP_A_VALUES.some(s => valA.includes(s))) break;
 
-      if (valA === 'TOTAL' || valA === 'PARA DILIGENCIAMIENTO' || valA === 'CÓDIGO:' || valA.includes('Responsable')) {
-        break;
-      }
+      if (valB === '' || SKIP_B_VALUES.has(valB.toUpperCase())) continue;
 
-      if (valB !== '' && valB !== 'TOTAL' && valB !== '% POR AREA' && valB !== 'ASPECTO' && valB !== 'ASPECTOS') {
-        const itemName = valB;
+      // Skip rows where B looks like a section header:
+      // 1) The normalized valB matches a known section name from the plantilla
+      // 2) Col A is non-empty in same row (section name often in col A on BPM sheets)
+      // 3) Col B is all-uppercase 4+ chars (generic all-caps header)
+      const valBUpper = valB.toUpperCase();
+      const isSectionByName = sectionNames.has(normalizeString(valB));
+      const isAllCapsHeader = SECTION_HEADER_RE.test(valB) && valB.length > 3 && valB === valBUpper;
+      const hasSectionInColA = valA !== '' && !STOP_A_VALUES.some(s => valA.includes(s));
+      if (isSectionByName || isAllCapsHeader || hasSectionInColA) continue;
+
+      dataRowNumbers.push(r);
+    }
+
+    // Step B: fill Excel rows positionally
+    // If counts match, pair by index. If they differ, fall back to text-based matching as best-effort.
+    const usePositional = dataRowNumbers.length === plantillaItems.length;
+
+    if (usePositional) {
+      plantillaItems.forEach(({ fila, sIdx }, idx) => {
+        const r = dataRowNumbers[idx];
+        if (!r) return;
 
         if (isMatrix && !isBPMScale) {
-          // Classic matrix: write X for each sub-area in the correct SI/NO/NA column
+          // Classic matrix: write X for each sub-area
           templateConfig.columnas.forEach((subArea) => {
-            const { ans: userAns } = resolveAns(itemName, subArea);
+            const base = multiSec ? `${fila}__sec_${sIdx}` : fila;
+            const colKey = `${base}__${subArea}`;
+            const fallKey = `${fila}__${subArea}`;
+            const userAns = getAns(colKey) || getAns(fallKey) || '';
             if (userAns) {
               const targetCol = colMappings.find(m => m.subArea === subArea && m.type === userAns.toUpperCase());
               if (targetCol) sheet.getRow(r).getCell(targetCol.colNumber).value = 'X';
             }
           });
         } else {
-          // Simple checklist OR BPM (1-5 scale)
-          const { ans: userAns, obs: userObs } = resolveAns(itemName, isBPMScale && templateConfig.columnas && templateConfig.columnas[0] && !['1','2','3','4','5','NA','N/A','SATISFACTORIO','OBSERVACIONES'].includes(String(templateConfig.columnas[0]).toUpperCase()) ? templateConfig.columnas[0] : null);
-
-          // Write X in the matched numeric/SI/NO/NA column
+          // BPM or simple checklist
+          const { ans: userAns, obs: userObs } = resolveAnsByFila(fila, sIdx, multiSec);
           if (userAns) {
             const normalizedAns = userAns === 'N/A' ? 'NA' : userAns.toUpperCase();
             const targetCol = colMappings.find(m => m.subArea === 'EVALUACION' && m.type === normalizedAns);
             if (targetCol) sheet.getRow(r).getCell(targetCol.colNumber).value = 'X';
           }
-
-          // Write observation text in the OBSERVACIONES column
           if (userObs) {
             const obsCol = colMappings.find(m => m.subArea === 'EVALUACION' && m.type === 'OBSERVACIONES');
-            if (obsCol) {
-              sheet.getRow(r).getCell(obsCol.colNumber).value = userObs;
-            }
+            if (obsCol) sheet.getRow(r).getCell(obsCol.colNumber).value = userObs;
           }
         }
-      }
+      });
+    } else {
+      // Fallback: text-based matching (original logic, normalized)
+      const resolveAnsByText = (itemName, subArea) => {
+        const multiSec2 = templateConfig.secciones && templateConfig.secciones.length > 1;
+        let ans = '';
+        let obs = '';
+        if (subArea) {
+          ans = getAns(`${itemName}__${subArea}`) || '';
+          obs = getAns(`${itemName}__${subArea}__obs`) || getAns(`${itemName}__${subArea}_obs`) || '';
+          if (!ans && multiSec2) {
+            for (let i = 0; i < templateConfig.secciones.length; i++) {
+              const k = `${itemName}__sec_${i}__${subArea}`;
+              if (getAns(k)) { ans = getAns(k); obs = getAns(`${k}__obs`) || getAns(`${k}_obs`) || obs; break; }
+            }
+          }
+        } else {
+          ans = getAns(itemName) || '';
+          obs = getAns(`${itemName}__obs`) || getAns(`${itemName}_obs`) || '';
+          if (!ans && templateConfig.secciones) {
+            for (let i = 0; i < templateConfig.secciones.length; i++) {
+              const k = `${itemName}__sec_${i}`;
+              if (getAns(k)) { ans = getAns(k); obs = getAns(`${k}__obs`) || getAns(`${k}_obs`) || obs; break; }
+              const colKey = templateConfig.columnas && templateConfig.columnas[0] ? `${k}__${templateConfig.columnas[0]}` : null;
+              if (colKey && getAns(colKey)) { ans = getAns(colKey); obs = getAns(`${colKey}__obs`) || getAns(`${colKey}_obs`) || obs; break; }
+            }
+          }
+          if (!ans && templateConfig.columnas && templateConfig.columnas[0]) {
+            const colKey = `${itemName}__${templateConfig.columnas[0]}`;
+            if (getAns(colKey)) { ans = getAns(colKey); obs = getAns(`${colKey}__obs`) || getAns(`${colKey}_obs`) || obs; }
+          }
+        }
+        return { ans: String(ans || '').trim(), obs: String(obs || '').trim() };
+      };
+
+      dataRowNumbers.forEach(r => {
+        const cellB = sheet.getRow(r).getCell(2);
+        const valB = cellB.value ? String(cellB.value).trim() : '';
+        if (!valB) return;
+        const itemName = valB;
+
+        if (isMatrix && !isBPMScale) {
+          templateConfig.columnas.forEach((subArea) => {
+            const { ans: userAns } = resolveAnsByText(itemName, subArea);
+            if (userAns) {
+              const targetCol = colMappings.find(m => m.subArea === subArea && m.type === userAns.toUpperCase());
+              if (targetCol) sheet.getRow(r).getCell(targetCol.colNumber).value = 'X';
+            }
+          });
+        } else {
+          const { ans: userAns, obs: userObs } = resolveAnsByText(itemName,
+            isBPMScale && templateConfig.columnas && templateConfig.columnas[0] &&
+            !['1','2','3','4','5','NA','N/A','SATISFACTORIO','OBSERVACIONES'].includes(String(templateConfig.columnas[0]).toUpperCase())
+              ? templateConfig.columnas[0] : null);
+          if (userAns) {
+            const normalizedAns = userAns === 'N/A' ? 'NA' : userAns.toUpperCase();
+            const targetCol = colMappings.find(m => m.subArea === 'EVALUACION' && m.type === normalizedAns);
+            if (targetCol) sheet.getRow(r).getCell(targetCol.colNumber).value = 'X';
+          }
+          if (userObs) {
+            const obsCol = colMappings.find(m => m.subArea === 'EVALUACION' && m.type === 'OBSERVACIONES');
+            if (obsCol) sheet.getRow(r).getCell(obsCol.colNumber).value = userObs;
+          }
+        }
+      });
     }
 
     // 8. Write general observations/comments at the bottom of main sheet
