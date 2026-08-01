@@ -5176,7 +5176,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                             const data = await res.json();
                                             if (res.ok) {
                                               triggerAlert('Visita Eliminada', 'La visita y todas sus evidencias se han eliminado correctamente.', 'success');
-                                              fetchVisitas();
+                                              loadData();
                                             } else {
                                               triggerAlert('Error al eliminar', data.error || 'Ocurrió un error en el servidor al intentar eliminar la visita.', 'error');
                                             }
@@ -6115,7 +6115,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                             if (res.ok) {
                               triggerAlert('Visita Eliminada', 'La visita se ha eliminado correctamente.', 'success');
                               setSelectedVisit(null);
-                              fetchVisitas();
+                              loadData();
                             } else {
                               triggerAlert('Error al eliminar', data.error || 'Ocurrió un error en el servidor al intentar eliminar la visita.', 'error');
                             }
