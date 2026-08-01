@@ -112,6 +112,7 @@ crepes-app/
 │   ├── uploads/                # Carpeta del sistema de carga Legacy / transitorio
 │   ├── cloudflared.exe         # Ejecutable para túneles de exposición exterior segura
 │   └── logo_crepes_waffles.svg # Identidad visual corporativa
+├── formatos_originales/        # Repositorio de formatos originales de Excel (ej: plantillas BPM)
 ├── src/
 │   ├── app/                    # Rutas y páginas de la aplicación (Next.js 14 App Router)
 │   │   ├── (dashboard)/        # Vistas operativas protegidas por autenticación (Layout corporativo)
@@ -148,9 +149,11 @@ crepes-app/
 │   └── lib/                    # Helpers de base de datos (`db.js`) y utilidades de sesión
 ├── add-bpm-checklist.js        # Script instalador de la plantilla corporativa Lista de Chequeo BPM
 ├── init-db.js                  # Inicializador y generador de tablas en SQLite
-├── migrate-db-2.js a 8.js      # Scripts del motor de migración evolutiva de base de datos
+├── migrate-db-2.js a 9.js      # Scripts del motor de migración evolutiva de base de datos
+├── migrate-db-audit.js         # Migración para la bitácora de auditoría
+├── migrate-db-mantenimiento.js # Migración de base de datos para áreas de mantenimiento
 ├── reset-passwords.js          # Utilidad para restaurar contraseñas de prueba a Bcrypt
-├── run-all-migrations.js       # Ejecutor general en orden de todas las migraciones (1 a 8)
+├── run-all-migrations.js       # Ejecutor general en orden de todas las migraciones
 ├── scripts/
 │   └── wipe_db.js              # Script avanzado para limpieza segura de base de datos (pase a Producción)
 ├── iniciar_servidor.bat        # Script por lotes para encendido rápido del servidor en Windows
@@ -179,7 +182,7 @@ Para generar la base de datos desde cero o actualizar una instalación existente
 # 1. Inicializar estructura base
 node init-db.js
 
-# 2. Ejecutar todas las migraciones evolutivas (v2 hasta v8)
+# 2. Ejecutar todas las migraciones evolutivas
 node run-all-migrations.js
 
 # 3. Instalar/verificar la plantilla corporativa de Lista de Chequeo BPM
