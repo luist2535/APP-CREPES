@@ -207,6 +207,7 @@ export async function GET(request) {
       return String(str)
         .normalize('NFD').replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
+        .replace(/[.,;:()\[\]{}¿?¡!"'\-]/g, '')
         .replace(/\s+/g, ' ')
         .trim();
     };
@@ -343,30 +344,58 @@ export async function GET(request) {
       // Fallback: text-based matching (original logic, normalized)
       const resolveAnsByText = (itemName, subArea) => {
         const multiSec2 = templateConfig.secciones && templateConfig.secciones.length > 1;
+        
+        const normItem = normalizeString(itemName);
+        let matchedItemName = itemName;
+        
+        let foundExact = false;
+        for (const k in normalizedAnswers) {
+          if (k === normItem || k.startsWith(normItem + '__')) { foundExact = true; break; }
+        }
+        
+        if (!foundExact) {
+           const targetWords = new Set(normItem.split(' ').filter(w => w.length > 3));
+           let bestKey = null;
+           let maxScore = 0;
+           for (const k in normalizedAnswers) {
+              const baseKey = k.split('__')[0];
+              const kWords = new Set(baseKey.split(' ').filter(w => w.length > 3));
+              let matchCount = 0;
+              for (const w of kWords) {
+                 if (targetWords.has(w)) matchCount++;
+              }
+              if (matchCount > maxScore && matchCount >= 3) {
+                 maxScore = matchCount;
+                 bestKey = baseKey;
+              }
+           }
+           if (bestKey) matchedItemName = bestKey;
+        }
+
         let ans = '';
         let obs = '';
         if (subArea) {
-          ans = getAns(`${itemName}__${subArea}`) || '';
-          obs = getAns(`${itemName}__${subArea}__obs`) || getAns(`${itemName}__${subArea}_obs`) || '';
+          ans = getAns(`${matchedItemName}__${subArea}`) || '';
+          obs = getAns(`${matchedItemName}__${subArea}__obs`) || getAns(`${matchedItemName}__${subArea}_obs`) || '';
           if (!ans && multiSec2) {
             for (let i = 0; i < templateConfig.secciones.length; i++) {
-              const k = `${itemName}__sec_${i}__${subArea}`;
+              const k = `${matchedItemName}__sec_${i}__${subArea}`;
               if (getAns(k)) { ans = getAns(k); obs = getAns(`${k}__obs`) || getAns(`${k}_obs`) || obs; break; }
             }
           }
         } else {
-          ans = getAns(itemName) || '';
-          obs = getAns(`${itemName}__obs`) || getAns(`${itemName}_obs`) || '';
+          ans = getAns(matchedItemName) || '';
+          obs = getAns(`${matchedItemName}__obs`) || getAns(`${matchedItemName}_obs`) || '';
           if (!ans && templateConfig.secciones) {
             for (let i = 0; i < templateConfig.secciones.length; i++) {
-              const k = `${itemName}__sec_${i}`;
+              const k = `${matchedItemName}__sec_${i}`;
               if (getAns(k)) { ans = getAns(k); obs = getAns(`${k}__obs`) || getAns(`${k}_obs`) || obs; break; }
               const colKey = templateConfig.columnas && templateConfig.columnas[0] ? `${k}__${templateConfig.columnas[0]}` : null;
               if (colKey && getAns(colKey)) { ans = getAns(colKey); obs = getAns(`${colKey}__obs`) || getAns(`${colKey}_obs`) || obs; break; }
             }
           }
           if (!ans && templateConfig.columnas && templateConfig.columnas[0]) {
-            const colKey = `${itemName}__${templateConfig.columnas[0]}`;
+            const colKey = `${matchedItemName}__${templateConfig.columnas[0]}`;
             if (getAns(colKey)) { ans = getAns(colKey); obs = getAns(`${colKey}__obs`) || getAns(`${colKey}_obs`) || obs; }
           }
         }
