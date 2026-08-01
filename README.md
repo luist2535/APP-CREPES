@@ -92,6 +92,18 @@
 - Catálogo y administración de Puntos de Venta (PDV), sus direcciones, ubicaciones y semáforos iniciales.
 - Mantenimiento del maestro de Ciudades y configuración de Áreas Operativas con personalización de paletas de color en formato hexadecimal y tipología de flujo.
 
+### 12. 🛡️ Seguridad y Protección de Datos
+- **Seguridad de Base de Datos (SQLite):**
+  - **Inmunidad contra Inyección SQL:** Todas las consultas al motor de base de datos se ejecutan estrictamente utilizando sentencias preparadas (Prepared Statements) a través de `better-sqlite3`, neutralizando cualquier intento de inyección de código malicioso.
+  - **Aislamiento de Datos:** El archivo físico de la base de datos (`crepes.db`) reside protegido en el servidor de backend y nunca está expuesto al directorio público o accesible vía web directamente.
+  - **Integridad Referencial y "Soft Delete":** Se utiliza un modelo de eliminación lógica (simulada) para entidades críticas como Usuarios y Equipos, garantizando que el historial de auditorías, firmas y trazabilidad permanezca intacto para futuras revisiones sin que existan registros "huérfanos".
+- **Criptografía y Sesiones Seguras:**
+  - Las contraseñas nunca se almacenan en texto plano; son sometidas a un fuerte hash unidireccional usando el algoritmo **Bcrypt**.
+  - El sistema de inicio de sesión genera **JSON Web Tokens (JWT)** firmados criptográficamente, los cuales se inyectan en cookies de tipo `HTTP-Only`. Esto hace que el token sea invisible para JavaScript en el navegador del usuario, bloqueando contundentemente ataques de robo de sesión como el *Cross-Site Scripting (XSS)*.
+- **Control de Acceso End-to-End (RBAC):** No solo la interfaz gráfica se adapta al rol del usuario, sino que absolutamente todos los *endpoints* (API backend) verifican la validez del token y el rol jerárquico antes de ejecutar operaciones de lectura, escritura o eliminación (Arquitectura Zero Trust interna).
+- **Protección Perimetral Avanzada (Túneles Red):** El despliegue de acceso externo se orquesta mediante **Cloudflare Tunnels** (`cloudflared`). Esto permite conectar el servidor a internet de manera inversa y cifrada sin necesidad de abrir puertos públicos (Port Forwarding) en el firewall del restaurante o data center corporativo, mitigando totalmente el riesgo de ataques DDoS directos y escaneos de puertos por bots maliciosos.
+- **Bitácora de Auditoría Inmutable:** Cada modificación de datos, eliminación de un registro operativo o cambio de estado de un Punto de Venta es sellada automáticamente con un registro de auditoría (timestamp exacto y usuario responsable), garantizando la transparencia administrativa ("Accountability").
+
 ---
 
 ## 📂 Estructura del Proyecto
