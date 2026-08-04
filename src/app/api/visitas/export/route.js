@@ -131,21 +131,56 @@ export async function GET(request) {
       return String(cell.value);
     };
 
-    const row4 = sheet.getRow(4);
-    row4.eachCell({ includeEmpty: true }, (cell) => {
-      const val = getCellValueStr(cell);
-      if (val.includes('VERIFICACIÓN REALIZADA POR') || val.includes('AUDITOR')) {
-        cell.value = val.replace(/_____+/, visit.auditor_nombre);
-      }
-      if (val.includes('FECHA')) {
-        const formattedDate = new Date(visit.fecha).toLocaleDateString('es-ES', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        });
-        cell.value = val.replace(/_____+/, formattedDate);
-      }
-    });
+    const getFormattedDate = () => {
+      const d = visit.created_at ? new Date(visit.created_at) : new Date(visit.fecha);
+      return d.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+    };
+    const getFormattedTime = () => {
+      if (!visit.created_at) return '';
+      const d = new Date(visit.created_at);
+      return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    };
+    const formattedDateTime = `${getFormattedDate()} a las ${getFormattedTime()}`;
+
+    for (let r = 3; r <= 6; r++) {
+      const headerRow = sheet.getRow(r);
+      headerRow.eachCell({ includeEmpty: true }, (cell) => {
+        const val = getCellValueStr(cell);
+        if (!val) return;
+
+        if (val.includes('VERIFICACIÓN REALIZADA POR') || val.includes('AUDITOR')) {
+          if (val.includes('____')) {
+            cell.value = val.replace(/_____+/, visit.auditor_nombre || '');
+          } else if (!val.includes(visit.auditor_nombre)) {
+            const parts = val.split(':');
+            cell.value = parts.length > 1 ? `${parts[0]}: ${visit.auditor_nombre || ''}` : `${val}: ${visit.auditor_nombre || ''}`;
+          }
+        }
+        
+        if (val.includes('FECHA Y HORA')) {
+          if (val.includes('____')) {
+            cell.value = val.replace(/_____+/, formattedDateTime);
+          } else {
+            const parts = val.split(':');
+            cell.value = parts.length > 1 ? `${parts[0]}: ${formattedDateTime}` : `${val}: ${formattedDateTime}`;
+          }
+        } else if (val.includes('FECHA')) {
+          if (val.includes('____')) {
+            cell.value = val.replace(/_____+/, getFormattedDate());
+          } else {
+            const parts = val.split(':');
+            cell.value = parts.length > 1 ? `${parts[0]}: ${getFormattedDate()}` : `${val}: ${getFormattedDate()}`;
+          }
+        } else if (val.includes('HORA')) {
+          if (val.includes('____')) {
+            cell.value = val.replace(/_____+/, getFormattedTime());
+          } else {
+            const parts = val.split(':');
+            cell.value = parts.length > 1 ? `${parts[0]}: ${getFormattedTime()}` : `${val}: ${getFormattedTime()}`;
+          }
+        }
+      });
+    }
 
     // 6. Map Columns for SI, NO, NA, 1-5 (BPM scale) and sub-areas
     const isMatrix = templateConfig.tipo === 'matrix';
