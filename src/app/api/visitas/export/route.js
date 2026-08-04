@@ -308,8 +308,8 @@ export async function GET(request) {
       const valBUpper = valB.toUpperCase();
       const isSectionByName = sectionNames.has(normalizeString(valB));
       const isAllCapsHeader = SECTION_HEADER_RE.test(valB) && valB.length > 3 && valB === valBUpper;
-      const hasSectionInColA = valA !== '' && !STOP_A_VALUES.some(s => valA.includes(s));
-      if (isSectionByName || isAllCapsHeader || hasSectionInColA) continue;
+      // We do NOT skip just because Col A has text. In many templates, Col A is a merged category cell spanning all questions.
+      if (isSectionByName || isAllCapsHeader) continue;
 
       dataRowNumbers.push(r);
     }
