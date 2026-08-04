@@ -122,9 +122,18 @@ export async function GET(request) {
     const answers = JSON.parse(visit.datos_formulario || '{}');
 
     // 5. Fill Auditor Name and Date in Row 4
+    const getCellValueStr = (cell) => {
+      if (!cell || cell.value === null || cell.value === undefined) return '';
+      if (typeof cell.value === 'object') {
+        if (cell.value.richText) return cell.value.richText.map(t => t.text).join('');
+        if (cell.value.formula) return String(cell.value.result || '');
+      }
+      return String(cell.value);
+    };
+
     const row4 = sheet.getRow(4);
     row4.eachCell({ includeEmpty: true }, (cell) => {
-      const val = cell.value ? String(cell.value) : '';
+      const val = getCellValueStr(cell);
       if (val.includes('VERIFICACIÓN REALIZADA POR') || val.includes('AUDITOR')) {
         cell.value = val.replace(/_____+/, visit.auditor_nombre);
       }
@@ -164,9 +173,9 @@ export async function GET(request) {
     const scanColHeaders = (startCol, endCol, subAreaName) => {
       for (let c = startCol; c <= endCol; c++) {
         // Try rows 7 → 6 → 5 for the header label
-        const h7 = sheet.getRow(7).getCell(c).value || '';
-        const h6 = sheet.getRow(6).getCell(c).value || '';
-        const h5 = sheet.getRow(5).getCell(c).value || '';
+        const h7 = getCellValueStr(sheet.getRow(7).getCell(c));
+        const h6 = getCellValueStr(sheet.getRow(6).getCell(c));
+        const h5 = getCellValueStr(sheet.getRow(5).getCell(c));
         const raw = h7 || h6 || h5;
         const type = normalizeHeaderType(raw);
         if (VALID_ANSWER_TYPES.has(type)) {
@@ -182,7 +191,7 @@ export async function GET(request) {
       const row5 = sheet.getRow(5);
       const subAreas = [];
       row5.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        const val = cell.value ? String(cell.value).trim() : '';
+        const val = getCellValueStr(cell).trim();
         if (val !== '' && val !== 'ASPECTO' && val !== 'ASPECTOS' && colNumber >= 3) {
           if (!subAreas.some(sa => sa.name === val)) {
             subAreas.push({ name: val, startCol: colNumber });
@@ -281,8 +290,8 @@ export async function GET(request) {
       const cellA = sheet.getRow(r).getCell(1);
       const cellB = sheet.getRow(r).getCell(2);
 
-      const valA = cellA.value ? String(cellA.value).trim() : '';
-      const valB = cellB.value ? String(cellB.value).trim() : '';
+      const valA = getCellValueStr(cellA).trim();
+      const valB = getCellValueStr(cellB).trim();
 
       // Detect comment/stop rows
       if (valA === 'COMENTARIOS:' || valA.startsWith('COMENTARIOS') || valA.includes('Observaciones adicionales')) {
@@ -322,7 +331,7 @@ export async function GET(request) {
             const fallKey = `${fila}__${subArea}`;
             const userAns = getAns(colKey) || getAns(fallKey) || '';
             if (userAns) {
-              const targetCol = colMappings.find(m => m.subArea === subArea && m.type === userAns.toUpperCase());
+              const targetCol = colMappings.find(m => m.subArea.trim().toUpperCase() === subArea.trim().toUpperCase() && m.type === userAns.toUpperCase());
               if (targetCol) sheet.getRow(r).getCell(targetCol.colNumber).value = 'X';
             }
           });
@@ -404,7 +413,7 @@ export async function GET(request) {
 
       dataRowNumbers.forEach(r => {
         const cellB = sheet.getRow(r).getCell(2);
-        const valB = cellB.value ? String(cellB.value).trim() : '';
+        const valB = getCellValueStr(cellB).trim();
         if (!valB) return;
         const itemName = valB;
 
@@ -412,7 +421,7 @@ export async function GET(request) {
           templateConfig.columnas.forEach((subArea) => {
             const { ans: userAns } = resolveAnsByText(itemName, subArea);
             if (userAns) {
-              const targetCol = colMappings.find(m => m.subArea === subArea && m.type === userAns.toUpperCase());
+              const targetCol = colMappings.find(m => m.subArea.trim().toUpperCase() === subArea.trim().toUpperCase() && m.type === userAns.toUpperCase());
               if (targetCol) sheet.getRow(r).getCell(targetCol.colNumber).value = 'X';
             }
           });
