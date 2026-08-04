@@ -92,47 +92,7 @@ export async function POST(request) {
     if (parseInt(area_id) === 7) jefeRolId = 9; // Sistemas -> Jefe Sistemas
 
     if (jefeRolId) {
-      const jefes = db.prepare("SELECT email, nombre FROM users WHERE rol_id = ?").all(jefeRolId);
-      
-      for (const jefe of jefes) {
-        if (jefe.email) {
-          const urgenciaText = urgencia === 'urgente' ? '🚨 URGENTE' : '📋 REVISIÓN';
-          const emailSubject = `${urgenciaText} Solicitud de Visita en PDV: ${pdvInfo.nombre}`;
-          const emailHtml = `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; border: 1px solid #E8DDD4; padding: 20px; border-radius: 8px;">
-              <h2 style="color: #6B3A2A; margin-top: 0;">🥞 Crepes en Punto</h2>
-              <p>Hola <strong>${jefe.nombre}</strong>,</p>
-              <p>Se ha recibido una nueva solicitud de soporte técnico de un Punto de Venta con prioridad <strong style="color: ${urgencia === 'urgente' ? '#DC2626' : '#D97706'}">${urgencia.toUpperCase()}</strong>:</p>
-              <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
-                <tr>
-                  <td style="padding: 8px; font-weight: bold; background: #F5EDE4; width: 150px; border: 1px solid #E8DDD4;">Punto de Venta:</td>
-                  <td style="padding: 8px; background: #F5EDE4; border: 1px solid #E8DDD4;">${pdvInfo.nombre}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px; font-weight: bold; border: 1px solid #E8DDD4;">Asunto / Título:</td>
-                  <td style="padding: 8px; border: 1px solid #E8DDD4;">${titulo}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px; font-weight: bold; background: #F5EDE4; border: 1px solid #E8DDD4;">Área Solicitada:</td>
-                  <td style="padding: 8px; background: #F5EDE4; border: 1px solid #E8DDD4;">${areaInfo.nombre}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px; font-weight: bold; border: 1px solid #E8DDD4;">Urgencia:</td>
-                  <td style="padding: 8px; font-weight: bold; color: ${urgencia === 'urgente' ? '#DC2626' : '#D97706'}; border: 1px solid #E8DDD4;">${urgencia.toUpperCase()}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px; font-weight: bold; background: #F5EDE4; border: 1px solid #E8DDD4;">Detalles:</td>
-                  <td style="padding: 8px; background: #F5EDE4; border: 1px solid #E8DDD4;">${descripcion}</td>
-                </tr>
-              </table>
-              <p>Por favor, ingresa al panel de administración para programar y asignar esta visita en el calendario.</p>
-              <a href="http://localhost:3000/solicitudes" style="display: inline-block; background: #6B3A2A; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">Ver Solicitudes de Soporte 📋</a>
-            </div>
-          `;
-          sendNotificationEmail({ to: jefe.email, subject: emailSubject, html: emailHtml })
-            .catch(err => console.error("Error al enviar email de solicitud:", err));
-        }
-      }
+      // Email sending disabled per user request
     }
 
     const ticketCode = 'TK-' + String(solicitudId).padStart(5, '0');

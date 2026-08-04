@@ -245,82 +245,11 @@ export async function POST(request) {
     // ==========================================
     // F1: Send email notification asynchronously
     // ==========================================
-    const emailTargets = [];
-
-    // Notify the assigned auxiliary (responsable)
-    if (responsableUser && responsableUser.email) {
-      emailTargets.push({
-        to: responsableUser.email,
-        subject: `📋 Nueva visita programada — ${pdvInfo?.pdv_nombre || 'PDV'} el ${fecha}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fdf8f3; border-radius: 12px; overflow: hidden;">
-            <div style="background: linear-gradient(135deg, #6B3A2A, #8B6914); padding: 24px; text-align: center;">
-              <h1 style="color: #fff; margin: 0; font-size: 22px;">🍫 Crepes en Punto</h1>
-              <p style="color: #fde68a; margin: 4px 0 0; font-size: 14px;">Sistema de Gestión Operativa</p>
-            </div>
-            <div style="padding: 28px;">
-              <h2 style="color: #6B3A2A; margin-top: 0;">Nueva visita programada para ti</h2>
-              <p style="color: #555;">Hola <strong>${responsableUser.nombre}</strong>, se ha programado una visita que requiere tu atención:</p>
-              <table style="width: 100%; border-collapse: collapse; margin: 16px 0; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
-                <tr style="background: #f9f3ed;"><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A; width: 40%;">📍 PDV</td><td style="padding: 10px 14px; color: #333;">${pdvInfo?.pdv_nombre || 'N/A'} — ${pdvInfo?.ciudad_nombre || ''}</td></tr>
-                <tr><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A;">🗂️ Área</td><td style="padding: 10px 14px; color: #333;">${areaInfo?.nombre || 'N/A'}</td></tr>
-                <tr style="background: #f9f3ed;"><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A;">📅 Fecha</td><td style="padding: 10px 14px; color: #333;">${fecha}</td></tr>
-                <tr><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A;">⏰ Horario</td><td style="padding: 10px 14px; color: #333;">${hora_inicio} – ${hora_fin}</td></tr>
-                <tr style="background: #f9f3ed;"><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A;">📝 Título</td><td style="padding: 10px 14px; color: #333;">${titulo}</td></tr>
-                ${descripcion ? `<tr><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A;">💬 Descripción</td><td style="padding: 10px 14px; color: #333;">${descripcion}</td></tr>` : ''}
-                ${override_justificacion ? `<tr style="background: #fef9c3;"><td style="padding: 10px 14px; font-weight: bold; color: #854d0e;">⚠️ Nota</td><td style="padding: 10px 14px; color: #854d0e;">Visita programada con excepción de horario: ${override_justificacion}</td></tr>` : ''}
-              </table>
-              <p style="color: #555;">Programada por: <strong>${user.nombre}</strong></p>
-              <p style="font-size: 12px; color: #999; margin-top: 24px;">Este es un mensaje automático del sistema Crepes en Punto. Por favor no responder.</p>
-            </div>
-          </div>
-        `
-      });
-    }
-
-    // Also notify PDV users linked to this PDV (Omitir si es área de Calidad / Visita Sorpresa)
-    const isCalidadArea = areaInfo?.nombre && areaInfo.nombre.trim().toLowerCase().includes('calidad');
-    if (!isCalidadArea) {
-      const pdvUsers = db.prepare('SELECT email, nombre FROM users WHERE pdv_id = ? AND rol_id = 17 AND activo = 1').all(parseInt(pdv_id));
-      for (const pdvUser of pdvUsers) {
-        if (pdvUser.email) {
-          emailTargets.push({
-            to: pdvUser.email,
-            subject: `📋 Visita programada en tu punto de venta — ${fecha}`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fdf8f3; border-radius: 12px; overflow: hidden;">
-                <div style="background: linear-gradient(135deg, #6B3A2A, #8B6914); padding: 24px; text-align: center;">
-                  <h1 style="color: #fff; margin: 0; font-size: 22px;">🍫 Crepes en Punto</h1>
-                  <p style="color: #fde68a; margin: 4px 0 0; font-size: 14px;">Sistema de Gestión Operativa</p>
-                </div>
-                <div style="padding: 28px;">
-                  <h2 style="color: #6B3A2A; margin-top: 0;">Visita programada en tu punto de venta</h2>
-                  <p style="color: #555;">Hola <strong>${pdvUser.nombre}</strong>, se ha programado la siguiente visita en tu PDV:</p>
-                  <table style="width: 100%; border-collapse: collapse; margin: 16px 0; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
-                    <tr style="background: #f9f3ed;"><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A; width: 40%;">🗂️ Área</td><td style="padding: 10px 14px; color: #333;">${areaInfo?.nombre || 'N/A'}</td></tr>
-                    <tr><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A;">📅 Fecha</td><td style="padding: 10px 14px; color: #333;">${fecha}</td></tr>
-                    <tr style="background: #f9f3ed;"><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A;">⏰ Horario</td><td style="padding: 10px 14px; color: #333;">${hora_inicio} – ${hora_fin}</td></tr>
-                    <tr><td style="padding: 10px 14px; font-weight: bold; color: #6B3A2A;">📝 Descripción</td><td style="padding: 10px 14px; color: #333;">${titulo}${descripcion ? ': ' + descripcion : ''}</td></tr>
-                  </table>
-                  <p style="font-size: 12px; color: #999; margin-top: 24px;">Este es un mensaje automático del sistema Crepes en Punto. Por favor no responder.</p>
-                </div>
-              </div>
-            `
-          });
-        }
-      }
-    } else {
-      console.log(`🔒 [Visita Sorpresa - Calidad] Se omite notificación de correo al PDV ID ${pdv_id} para mantener confidencialidad de la visita de Calidad.`);
-    }
-
-    // Fire & forget: send all emails without blocking the response
-    Promise.all(emailTargets.map(e => sendNotificationEmail(e))).catch(err => {
-      console.error('Error sending visit notification emails:', err);
-    });
+    // Email sending has been temporarily disabled per user request
 
     return NextResponse.json({ 
       evento: createdEvent, 
-      message: 'Visita programada exitosamente, asignada al Auxiliar correspondiente y sincronizada con Outlook' 
+      message: 'Visita programada exitosamente, asignada al Auxiliar correspondiente' 
     });
   } catch (error) {
     console.error('Calendar POST error:', error);
