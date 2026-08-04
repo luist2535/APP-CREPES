@@ -182,7 +182,12 @@ export async function POST(request) {
     let responsableId = null;
     let responsableUser = null;
     if (auxRolId) {
-      responsableUser = db.prepare('SELECT id, nombre, email FROM users WHERE rol_id = ? AND activo = 1 LIMIT 1').get(auxRolId);
+      if (parseInt(user.rol_id) === auxRolId) {
+        responsableUser = db.prepare('SELECT id, nombre, email FROM users WHERE id = ?').get(user.id);
+      } else {
+        responsableUser = db.prepare('SELECT id, nombre, email FROM users WHERE rol_id = ? AND activo = 1 LIMIT 1').get(auxRolId);
+      }
+      
       if (responsableUser) {
         responsableId = responsableUser.id;
       }

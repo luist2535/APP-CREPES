@@ -133,6 +133,10 @@ export async function POST(request) {
       } catch (e) {}
     }
 
+    // Si el usuario es Auxiliar y no se especifica responsable_id, se le asigna a sí mismo
+    const isAuxiliar = [10, 11, 12, 13, 14, 15, 16].includes(parseInt(user.rol_id));
+    const finalResponsableId = responsable_id || (isAuxiliar ? user.id : null);
+
     // Insert visit (when directly creating a completed visit, usually by coordinators/admin)
     const result = db.prepare(`
       INSERT INTO visitas (pdv_id, user_id, area_id, tipo_visita_id, plantilla_id, fecha, hora_inicio, hora_fin, datos_formulario, responsable_id, fecha_compromiso, estado, observaciones, repuestos, firma_auxiliar, hallazgos, acciones_correctivas, evento_id, equipo_id, categoria_id, version_checklist, campos_personalizados, historial_versiones)
@@ -141,7 +145,7 @@ export async function POST(request) {
       pdv_id, user.id, area_id, tipo_visita_id, plantilla_id || null, 
       fecha, hora_inicio || null, hora_fin || null, 
       JSON.stringify(datos_formulario || {}), 
-      responsable_id || null, fecha_compromiso || null, observaciones || null,
+      finalResponsableId, fecha_compromiso || null, observaciones || null,
       repuestos || null, firma_auxiliar || null, hallazgos || null, acciones_correctivas || null,
       evento_id || null, equipo_id || null, categoria_id || null,
       initialVersion,
