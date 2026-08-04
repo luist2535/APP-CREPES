@@ -66,7 +66,7 @@
   1. *Firma del Técnico o Auxiliar* responsable de la labor.
   2. *Firma del Funcionario / Gerente del PDV* que recibe y valida el trabajo en el restaurante.
   3. *Aprobación y Firma del Jefe de Área* con sus comentarios formales de revisión.
-- **Autocierre de Agenda, UX Modal y Exportación en PDF**: Las ventanas modales de alerta y confirmación cuentan con botones de cierre rápido (`×`) en el encabezado. Al firmar y finalizar una visita, la cita vinculada en el calendario se marca automáticamente con visto bueno (`✓`). Pulsando **"Exportar PDF"**, el sistema genera un documento formateado para impresión y archivo corporativo con todas las respuestas, fotos y firmas.
+  - **Autocierre de Agenda, UX Modal y Exportación (PDF y Excel)**: Las ventanas modales de alerta y confirmación cuentan con botones de cierre rápido (`×`) en el encabezado. Al firmar y finalizar una visita, la cita vinculada en el calendario se marca automáticamente con visto bueno (`✓`). Pulsando **"Exportar PDF"**, el sistema genera un documento formateado para impresión. Además, el sistema **exporta de manera inteligente a plantillas de Excel corporativas**, interpretando de forma dinámica formatos complejos (texto enriquecido), mapeando encabezados combinados y rellenando automáticamente datos como fecha y hora exactas de ejecución, todo sin alterar el diseño visual original del documento.
 
 ### 7. 📷 Fichas de Equipos, Mantenimiento Preventivo y Escáner QR
 - Escáner QR integrado que activa la cámara del celular o tablet para identificar al instante cualquier máquina o equipo en cocina, barra o cuarto frío.
