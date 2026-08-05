@@ -31,7 +31,6 @@
   - **Puntos de Venta (PDVs)**: Cuentas específicas para cada restaurante o módulo de atención, permitiendo al personal en sitio reportar novedades y generar tickets o solicitudes de asistencia técnica en tiempo real.
 - **Gestión Segura de Usuarios y Soft Delete**: Eliminación simulada (lógica) de usuarios que preserva la integridad del historial operativo, liberando automáticamente el correo electrónico para permitir nuevos registros, todo bajo un marco de protección de integridad referencial.
 - **Auditoría Completa de Usuarios**: Registro automático e inmutable en la bitácora de auditoría de todas las acciones administrativas (creación de usuarios, modificación de datos, cambios de rol y activaciones/desactivaciones).
-- **Login Rápido para Pruebas**: Panel de autenticación con botones de autocompletado rápido para facilitar las pruebas en entornos de desarrollo (contraseña maestra de prueba: `admin123`).
 
 ### 2. 📊 Dashboard Ejecutivo en Tiempo Real & Trazabilidad Histórica
 - Indicadores numéricos consolidados del estado general de la red (Puntos Activos, Con Alertas, Fuera de Servicio y Bloqueados).
@@ -205,11 +204,6 @@ node add-bpm-checklist.js
 node scripts/wipe_db.js
 ```
 
-*(Opcional)* Si deseas restablecer las contraseñas de todas las cuentas preconfiguradas a la clave maestra de prueba (`admin123`), ejecuta:
-```bash
-node reset-passwords.js
-```
-
 ### 4. Iniciar en Entorno de Desarrollo o Red Local
 Para levantar el servidor web en el puerto `3000`:
 ```bash
@@ -225,25 +219,4 @@ npm run start
 ```
 > [!TIP]
 > **Acceso exterior y Servicio de Windows:** Consulta el documento interno `guia_despliegue_windows_service.md` para configurar la aplicación para que se inicie automáticamente como Servicio en segundo plano en Windows Server y para activar el túnel de internet seguro con **`compartir_en_internet.bat`** (vía Cloudflare Tunnel).
-
----
-
-## 👥 Credenciales de Prueba Preconfiguradas
-
-Para facilitar la exploración de cada uno de los 17 roles y módulos del sistema en entornos de evaluación, todas las cuentas preconfiguradas comparten la contraseña maestra: **`admin123`**
-
-| Rol / Perfil | Correo Electrónico | Ciudad / Alcance | Módulos y Permisos Principales |
-| :--- | :--- | :--- | :--- |
-| **Administrador** | `admin@crepesenpunto.com` | Global | Control total, administración de variables maestras, usuarios, ciudades y PDVs. |
-| **Coordinador** | `carlos@crepesenpunto.com` | Cartagena | Gestión del Semáforo Territorial, bloqueos de horario y supervisión de auditorías. |
-| **Coordinadora** | `maria@crepesenpunto.com` | Barranquilla | Gestión del Semáforo Territorial en su zona, bloqueos y reportes. |
-| **Jefe de Sistemas** | `jefe_sistemas@crepesenpunto.com` | Global | Flujo técnico, diagnóstico, aprobación de visitas de sistemas y gestión de tickets. |
-| **Auxiliar de Sistemas** | `aux_sistemas@crepesenpunto.com` | Global | Ejecución en sitio de soporte técnico en hardware, redes, POS e impresoras. |
-| **Supervisor Mantenimiento** | `luis@crepesenpunto.com` | Global | Flujo técnico de mantenimiento (gas, inyección, refrigeración, locativo), repuestos y QR. |
-| **Auxiliar Mantenimiento** | `aux_mante@crepesenpunto.com` | Global | Auditoría e intervención física de maquinaria y reporte correctivo. |
-| **Supervisor Calidad** | `sandra@crepesenpunto.com` | Global | Flujo administrativo, listas de chequeo BPM, higiene e inspección de manipulación. |
-| **Auxiliar Calidad** | `aux_calidad@crepesenpunto.com` | Global | Inspección en sitio de BPM, sanidad y registro de evidencias de limpieza. |
-| **Supervisor SST** | `ana@crepesenpunto.com` | Global | Flujo administrativo, inspección de extintores, botiquines, camillas y seguridad de personal. |
-| **Auxiliar SST** | `aux_sst@crepesenpunto.com` | Global | Auditoría operativa de condiciones de trabajo seguras y elementos de protección. |
-| **Punto de Venta (PDV)** | `pdv_[nombre]@crepesenpunto.com`<br>*(ej: `pdv_altoprado@crepesenpunto.com`)* | Específico al PDV | Creación y seguimiento de **Solicitudes y Tickets de Asistencia Técnica**, firma de visitas recibidas y consulta de agenda. |
 
