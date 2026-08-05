@@ -592,7 +592,6 @@ export default function DashboardLayout({ children }) {
 
           {/* Mobile Logo & Brand (Redesign to match mockup) */}
           <div className="header-brand-mobile-custom">
-            <span className="brand-custom-text">CREPES & WAFFLES <span style={{fontSize: '0.6em', verticalAlign: 'top'}}>®</span></span>
           </div>
 
           <div className="header-actions">
