@@ -1,73 +1,66 @@
 @echo off
-setlocal EnableExtensions EnableDelayedExpansion
+setlocal EnableDelayedExpansion
 
-:: ================================================================
-:: CREPES EN PUNTO - PANEL DE CONTROL
-:: Version 3.0 - Interfaz de texto plano
-:: ================================================================
-
-if /I not "%~1"=="run" (
-    start "Crepes en Punto - Panel de Control" cmd /k ""%~f0" run"
+if not "%1"=="run" (
+    start "Crepes en Punto - Panel de Control" cmd /k "%~f0" run
     exit /b
 )
 
-title Crepes en Punto - Panel de Control v3.0
-mode con: cols=92 lines=42
+title Crepes en Punto - Panel de Control v2.0
+mode con: cols=80 lines=38
 color 0B
-cd /d "%~dp0"
 
-set "VERSION=3.0.0"
+set "VERSION=2.0.0"
 set "PORT=3000"
-set "APP_NAME=CREPES EN PUNTO"
-set "DB_FILE=database\crepes.sqlite"
-set "BACKUP_DIR=backups"
 
-:: ----------------------------------------------------------------
-:: Verificacion inicial
-:: ----------------------------------------------------------------
-call :refresh_status
+:: Verificaciones
+set "S_NODE=FALTA"
+set "S_NPM=FALTA"
+set "S_GIT=NO DISP."
+set "S_DEPS=PENDIENTE"
+set "S_DB=PENDIENTE"
+
+where node >nul 2>nul && set "S_NODE=OK"
+where npm >nul 2>nul && set "S_NPM=OK"
+where git >nul 2>nul && set "S_GIT=OK"
+if exist node_modules set "S_DEPS=OK"
+if exist "database\crepes.sqlite" set "S_DB=OK"
 
 :main_menu
 cls
 color 0B
+echo.
+echo  ==============================================================
+echo  #                                                            #
+echo  #             CREPES EN PUNTO - PANEL DE CONTROL             #
+echo  #             Sistema de Gestion del Servidor                #
+echo  #                    Version %VERSION%                           #
+echo  #                                                            #
+echo  ==============================================================
+echo.
+echo                       ESTADO DEL SISTEMA
+echo   ----------------------------------------------------------------------
+echo    Node.js: %S_NODE%    NPM: %S_NPM%    Git: %S_GIT%    Deps: %S_DEPS%    BD: %S_DB%
+echo   ----------------------------------------------------------------------
+echo.
+echo   MENU PRINCIPAL
+echo   -----------------------------------------------------------------
+echo.
+echo    [1]  Iniciar Servidor - Produccion (Recomendado)
+echo    [2]  Iniciar Servidor - Desarrollo (Hot Reload)
+echo    [3]  Actualizar desde GitHub (git pull + build)
+echo    [4]  Guardar cambios en GitHub (git push)
+echo    [5]  Verificar Entorno completo
+echo    [6]  Respaldar Base de Datos
+echo.
+echo    [0]  Salir
+echo.
+echo   -------------------------------------------------------------------------
+echo    Usuario: %USERNAME%    Fecha: %DATE%    Hora: %TIME:~0,8%
+echo   -------------------------------------------------------------------------
+echo.
 
-echo.
-echo  +==================================================================================+
-echo  ^|                         CREPES EN PUNTO - PANEL DE CONTROL                       ^|
-echo  ^|                         Sistema de Gestion del Servidor                          ^|
-echo  ^|                              Version %VERSION%                                  ^|
-echo  +==================================================================================+
-echo.
-echo  +------------------------------ ESTADO DEL SISTEMA -------------------------------+
-echo  ^|  Node.js: [!S_NODE!]    NPM: [!S_NPM!]    Git: [!S_GIT!]    Deps: [!S_DEPS!]    BD: [!S_DB!]  ^|
-echo  ^+----------------------------------------------------------------------------------+
-echo.
-echo  +-------------------------------- MENU PRINCIPAL ----------------------------------+
-echo  ^|                                                                                  ^|
-echo  ^|   [1]  Iniciar servidor en PRODUCCION                                           ^|
-echo  ^|   [2]  Iniciar servidor en DESARROLLO                                            ^|
-echo  ^|                                                                                  ^|
-echo  ^|   [3]  Actualizar desde GitHub          git pull + npm install + build            ^|
-echo  ^|   [4]  Guardar cambios en GitHub        git add + commit + push                   ^|
-echo  ^|                                                                                  ^|
-echo  ^|   [5]  Verificar entorno completo                                                 ^|
-echo  ^|   [6]  Respaldar base de datos                                                   ^|
-echo  ^|   [7]  Limpiar archivos temporales                                               ^|
-echo  ^|                                                                                  ^|
-echo  ^|   [0]  Salir                                                                      ^|
-echo  ^|                                                                                  ^|
-echo  +----------------------------------------------------------------------------------+
-echo.
-echo  Usuario : %USERNAME%
-echo  Equipo  : %COMPUTERNAME%
-echo  Fecha   : %DATE%
-echo  Hora    : %TIME:~0,8%
-echo  Puerto  : %PORT%
-echo  Ruta    : %CD%
-echo.
-echo  ------------------------------------------------------------------------------------
-set "opcion="
-set /p "opcion=  Seleccione una opcion [0-7]: "
+set /p "opcion=   Seleccione una opcion [0-6]: "
 
 if "%opcion%"=="1" goto opt_production
 if "%opcion%"=="2" goto opt_development
@@ -75,480 +68,350 @@ if "%opcion%"=="3" goto opt_git_pull
 if "%opcion%"=="4" goto opt_git_push
 if "%opcion%"=="5" goto opt_verify
 if "%opcion%"=="6" goto opt_backup_db
-if "%opcion%"=="7" goto opt_cleanup
 if "%opcion%"=="0" goto opt_exit
 
-color 0C
 echo.
-echo  [ERROR] Opcion no valida. Seleccione un numero entre 0 y 7.
+echo   Opcion no valida.
 timeout /t 2 >nul
 goto main_menu
 
-
-:: ================================================================
+:: ===============================================================
 :: [1] PRODUCCION
-:: ================================================================
+:: ===============================================================
 :opt_production
 cls
 color 0A
-
 echo.
-echo  +==================================================================================+
-echo  ^|                         MODO PRODUCCION                                          ^|
-echo  ^|                         Preparando aplicacion...                                  ^|
-echo  +==================================================================================+
+echo  ==============================================================
+echo       INICIANDO SERVIDOR EN MODO PRODUCCION
+echo  ==============================================================
 echo.
 
-call :free_port
-if errorlevel 1 goto pause_menu
+echo   [%TIME:~0,8%] [1/5] Liberando puerto %PORT%...
+for /f "tokens=5" %%a in ('netstat -aon ^| find ":%PORT%" ^| find "LISTENING"') do taskkill /f /pid %%a >nul 2>&1
+echo   [OK] Puerto %PORT% liberado.
+echo.
 
-echo  [1/5] Verificando dependencias...
-if not exist "node_modules" (
-    echo       Instalando dependencias con npm install...
+echo   [%TIME:~0,8%] [2/5] Verificando dependencias...
+if not exist node_modules (
+    echo   Instalando dependencias del proyecto...
     call npm install
     if errorlevel 1 goto error_npm
 )
-echo       [OK] Dependencias listas.
+echo   [OK] Dependencias listas.
 echo.
 
-echo  [2/5] Verificando base de datos...
-if exist "%DB_FILE%" (
-    echo       [OK] Base de datos encontrada.
-) else (
-    echo       [AVISO] No se encontro %DB_FILE%.
-)
-echo.
-
-echo  [3/5] Ejecutando migraciones...
+echo   [%TIME:~0,8%] [3/5] Ejecutando migraciones de base de datos...
 if exist "run-all-migrations.js" (
     call node run-all-migrations.js
-    if errorlevel 1 (
-        echo       [ERROR] Fallaron las migraciones.
-        goto pause_menu
-    )
-    echo       [OK] Migraciones completadas.
-) else (
-    echo       [INFO] No hay archivo de migraciones.
 )
+echo   [OK] Base de datos lista.
 echo.
 
-echo  [4/5] Compilando aplicacion Next.js...
-echo       Este proceso puede tardar varios minutos.
+echo   [%TIME:~0,8%] [4/5] Compilando aplicacion (esto toma 2-5 min)...
 echo.
 call npm run build
 if errorlevel 1 goto error_build
 echo.
-echo       [OK] Compilacion exitosa.
+echo   [OK] Compilacion exitosa.
 echo.
 
-echo  [5/5] Iniciando servidor de produccion...
+echo   [%TIME:~0,8%] [5/5] Levantando servidor en produccion...
 echo.
-echo  +==================================================================================+
-echo  ^|  SERVIDOR LISTO                                                                   ^|
-echo  ^|  URL: http://localhost:%PORT%                                                     ^|
-echo  ^|  Presiona CTRL+C para detener el servidor.                                        ^|
-echo  +==================================================================================+
+echo  ==============================================================
+echo   SERVIDOR LISTO EN: http://localhost:%PORT%
+echo  ==============================================================
+echo   Presiona Ctrl+C para detener el servidor.
 echo.
-start "" "http://localhost:%PORT%"
+start http://localhost:%PORT% >nul 2>&1
 call npm run start
 goto the_end
 
-
-:: ================================================================
+:: ===============================================================
 :: [2] DESARROLLO
-:: ================================================================
+:: ===============================================================
 :opt_development
 cls
 color 0E
-
 echo.
-echo  +==================================================================================+
-echo  ^|                         MODO DESARROLLO                                           ^|
-echo  ^|                         Hot Reload activado                                       ^|
-echo  +==================================================================================+
+echo  ==============================================================
+echo       INICIANDO SERVIDOR EN MODO DESARROLLO
+echo  ==============================================================
 echo.
 
-call :free_port
-if errorlevel 1 goto pause_menu
+echo   [%TIME:~0,8%] [1/3] Liberando puerto %PORT%...
+for /f "tokens=5" %%a in ('netstat -aon ^| find ":%PORT%" ^| find "LISTENING"') do taskkill /f /pid %%a >nul 2>&1
+echo   [OK] Puerto liberado.
+echo.
 
-echo  [1/3] Verificando dependencias...
-if not exist "node_modules" (
-    echo       Instalando dependencias...
+echo   [%TIME:~0,8%] [2/3] Verificando dependencias...
+if not exist node_modules (
     call npm install
     if errorlevel 1 goto error_npm
 )
-echo       [OK] Dependencias listas.
+echo   [OK] Dependencias listas.
 echo.
 
-echo  [2/3] Verificando base de datos...
-if exist "%DB_FILE%" (
-    echo       [OK] Base de datos encontrada.
-) else (
-    echo       [AVISO] Base de datos no encontrada.
-)
-echo.
-
-echo  [3/3] Ejecutando migraciones...
+echo   [%TIME:~0,8%] [3/3] Ejecutando migraciones de base de datos...
 if exist "run-all-migrations.js" (
     call node run-all-migrations.js
-    if errorlevel 1 goto pause_menu
-    echo       [OK] Migraciones completadas.
-) else (
-    echo       [INFO] No hay archivo de migraciones.
 )
+echo   [OK] Base de datos lista.
 echo.
-
-echo  +==================================================================================+
-echo  ^|  SERVIDOR DE DESARROLLO                                                           ^|
-echo  ^|  URL: http://localhost:%PORT%                                                     ^|
-echo  ^|  Los cambios se reflejan automaticamente.                                        ^|
-echo  ^|  Presiona CTRL+C para detener.                                                    ^|
-echo  +==================================================================================+
+echo  ==============================================================
+echo   SERVIDOR DEV EN: http://localhost:%PORT%
+echo  ==============================================================
+echo   Los cambios en el codigo se reflejan en tiempo real.
+echo   Presiona Ctrl+C para detener.
 echo.
-start "" "http://localhost:%PORT%"
+start http://localhost:%PORT% >nul 2>&1
 call npm run dev
 goto the_end
 
-
-:: ================================================================
-:: [3] GIT PULL
-:: ================================================================
+:: ===============================================================
+:: [3] ACTUALIZAR DESDE GITHUB
+:: ===============================================================
 :opt_git_pull
 cls
 color 0D
-
 echo.
-echo  +==================================================================================+
-echo  ^|                         ACTUALIZAR DESDE GITHUB                                   ^|
-echo  ^|                         git pull + install + build                                ^|
-echo  +==================================================================================+
+echo  ==============================================================
+echo       ACTUALIZAR SERVIDOR DESDE GITHUB (Git Pull)
+echo  ==============================================================
 echo.
 
-where git >nul 2>&1
-if errorlevel 1 (
-    echo  [ERROR] Git no esta instalado o no esta en PATH.
+where git >nul 2>nul
+if %errorlevel% neq 0 (
+    echo   [ERROR] Git no esta instalado.
+    echo   Descargalo de: https://git-scm.com
     goto pause_menu
 )
 
-echo  [1/3] Descargando cambios desde GitHub...
+echo   [%TIME:~0,8%] [1/3] Descargando cambios desde GitHub...
 echo.
-git pull origin main
+call git pull origin main
 if errorlevel 1 (
     echo.
-    echo  [ERROR] No se pudieron descargar los cambios.
+    echo   [ERROR] No se pudieron descargar los cambios.
+    echo   Verifica tu conexion a internet.
     goto pause_menu
 )
 echo.
-echo       [OK] Codigo actualizado.
+echo   [OK] Codigo actualizado.
 echo.
 
-echo  [2/3] Actualizando dependencias...
+echo   [%TIME:~0,8%] [2/3] Instalando nuevas dependencias...
 call npm install
-if errorlevel 1 goto error_npm
-echo       [OK] Dependencias actualizadas.
+echo   [OK] Dependencias actualizadas.
 echo.
 
-echo  [3/3] Generando build de produccion...
+echo   [%TIME:~0,8%] [3/3] Recompilando aplicacion...
 echo.
 call npm run build
-if errorlevel 1 goto error_build
-
+if errorlevel 1 (
+    echo.
+    echo   [ERROR] Error al compilar. Revisa los errores arriba.
+    goto pause_menu
+)
 echo.
-echo  +==================================================================================+
-echo  ^|                         ACTUALIZACION COMPLETADA                                  ^|
-echo  ^|                         El proyecto esta listo.                                   ^|
-echo  +==================================================================================+
+echo  ==============================================================
+echo   ACTUALIZACION COMPLETADA EXITOSAMENTE
+echo  ==============================================================
+echo   Puedes iniciar el servidor con la opcion [1] o [2].
 goto pause_menu
 
-
-:: ================================================================
-:: [4] GIT PUSH
-:: ================================================================
+:: ===============================================================
+:: [4] GUARDAR CAMBIOS EN GITHUB
+:: ===============================================================
 :opt_git_push
 cls
 color 0D
-
 echo.
-echo  +==================================================================================+
-echo  ^|                         GUARDAR CAMBIOS EN GITHUB                                 ^|
-echo  ^|                         git add + commit + push                                    ^|
-echo  +==================================================================================+
+echo  ==============================================================
+echo       GUARDAR CAMBIOS EN GITHUB (Git Push)
+echo  ==============================================================
 echo.
 
-where git >nul 2>&1
-if errorlevel 1 (
-    echo  [ERROR] Git no esta instalado o no esta en PATH.
+where git >nul 2>nul
+if %errorlevel% neq 0 (
+    echo   [ERROR] Git no esta instalado.
     goto pause_menu
 )
 
-echo  ARCHIVOS MODIFICADOS
-echo  ------------------------------------------------------------------------------------
+echo   Archivos modificados:
+echo   -----------------------------------------------------------
 git status --short
-echo  ------------------------------------------------------------------------------------
+echo   -----------------------------------------------------------
 echo.
 
-set "commit_msg="
-set /p "commit_msg=  Mensaje del commit: "
-
-if not defined commit_msg (
-    set "commit_msg=Actualizacion %DATE% %TIME:~0,8%"
-)
+set /p "commit_msg=   Describe los cambios: "
+if "%commit_msg%"=="" set "commit_msg=Actualizacion %DATE% %TIME:~0,8%"
 
 echo.
-echo  [1/3] Preparando archivos...
+echo   [%TIME:~0,8%] [1/3] Preparando archivos (git add)...
 git add -A
-if errorlevel 1 (
-    echo  [ERROR] No se pudieron preparar los archivos.
-    goto pause_menu
-)
-echo       [OK] Archivos preparados.
+echo   [OK] Archivos preparados.
 echo.
 
-echo  [2/3] Creando commit...
+echo   [%TIME:~0,8%] [2/3] Creando commit...
 git commit -m "%commit_msg%"
-if errorlevel 1 (
-    echo       [INFO] Puede que no existan cambios para confirmar.
-)
+echo   [OK] Commit creado.
 echo.
 
-echo  [3/3] Subiendo cambios a GitHub...
+echo   [%TIME:~0,8%] [3/3] Subiendo a GitHub (git push)...
+echo.
 git push origin main
 if errorlevel 1 (
     echo.
-    echo  [ERROR] No se pudo ejecutar git push.
+    echo   [ERROR] No se pudo subir. Verifica conexion y credenciales.
     goto pause_menu
 )
-
 echo.
-echo  +==================================================================================+
-echo  ^|                         CAMBIOS GUARDADOS                                         ^|
-echo  ^|                         GitHub actualizado correctamente                          ^|
-echo  +==================================================================================+
+echo  ==============================================================
+echo   CAMBIOS GUARDADOS EN GITHUB EXITOSAMENTE
+echo  ==============================================================
 goto pause_menu
 
-
-:: ================================================================
+:: ===============================================================
 :: [5] VERIFICAR ENTORNO
-:: ================================================================
+:: ===============================================================
 :opt_verify
 cls
 color 0B
-
 echo.
-echo  +==================================================================================+
-echo  ^|                         VERIFICACION DEL ENTORNO                                   ^|
-echo  +==================================================================================+
+echo  ==============================================================
+echo       VERIFICACION DEL ENTORNO
+echo  ==============================================================
 echo.
-echo  COMPONENTE                 ESTADO              VERSION
-echo  ------------------------------------------------------------------------------------
+echo   Componente              Estado        Version
+echo   -----------------------------------------------------------
 
-where node >nul 2>&1
-if errorlevel 1 (
-    echo  Node.js                   [FALTA]              -
+where node >nul 2>nul
+if %errorlevel% equ 0 (
+    for /f "tokens=*" %%v in ('node --version') do echo   Node.js                 [OK]          %%v
 ) else (
-    for /f "tokens=*" %%v in ('node --version') do echo  Node.js                   [OK]                 %%v
+    echo   Node.js                 [FALTA]
 )
 
-where npm >nul 2>&1
-if errorlevel 1 (
-    echo  NPM                       [FALTA]              -
+where npm >nul 2>nul
+if %errorlevel% equ 0 (
+    for /f "tokens=*" %%v in ('npm --version') do echo   NPM                     [OK]          v%%v
 ) else (
-    for /f "tokens=*" %%v in ('npm --version') do echo  NPM                       [OK]                 v%%v
+    echo   NPM                     [FALTA]
 )
 
-where git >nul 2>&1
-if errorlevel 1 (
-    echo  Git                       [NO DISP.]           -
+where git >nul 2>nul
+if %errorlevel% equ 0 (
+    for /f "tokens=*" %%v in ('git --version') do echo   Git                     [OK]          %%v
 ) else (
-    for /f "tokens=*" %%v in ('git --version') do echo  Git                       [OK]                 %%v
+    echo   Git                     [NO DISP.]
 )
 
+echo   -----------------------------------------------------------
 echo.
-echo  ARCHIVOS DEL PROYECTO
-echo  ------------------------------------------------------------------------------------
-if exist "package.json"           (echo  package.json              [OK]) else (echo  package.json              [FALTA])
-if exist "node_modules"           (echo  node_modules              [OK]) else (echo  node_modules              [PENDIENTE])
-if exist ".next"                  (echo  .next / build             [OK]) else (echo  .next / build             [NO COMPILADO])
-if exist "%DB_FILE%"              (echo  crepes.sqlite             [OK]) else (echo  crepes.sqlite             [FALTA])
-if exist ".env"                   (echo  .env                      [OK]) else (echo  .env                      [FALTA])
-
+echo   Archivos del Proyecto
+echo   -----------------------------------------------------------
+if exist "package.json"            (echo   package.json            [OK]) else (echo   package.json            [FALTA])
+if exist "node_modules"            (echo   node_modules            [OK]) else (echo   node_modules            [PENDIENTE])
+if exist ".next"                   (echo   .next [build]           [OK]) else (echo   .next [build]           [NO COMPILADO])
+if exist "database\crepes.sqlite"  (echo   crepes.sqlite           [OK]) else (echo   crepes.sqlite           [PENDIENTE])
+if exist ".env"                    (echo   .env                    [OK]) else (echo   .env                    [FALTA])
+echo   -----------------------------------------------------------
 echo.
-echo  SERVIDOR
-echo  ------------------------------------------------------------------------------------
+echo   Estado de Red
+echo   -----------------------------------------------------------
 netstat -aon | find ":%PORT%" | find "LISTENING" >nul 2>&1
-if errorlevel 1 (
-    echo  Puerto %PORT%               [LIBRE]
+if %errorlevel% equ 0 (
+    echo   Puerto %PORT%              [EN USO]
 ) else (
-    echo  Puerto %PORT%               [EN USO]
+    echo   Puerto %PORT%              [LIBRE]
 )
-
-echo.
-echo  CONFIGURACION
-echo  ------------------------------------------------------------------------------------
-echo  Directorio: %CD%
-echo  Puerto:     %PORT%
-echo  Version:    %VERSION%
-echo.
+echo   -----------------------------------------------------------
 goto pause_menu
 
-
-:: ================================================================
-:: [6] BACKUP DB
-:: ================================================================
+:: ===============================================================
+:: [6] RESPALDAR BASE DE DATOS
+:: ===============================================================
 :opt_backup_db
 cls
 color 0E
-
 echo.
-echo  +==================================================================================+
-echo  ^|                         RESPALDO DE BASE DE DATOS                                 ^|
-echo  +==================================================================================+
+echo  ==============================================================
+echo       RESPALDO DE BASE DE DATOS
+echo  ==============================================================
 echo.
 
-if not exist "%DB_FILE%" (
-    echo  [ERROR] No se encontro la base de datos:
-    echo          %DB_FILE%
+if not exist "database\crepes.sqlite" (
+    echo   [ERROR] No se encontro la base de datos.
     goto pause_menu
 )
 
+set "BACKUP_DIR=backups"
 if not exist "%BACKUP_DIR%" mkdir "%BACKUP_DIR%"
 
-for /f "tokens=1-3 delims=/" %%a in ("%DATE%") do (
-    set "FECHA=%%c-%%b-%%a"
-)
+for /f "tokens=1-3 delims=/" %%a in ("%DATE%") do set "FECHA=%%c-%%b-%%a"
+set "BFILE=%BACKUP_DIR%\crepes_%FECHA%_%TIME:~0,2%%TIME:~3,2%%TIME:~6,2%.sqlite"
+set "BFILE=%BFILE: =0%"
 
-set "HORA=%TIME:~0,2%%TIME:~3,2%%TIME:~6,2%"
-set "HORA=%HORA: =0%"
-set "BFILE=%BACKUP_DIR%\crepes_%FECHA%_%HORA%.sqlite"
-
-echo  Creando respaldo...
-copy /Y "%DB_FILE%" "%BFILE%" >nul
+echo   Copiando base de datos...
+copy "database\crepes.sqlite" "%BFILE%" >nul 2>&1
 if errorlevel 1 (
-    echo  [ERROR] No se pudo crear el respaldo.
+    echo   [ERROR] No se pudo crear el respaldo.
     goto pause_menu
 )
-
 echo.
-echo  +==================================================================================+
-echo  ^|                         RESPALDO CREADO                                          ^|
-echo  ^|  Archivo: %BFILE%
-echo  +==================================================================================+
+echo  ==============================================================
+echo   RESPALDO CREADO: %BFILE%
+echo  ==============================================================
 echo.
-echo  ULTIMOS RESPALDOS
-echo  ------------------------------------------------------------------------------------
-dir /b /o-d "%BACKUP_DIR%\*.sqlite" 2>nul
-echo  ------------------------------------------------------------------------------------
+echo   Respaldos disponibles:
+echo   -----------------------------------------------------------
+dir /b "%BACKUP_DIR%\*.sqlite" 2>nul
+echo   -----------------------------------------------------------
 goto pause_menu
 
-
-:: ================================================================
-:: [7] LIMPIEZA
-:: ================================================================
-:opt_cleanup
+:: ===============================================================
+:: [0] SALIR
+:: ===============================================================
+:opt_exit
 cls
-color 0E
-
 echo.
-echo  +==================================================================================+
-echo  ^|                         LIMPIEZA DEL PROYECTO                                     ^|
-echo  +==================================================================================+
+echo   Hasta luego - Crepes en Punto
 echo.
-echo  Esta opcion elimina archivos temporales de Next.js.
-echo  No elimina node_modules ni la base de datos.
-echo.
-set "confirm="
-set /p "confirm=  Deseas continuar? [S/N]: "
-
-if /I not "%confirm%"=="S" goto main_menu
-
-echo.
-echo  [1/2] Eliminando carpeta .next...
-if exist ".next" (
-    rmdir /s /q ".next"
-    echo       [OK] .next eliminada.
-) else (
-    echo       [INFO] .next no existe.
-)
-
-echo.
-echo  [2/2] Limpiando archivos temporales de npm...
-call npm cache verify >nul 2>&1
-echo       [OK] Cache verificada.
-
-echo.
-echo  Limpieza completada.
-goto pause_menu
-
-
-:: ================================================================
-:: UTILIDADES
-:: ================================================================
-:refresh_status
-set "S_NODE=FALTA"
-set "S_NPM=FALTA"
-set "S_GIT=NO"
-set "S_DEPS=PEND"
-set "S_DB=PEND"
-
-where node >nul 2>&1 && set "S_NODE=OK"
-where npm >nul 2>&1 && set "S_NPM=OK"
-where git >nul 2>&1 && set "S_GIT=OK"
-if exist "node_modules" set "S_DEPS=OK"
-if exist "%DB_FILE%" set "S_DB=OK"
+timeout /t 1 >nul
 exit /b
 
-:free_port
-echo  [0/5] Verificando puerto %PORT%...
-for /f "tokens=5" %%a in ('netstat -aon ^| find ":%PORT%" ^| find "LISTENING"') do (
-    echo       Puerto ocupado por PID %%a. Cerrando proceso...
-    taskkill /f /pid %%a >nul 2>&1
-)
-echo       [OK] Puerto %PORT% disponible.
-echo.
-exit /b
-
+:: ===============================================================
+:: ERRORES
+:: ===============================================================
 :error_npm
 color 0C
 echo.
-echo  +==================================================================================+
-echo  ^|  [ERROR] NO SE PUDIERON INSTALAR LAS DEPENDENCIAS                                ^|
-echo  +==================================================================================+
-echo  Revisa tu conexion a internet y el mensaje de npm mostrado arriba.
+echo  ==============================================================
+echo   [ERROR] No se pudieron instalar las dependencias.
+echo  ==============================================================
+echo   Si no hay internet, copia 'node_modules' manualmente.
 goto pause_menu
 
 :error_build
 color 0C
 echo.
-echo  +==================================================================================+
-echo  ^|  [ERROR] FALLO LA COMPILACION                                                    ^|
-echo  +==================================================================================+
-echo  Revisa el error de Next.js mostrado arriba.
+echo  ==============================================================
+echo   [ERROR] Fallo la compilacion del proyecto.
+echo  ==============================================================
+echo   Revisa los errores arriba en la consola.
 goto pause_menu
 
 :pause_menu
 echo.
-echo  ------------------------------------------------------------------------------------
-echo  Presiona cualquier tecla para volver al menu...
+echo   -----------------------------------------------------------
+echo   Presiona cualquier tecla para volver al menu...
+echo   -----------------------------------------------------------
 pause >nul
-call :refresh_status
 goto main_menu
-
-:opt_exit
-cls
-color 0B
-echo.
-echo  +==================================================================================+
-echo  ^|                         CREPES EN PUNTO                                           ^|
-echo  ^|                                                                                  ^|
-echo  ^|                         Panel cerrado correctamente.                             ^|
-echo  ^|                         Hasta luego.                                              ^|
-echo  +==================================================================================+
-echo.
-timeout /t 2 >nul
-exit /b
 
 :the_end
 echo.
-echo  Servidor detenido.
-echo  Presiona cualquier tecla para salir...
+echo   El servidor se ha detenido.
+echo   Presiona cualquier tecla para salir...
 pause >nul
