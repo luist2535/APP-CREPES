@@ -9,6 +9,7 @@ if not "%1"=="run" (
 title Crepes en Punto - Panel de Control v2.0
 mode con: cols=80 lines=38
 color 0B
+cd /d "%~dp0"
 
 set "VERSION=2.0.0"
 set "PORT=3000"
@@ -24,7 +25,7 @@ where node >nul 2>nul && set "S_NODE=OK"
 where npm >nul 2>nul && set "S_NPM=OK"
 where git >nul 2>nul && set "S_GIT=OK"
 if exist node_modules set "S_DEPS=OK"
-if exist "database\crepes.sqlite" set "S_DB=OK"
+if exist "database\crepes.db" set "S_DB=OK"
 
 :main_menu
 cls
@@ -314,7 +315,7 @@ echo   -----------------------------------------------------------
 if exist "package.json"            (echo   package.json            [OK]) else (echo   package.json            [FALTA])
 if exist "node_modules"            (echo   node_modules            [OK]) else (echo   node_modules            [PENDIENTE])
 if exist ".next"                   (echo   .next [build]           [OK]) else (echo   .next [build]           [NO COMPILADO])
-if exist "database\crepes.sqlite"  (echo   crepes.sqlite           [OK]) else (echo   crepes.sqlite           [PENDIENTE])
+if exist "database\crepes.db"  (echo   crepes.db               [OK]) else (echo   crepes.db           [PENDIENTE])
 if exist ".env"                    (echo   .env                    [OK]) else (echo   .env                    [FALTA])
 echo   -----------------------------------------------------------
 echo.
@@ -341,7 +342,7 @@ echo       RESPALDO DE BASE DE DATOS
 echo  ==============================================================
 echo.
 
-if not exist "database\crepes.sqlite" (
+if not exist "database\crepes.db" (
     echo   [ERROR] No se encontro la base de datos.
     goto pause_menu
 )
@@ -354,7 +355,7 @@ set "BFILE=%BACKUP_DIR%\crepes_%FECHA%_%TIME:~0,2%%TIME:~3,2%%TIME:~6,2%.sqlite"
 set "BFILE=%BFILE: =0%"
 
 echo   Copiando base de datos...
-copy "database\crepes.sqlite" "%BFILE%" >nul 2>&1
+copy "database\crepes.db" "%BFILE%" >nul 2>&1
 if errorlevel 1 (
     echo   [ERROR] No se pudo crear el respaldo.
     goto pause_menu
