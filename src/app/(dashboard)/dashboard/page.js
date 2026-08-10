@@ -139,89 +139,259 @@ export default function DashboardPage() {
       <div className="kpis-container">
 
         {/* Card 1: POI OPERANDO */}
-        <div className="kpi-card">
-          <div className="kpi-card-content">
-            <div className="kpi-icon-box" style={{ background: '#E8F5E9' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2E7D32" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                <path d="M3 9h18"/><path d="M9 21V9"/><path d="M7 14l3-3 3 3 4-4"/>
-              </svg>
+        {(() => {
+          const total = data?.totalPdv || 20;
+          const count = greenCount || 20;
+          const pct = total > 0 ? Math.round((count / total) * 100) : 100;
+          const r = 22; const circ = 2 * Math.PI * r;
+          const offset = circ - (pct / 100) * circ;
+          return (
+            <div className="kpi-card kpi-card-enhanced">
+              <div className="kpi-card-top">
+                <div className="kpi-header-row">
+                  <div className="kpi-icon-box" style={{ background: 'linear-gradient(135deg, #E8F5E9, #C8E6C9)' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2E7D32" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2"/>
+                      <path d="M3 9h18"/><path d="M9 21V9"/><path d="M7 14l3-3 3 3 4-4"/>
+                    </svg>
+                  </div>
+                  <div className="kpi-mini-ring">
+                    <svg width="52" height="52" viewBox="0 0 52 52">
+                      <circle cx="26" cy="26" r={r} fill="transparent" stroke="#F0F0F0" strokeWidth="4"/>
+                      <circle cx="26" cy="26" r={r} fill="transparent" stroke="#22C55E" strokeWidth="4"
+                        strokeDasharray={circ} strokeDashoffset={offset}
+                        strokeLinecap="round" transform="rotate(-90 26 26)" style={{ transition: 'stroke-dashoffset 1s ease' }}/>
+                    </svg>
+                    <span className="kpi-ring-pct">{pct}%</span>
+                  </div>
+                </div>
+                <div className="kpi-label">POI OPERANDO</div>
+                <div className="kpi-num-row">
+                  <span className="kpi-num">{count}</span>
+                  <span className="kpi-total-badge">/ {total} total</span>
+                </div>
+              </div>
+              <div className="kpi-detail-section">
+                <div className="kpi-progress-track">
+                  <div className="kpi-progress-fill" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #22C55E, #4ADE80)' }} />
+                </div>
+                <div className="kpi-detail-row">
+                  <div className="kpi-detail-item">
+                    <span className="kpi-detail-dot" style={{ background: '#22C55E' }} />
+                    <span className="kpi-detail-label">Meta diaria</span>
+                    <span className="kpi-detail-val">{total}</span>
+                  </div>
+                  <div className="kpi-detail-item">
+                    <span className="kpi-detail-dot" style={{ background: '#86EFAC' }} />
+                    <span className="kpi-detail-label">Alcanzado</span>
+                    <span className="kpi-detail-val">{count}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="kpi-footer-trend">
+                <span className="kpi-trend green">↑ 5% vs ayer</span>
+                <div className="kpi-sparkline">
+                  <svg viewBox="0 0 60 20" width="60" height="20">
+                    <path d="M0,16 L10,14 L20,12 L30,15 L40,10 L50,8 L60,5" fill="none" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round"/>
+                    <circle cx="60" cy="5" r="2" fill="#22C55E"/>
+                  </svg>
+                </div>
+              </div>
             </div>
-            <div className="kpi-text-box">
-              <div className="kpi-label">POI OPERANDO</div>
-              <div className="kpi-num">{greenCount || 20}</div>
-              <div className="kpi-trend green">↑ 5% vs ayer</div>
-            </div>
-          </div>
-          {/* Smooth wave line with end dot */}
-          <div className="kpi-wave">
-            <svg viewBox="0 0 200 30" width="100%" height="30" preserveAspectRatio="none">
-              <path d="M 0,22 Q 40,26 80,18 T 160,20 T 195,8" fill="none" stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round"/>
-              <circle cx="195" cy="8" r="3.5" fill="#22C55E"/>
-            </svg>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* Card 2: ALERTAS */}
-        <div className="kpi-card">
-          <div className="kpi-card-content">
-            <div className="kpi-icon-box" style={{ background: '#FFF8E1' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F57F17" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
+        {(() => {
+          const total = data?.totalPdv || 20;
+          const count = yellowCount || 0;
+          const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+          const r = 22; const circ = 2 * Math.PI * r;
+          const offset = circ - (pct / 100) * circ;
+          return (
+            <div className="kpi-card kpi-card-enhanced">
+              <div className="kpi-card-top">
+                <div className="kpi-header-row">
+                  <div className="kpi-icon-box" style={{ background: 'linear-gradient(135deg, #FFF8E1, #FFF3C4)' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F57F17" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                  </div>
+                  <div className="kpi-mini-ring">
+                    <svg width="52" height="52" viewBox="0 0 52 52">
+                      <circle cx="26" cy="26" r={r} fill="transparent" stroke="#F0F0F0" strokeWidth="4"/>
+                      <circle cx="26" cy="26" r={r} fill="transparent" stroke="#EAB308" strokeWidth="4"
+                        strokeDasharray={circ} strokeDashoffset={offset}
+                        strokeLinecap="round" transform="rotate(-90 26 26)" style={{ transition: 'stroke-dashoffset 1s ease' }}/>
+                    </svg>
+                    <span className="kpi-ring-pct">{pct}%</span>
+                  </div>
+                </div>
+                <div className="kpi-label">ALERTAS</div>
+                <div className="kpi-num-row">
+                  <span className="kpi-num">{count}</span>
+                  <span className="kpi-total-badge">/ {total} total</span>
+                </div>
+              </div>
+              <div className="kpi-detail-section">
+                <div className="kpi-progress-track">
+                  <div className="kpi-progress-fill" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #EAB308, #FACC15)' }} />
+                </div>
+                <div className="kpi-detail-row">
+                  <div className="kpi-detail-item">
+                    <span className="kpi-detail-dot" style={{ background: '#EAB308' }} />
+                    <span className="kpi-detail-label">Requieren atención</span>
+                    <span className="kpi-detail-val">{count}</span>
+                  </div>
+                  <div className="kpi-detail-item">
+                    <span className="kpi-detail-dot" style={{ background: '#FDE68A' }} />
+                    <span className="kpi-detail-label">Resueltas hoy</span>
+                    <span className="kpi-detail-val">0</span>
+                  </div>
+                </div>
+              </div>
+              <div className="kpi-footer-trend">
+                <span className="kpi-trend gray">Sin cambios</span>
+                <div className="kpi-sparkline">
+                  <svg viewBox="0 0 60 20" width="60" height="20">
+                    <path d="M0,10 L10,12 L20,10 L30,11 L40,10 L50,10 L60,10" fill="none" stroke="#EAB308" strokeWidth="1.5" strokeLinecap="round"/>
+                    <circle cx="60" cy="10" r="2" fill="#EAB308"/>
+                  </svg>
+                </div>
+              </div>
             </div>
-            <div className="kpi-text-box">
-              <div className="kpi-label">ALERTAS</div>
-              <div className="kpi-num">{yellowCount || 0}</div>
-              <div className="kpi-trend gray">Sin cambios</div>
-            </div>
-          </div>
-          <div className="kpi-solid-line" style={{ background: '#EAB308' }} />
-        </div>
+          );
+        })()}
 
         {/* Card 3: FUERA DE SERVICIO */}
-        <div className="kpi-card">
-          <div className="kpi-card-content">
-            <div className="kpi-icon-box" style={{ background: '#FFEBEE' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C62828" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
+        {(() => {
+          const total = data?.totalPdv || 20;
+          const count = redCount || 0;
+          const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+          const r = 22; const circ = 2 * Math.PI * r;
+          const offset = circ - (pct / 100) * circ;
+          return (
+            <div className="kpi-card kpi-card-enhanced">
+              <div className="kpi-card-top">
+                <div className="kpi-header-row">
+                  <div className="kpi-icon-box" style={{ background: 'linear-gradient(135deg, #FFEBEE, #FFCDD2)' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C62828" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                  </div>
+                  <div className="kpi-mini-ring">
+                    <svg width="52" height="52" viewBox="0 0 52 52">
+                      <circle cx="26" cy="26" r={r} fill="transparent" stroke="#F0F0F0" strokeWidth="4"/>
+                      <circle cx="26" cy="26" r={r} fill="transparent" stroke="#EF4444" strokeWidth="4"
+                        strokeDasharray={circ} strokeDashoffset={offset}
+                        strokeLinecap="round" transform="rotate(-90 26 26)" style={{ transition: 'stroke-dashoffset 1s ease' }}/>
+                    </svg>
+                    <span className="kpi-ring-pct">{pct}%</span>
+                  </div>
+                </div>
+                <div className="kpi-label">FUERA DE SERVICIO</div>
+                <div className="kpi-num-row">
+                  <span className="kpi-num">{count}</span>
+                  <span className="kpi-total-badge">/ {total} total</span>
+                </div>
+              </div>
+              <div className="kpi-detail-section">
+                <div className="kpi-progress-track">
+                  <div className="kpi-progress-fill" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #EF4444, #F87171)' }} />
+                </div>
+                <div className="kpi-detail-row">
+                  <div className="kpi-detail-item">
+                    <span className="kpi-detail-dot" style={{ background: '#EF4444' }} />
+                    <span className="kpi-detail-label">Críticos</span>
+                    <span className="kpi-detail-val">{count}</span>
+                  </div>
+                  <div className="kpi-detail-item">
+                    <span className="kpi-detail-dot" style={{ background: '#FCA5A5' }} />
+                    <span className="kpi-detail-label">Tiempo prom.</span>
+                    <span className="kpi-detail-val">{count > 0 ? '2.4h' : '—'}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="kpi-footer-trend">
+                <span className="kpi-trend gray">Sin cambios</span>
+                <div className="kpi-sparkline">
+                  <svg viewBox="0 0 60 20" width="60" height="20">
+                    <path d="M0,12 L10,10 L20,14 L30,12 L40,12 L50,10 L60,10" fill="none" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round"/>
+                    <circle cx="60" cy="10" r="2" fill="#EF4444"/>
+                  </svg>
+                </div>
+              </div>
             </div>
-            <div className="kpi-text-box">
-              <div className="kpi-label">FUERA DE SERVICIO</div>
-              <div className="kpi-num">{redCount || 0}</div>
-              <div className="kpi-trend gray">Sin cambios</div>
-            </div>
-          </div>
-          <div className="kpi-solid-line" style={{ background: '#EF4444' }} />
-        </div>
+          );
+        })()}
 
         {/* Card 4: VISITAS PENDIENTES */}
-        <div className="kpi-card">
-          <div className="kpi-card-content">
-            <div className="kpi-icon-box" style={{ background: '#F5EDE4' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6B3A2A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
+        {(() => {
+          const count = data?.visitasPendientes ?? 3;
+          const meta = data?.visitasMes ?? 10;
+          const completadas = meta > count ? meta - count : 0;
+          const pctDone = meta > 0 ? Math.round((completadas / meta) * 100) : 0;
+          const r = 22; const circ = 2 * Math.PI * r;
+          const offset = circ - (pctDone / 100) * circ;
+          return (
+            <div className="kpi-card kpi-card-enhanced">
+              <div className="kpi-card-top">
+                <div className="kpi-header-row">
+                  <div className="kpi-icon-box" style={{ background: 'linear-gradient(135deg, #F5EDE4, #E8D5C4)' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B3A2A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                      <circle cx="9" cy="7" r="4"/>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                  </div>
+                  <div className="kpi-mini-ring">
+                    <svg width="52" height="52" viewBox="0 0 52 52">
+                      <circle cx="26" cy="26" r={r} fill="transparent" stroke="#F0F0F0" strokeWidth="4"/>
+                      <circle cx="26" cy="26" r={r} fill="transparent" stroke="#6B3A2A" strokeWidth="4"
+                        strokeDasharray={circ} strokeDashoffset={offset}
+                        strokeLinecap="round" transform="rotate(-90 26 26)" style={{ transition: 'stroke-dashoffset 1s ease' }}/>
+                    </svg>
+                    <span className="kpi-ring-pct">{pctDone}%</span>
+                  </div>
+                </div>
+                <div className="kpi-label">VISITAS PENDIENTES</div>
+                <div className="kpi-num-row">
+                  <span className="kpi-num">{count}</span>
+                  <span className="kpi-total-badge">pendientes</span>
+                </div>
+              </div>
+              <div className="kpi-detail-section">
+                <div className="kpi-progress-track">
+                  <div className="kpi-progress-fill" style={{ width: `${pctDone}%`, background: 'linear-gradient(90deg, #6B3A2A, #8B5E3C)' }} />
+                </div>
+                <div className="kpi-detail-row">
+                  <div className="kpi-detail-item">
+                    <span className="kpi-detail-dot" style={{ background: '#6B3A2A' }} />
+                    <span className="kpi-detail-label">Completadas</span>
+                    <span className="kpi-detail-val">{completadas}</span>
+                  </div>
+                  <div className="kpi-detail-item">
+                    <span className="kpi-detail-dot" style={{ background: '#D4A574' }} />
+                    <span className="kpi-detail-label">Programadas</span>
+                    <span className="kpi-detail-val">{meta}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="kpi-footer-trend">
+                <span className="kpi-trend brown">↓ 2 vs ayer</span>
+                <div className="kpi-sparkline">
+                  <svg viewBox="0 0 60 20" width="60" height="20">
+                    <path d="M0,8 L10,10 L20,6 L30,12 L40,8 L50,14 L60,16" fill="none" stroke="#6B3A2A" strokeWidth="1.5" strokeLinecap="round"/>
+                    <circle cx="60" cy="16" r="2" fill="#6B3A2A"/>
+                  </svg>
+                </div>
+              </div>
             </div>
-            <div className="kpi-text-box">
-              <div className="kpi-label">VISITAS PENDIENTES</div>
-              <div className="kpi-num">{data?.visitasPendientes ?? 3}</div>
-              <div className="kpi-trend brown">↓ 2 vs ayer</div>
-            </div>
-          </div>
-          {/* Smooth wave line with end dot */}
-          <div className="kpi-wave">
-            <svg viewBox="0 0 200 30" width="100%" height="30" preserveAspectRatio="none">
-              <path d="M 0,10 Q 50,24 100,16 T 195,22" fill="none" stroke="#6B3A2A" strokeWidth="2.5" strokeLinecap="round"/>
-              <circle cx="195" cy="22" r="3.5" fill="#6B3A2A"/>
-            </svg>
-          </div>
-        </div>
+          );
+        })()}
 
       </div>
 
@@ -586,6 +756,51 @@ export default function DashboardPage() {
           .kpis-container {
             gap: 12px;
           }
+          .kpi-card-top {
+            padding: 12px 14px 10px 14px;
+          }
+          .kpi-icon-box {
+            width: 34px;
+            height: 34px;
+          }
+          .kpi-icon-box svg {
+            width: 16px;
+            height: 16px;
+          }
+          .kpi-mini-ring {
+            width: 42px;
+            height: 42px;
+          }
+          .kpi-mini-ring svg {
+            width: 42px;
+            height: 42px;
+          }
+          .kpi-ring-pct {
+            font-size: 0.55rem;
+          }
+          .kpi-num {
+            font-size: 1.5rem;
+          }
+          .kpi-total-badge {
+            font-size: 0.6rem;
+          }
+          .kpi-label {
+            font-size: 0.55rem;
+            letter-spacing: 0.5px;
+          }
+          .kpi-detail-section {
+            padding: 0 14px 8px 14px;
+          }
+          .kpi-detail-item {
+            font-size: 0.6rem;
+          }
+          .kpi-footer-trend {
+            padding: 6px 14px;
+          }
+          .kpi-sparkline svg {
+            width: 48px;
+            height: 16px;
+          }
           
           /* Map and Table side-by-side on mobile */
           .map-row-content {
@@ -645,26 +860,39 @@ export default function DashboardPage() {
 
         .kpi-card {
           background: #FFFFFF;
-          border-radius: 12px;
-          padding: 16px 16px 36px 16px;
+          border-radius: 14px;
           border: 1px solid #F4EBE1;
-          box-shadow: 0 4px 15px rgba(107, 58, 42, 0.04);
+          box-shadow: 0 2px 12px rgba(107, 58, 42, 0.04);
           position: relative;
           overflow: hidden;
           display: flex;
           flex-direction: column;
+          transition: transform 0.25s ease, box-shadow 0.25s ease;
         }
 
-        .kpi-card-content {
+        .kpi-card:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 8px 28px rgba(107, 58, 42, 0.10);
+        }
+
+        .kpi-card-enhanced {
+          padding: 0;
+        }
+
+        .kpi-card-top {
+          padding: 16px 18px 12px 18px;
+        }
+
+        .kpi-header-row {
           display: flex;
-          gap: 12px;
+          justify-content: space-between;
           align-items: flex-start;
-          flex: 1;
+          margin-bottom: 10px;
         }
 
         .kpi-icon-box {
-          width: 44px;
-          height: 44px;
+          width: 40px;
+          height: 40px;
           border-radius: 10px;
           display: flex;
           align-items: center;
@@ -672,28 +900,118 @@ export default function DashboardPage() {
           flex-shrink: 0;
         }
 
-        .kpi-text-box {
+        .kpi-mini-ring {
+          position: relative;
+          width: 52px;
+          height: 52px;
           display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          text-align: left;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .kpi-ring-pct {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.62rem;
+          font-weight: 800;
+          color: #2C1810;
         }
 
         .kpi-label {
-          font-size: 0.65rem;
+          font-size: 0.62rem;
           font-weight: 800;
-          color: #2C1810;
-          letter-spacing: 0.6px;
-          margin-bottom: 2px;
+          color: #9CA3AF;
+          letter-spacing: 0.8px;
+          margin-bottom: 4px;
           text-transform: uppercase;
         }
 
+        .kpi-num-row {
+          display: flex;
+          align-items: baseline;
+          gap: 6px;
+        }
+
         .kpi-num {
-          font-size: 1.8rem;
+          font-size: 2rem;
           font-weight: 800;
           color: #2C1810;
           line-height: 1;
-          margin-bottom: 2px;
+        }
+
+        .kpi-total-badge {
+          font-size: 0.7rem;
+          font-weight: 600;
+          color: #B0A8A0;
+        }
+
+        /* Detail Section */
+        .kpi-detail-section {
+          padding: 0 18px 12px 18px;
+          border-top: 1px solid #F9F5F0;
+        }
+
+        .kpi-progress-track {
+          width: 100%;
+          height: 4px;
+          background: #F4EBE1;
+          border-radius: 4px;
+          margin: 12px 0 10px 0;
+          overflow: hidden;
+        }
+
+        .kpi-progress-fill {
+          height: 100%;
+          border-radius: 4px;
+          transition: width 1s ease;
+        }
+
+        .kpi-detail-row {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .kpi-detail-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.68rem;
+        }
+
+        .kpi-detail-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          flex-shrink: 0;
+        }
+
+        .kpi-detail-label {
+          color: #9CA3AF;
+          font-weight: 500;
+          flex: 1;
+        }
+
+        .kpi-detail-val {
+          font-weight: 700;
+          color: #2C1810;
+        }
+
+        /* Footer Trend */
+        .kpi-footer-trend {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px 18px;
+          background: #FDFBF9;
+          border-top: 1px solid #F9F5F0;
+        }
+
+        .kpi-sparkline {
+          flex-shrink: 0;
         }
 
         .kpi-trend {
@@ -704,23 +1022,6 @@ export default function DashboardPage() {
         .kpi-trend.gray { color: #9CA3AF; }
         .kpi-trend.brown { color: #6B3A2A; }
 
-        .kpi-wave {
-          position: absolute;
-          bottom: -4px;
-          left: 0;
-          width: 100%;
-        }
-        .kpi-wave svg {
-          display: block;
-        }
-
-        .kpi-solid-line {
-          position: absolute;
-          bottom: 0;
-          left: 0;
-          width: 100%;
-          height: 4px;
-        }
 
         .donut-gauge-container {
           display: flex;
