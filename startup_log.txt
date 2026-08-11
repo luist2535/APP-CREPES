@@ -1,0 +1,226 @@
+[mar. 11/08/2026 14:08:07,90] === INICIO SERVIDOR PRODUCCION === 
+[14:08:08,00] Puerto 3000 liberado 
+[14:08:08,01] Dependencias listas 
+====================================================
+🗄️  VERIFICANDO Y ACTUALIZANDO BASE DE DATOS
+====================================================
+
+▶️  Ejecutando init-db.js...
+🗄️ Iniciando conexión e inicialización de SQLite...
+✅ Base de datos lista.
+   - Usuarios sembrados: 38
+   - Puntos de Venta (PDVs): 20
+
+▶️  Ejecutando migrate-db.js...
+⚡ Iniciando migración de base de datos...
+ℹ️ La columna "etiqueta" ya existe.
+✅ Tabla "equipos" verificada/creada exitosamente.
+✅ Índice "idx_equipos_pdv" creado exitosamente.
+✅ Datos de equipos sembrados en la base de datos.
+🎉 Migración completada exitosamente.
+
+▶️  Ejecutando migrate-db-2.js...
+⚡ Iniciando segunda migración (Calendario -> Áreas)...
+ℹ️ La columna "area_id" ya existe.
+🎉 Segunda migración completada exitosamente.
+
+▶️  Ejecutando migrate-db-3.js...
+⚡ Iniciando tercera migración de base de datos...
+ℹ️ La columna "tipo_flujo" ya existe.
+ℹ️ La columna "repuestos" ya existe.
+ℹ️ La columna "firma_auxiliar" ya existe.
+ℹ️ La columna "firma_jefe" ya existe.
+ℹ️ La columna "comentarios_jefe" ya existe.
+ℹ️ La columna "hallazgos" ya existe.
+ℹ️ La columna "acciones_correctivas" ya existe.
+ℹ️ La columna "evento_id" ya existe.
+ℹ️ El área "Sistemas" ya existe.
+✅ Tipos de flujo actualizados para todas las áreas (Mantenimiento y Sistemas = tecnico, otros = administrativo).
+ℹ️ El rol "Jefe de Sistemas" ya existe.
+ℹ️ El rol "Auxiliar de Operaciones" ya existe.
+ℹ️ El rol "Auxiliar SST" ya existe.
+ℹ️ El rol "Auxiliar de Mantenimiento" ya existe.
+ℹ️ El rol "Auxiliar de Calidad" ya existe.
+ℹ️ El rol "Auxiliar DRH" ya existe.
+ℹ️ El rol "Auxiliar Formación" ya existe.
+ℹ️ El rol "Auxiliar de Sistemas" ya existe.
+🎉 Migración 3 completada exitosamente.
+
+▶️  Ejecutando migrate-db-4.js...
+⚡ Iniciando cuarta migración de base de datos...
+ℹ️ La columna "pdv_id" ya existe en la tabla "users".
+✅ Tabla "solicitudes_visita" creada o verificada con éxito.
+ℹ️ El rol "Punto de Venta" ya existe.
+Encontrados 20 puntos de venta para crear accesos.
+ℹ️ Usuario de prueba existente actualizado: PDV San Martín (pdv_sanmartn@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV Plaza Bocagrande (pdv_plazabocagrande@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV San Juan (pdv_sanjuan@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV San Pedro (pdv_sanpedro@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV San Diego (pdv_sandiego@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV Serrezuela (pdv_serrezuela@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV Mall Plaza (pdv_mallplaza@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV Caribe Plaza (pdv_caribeplaza@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV Oficinas Administrativas (pdv_oficinasadministrativas@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV Parque Alegra (pdv_parquealegra@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV Portal del Prado (pdv_portaldelprado@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV Alto Prado (pdv_altoprado@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV Le Meridiem Golf (pdv_lemeridiemgolf@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV Viva (pdv_viva@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV Buenavista I (pdv_buenavistai@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV Heladería Buenavista II (pdv_heladerabuenavistaii@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV Logika / Planta de producción (pdv_logikaplantadeproduccin@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV Zazue (pdv_zazue@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV Casacentro (pdv_casacentro@crepesenpunto.com)
+ℹ️ Usuario de prueba existente actualizado: PDV Buena Vista (pdv_buenavista@crepesenpunto.com)
+🎉 Cuarta migración completada exitosamente.
+
+▶️  Ejecutando migrate-db-5.js...
+⚡ Iniciando quinta migración de base de datos...
+✅ Tabla "configuraciones" creada o verificada con éxito.
+ℹ️ La configuración "smtp_host" ya está registrada.
+ℹ️ La configuración "smtp_port" ya está registrada.
+ℹ️ La configuración "smtp_user" ya está registrada.
+ℹ️ La configuración "smtp_pass" ya está registrada.
+🎉 Quinta migración completada exitosamente.
+
+▶️  Ejecutando migrate-db-6.js...
+⚡ Iniciando sexta migración de base de datos...
+ℹ️ La columna "equipo_id" ya existe.
+🎉 Sexta migración completada exitosamente.
+
+▶️  Ejecutando migrate-db-7.js...
+
+🔄 Migrando: C:\Users\p.tecbqa\Documents\App Crepes 2.0\crepes-app\database\crepes.db
+  ✅ Tabla categorias_visita creada/ya existe.
+  ℹ️  visitas.categoria_id ya existe.
+  ℹ️  eventos_calendario.override_justificacion ya existe.
+  ℹ️  categorias_visita ya tiene 206 registros. Omitiendo seed.
+⚠️  BD no encontrada en: C:\ProgramData\CrepesApp\crepes.db — omitiendo.
+
+🎉 migrate-db-7.js completado exitosamente.
+
+▶️  Ejecutando migrate-db-8.js...
+⚡ [Migración 8] Iniciando configuración de Repositorio Documental y Carpetas...
+✅ Tabla "archivos_repositorio" e índices creados con éxito.
+📁 Carpeta asegurada: public/archivos/excel
+📁 Carpeta asegurada: public/archivos/fotos
+📁 Carpeta asegurada: public/archivos/pdf
+📁 Carpeta asegurada: public/archivos/documentos
+📁 Carpeta asegurada: public/archivos/general
+✅ Se registraron 0 archivos previos en la base de datos.
+🎉 Migración 8 completada: Todo organizado por carpetas y respaldado en BD.
+
+▶️  Ejecutando migrate-db-9.js...
+⚡ [Migración 9] Iniciando actualización de nombre DRH y mejoras de esquema de Cargos...
+✅ Área actualizada en tabla 'areas' (1 registros modificados).
+✅ Cargo ID 14 actualizado de 'Auxiliar VRH' a 'Auxiliar DRH' (1 registros modificados).
+ℹ️ La columna "activo" ya existe en la tabla "roles".
+✅ Tabla "historial_secciones_calidad" e índices creados con éxito para analítica longitudinal de Calidad.
+🎉 Migración 9 completada exitosamente.
+
+▶️  Ejecutando add-bpm-checklist.js...
+⚡ Verificando e instalando plantilla BPM...
+ℹ️ La plantilla "Lista de Chequeo BPM" ya existe (ID: 15). Omitiendo creación.
+
+✅  Base de datos verificada y lista para producción.
+[14:08:10,00] Migraciones completas 
+
+> crepes-app@0.1.0 build
+> next build
+
+⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of C:\Users\p.tecbqa\Documents\App Crepes 2.0\package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * C:\Users\p.tecbqa\Documents\App Crepes 2.0\crepes-app\package-lock.json
+
+▲ Next.js 16.2.9 (Turbopack)
+- Environments: .env.local, .env
+
+  Creating an optimized production build ...
+Turbopack build encountered 1 warnings:
+./crepes-app/next.config.mjs
+Encountered unexpected file in NFT list
+A file was traced that indicates that the whole project was traced unintentionally. Somewhere in the import trace below, there are:
+- filesystem operations (like path.join, path.resolve or fs.readFile), or
+- very dynamic requires (like require('./' + foo)).
+To resolve this, you can
+- remove them if possible, or
+- only use them in development, or
+- make sure they are statically scoped to some subfolder: path.join(process.cwd(), 'data', bar), or
+- add ignore comments: path.join(/*turbopackIgnore: true*/ process.cwd(), bar)
+
+Import trace:
+  App Route:
+    ./crepes-app/next.config.mjs
+    ./crepes-app/src/app/uploads/[filename]/route.js
+
+
+✓ Compiled successfully in 7.6s
+  Running TypeScript ...
+  Finished TypeScript in 352ms ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/48) ...
+  Generating static pages using 7 workers (12/48) 
+  Generating static pages using 7 workers (24/48) 
+  Generating static pages using 7 workers (36/48) 
+✓ Generating static pages using 7 workers (48/48) in 729ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /admin
+├ ƒ /api/admin
+├ ƒ /api/admin/email-settings
+├ ƒ /api/archivos
+├ ƒ /api/auditorias
+├ ƒ /api/auth/force-change-password
+├ ƒ /api/auth/login
+├ ƒ /api/auth/logout
+├ ƒ /api/auth/me
+├ ƒ /api/auth/microsoft
+├ ƒ /api/auth/microsoft/callback
+├ ƒ /api/bloqueos
+├ ƒ /api/calendario
+├ ƒ /api/cargos
+├ ƒ /api/dashboard
+├ ƒ /api/equipos
+├ ƒ /api/historial
+├ ƒ /api/inspecciones
+├ ƒ /api/mantenimientos
+├ ƒ /api/mantenimientos/[id]
+├ ƒ /api/mantenimientos/reportes
+├ ƒ /api/notifications
+├ ƒ /api/pdv
+├ ƒ /api/plantillas
+├ ƒ /api/reportes
+├ ƒ /api/reportes/calidad-comportamiento
+├ ƒ /api/roles-permisos
+├ ƒ /api/solicitudes
+├ ƒ /api/uploads
+├ ƒ /api/users
+├ ƒ /api/users/notificaciones
+├ ƒ /api/visitas
+├ ƒ /api/visitas/export
+├ ƒ /api/visitas/export-general
+├ ○ /archivos
+├ ƒ /archivos/[...path]
+├ ○ /auditoria
+├ ○ /bloqueos
+├ ○ /calendario
+├ ○ /dashboard
+├ ○ /equipos
+├ ○ /mantenimiento
+├ ○ /reportes
+├ ○ /solicitudes
+├ ○ /territorial
+├ ƒ /uploads/[filename]
+└ ○ /visitas
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+[14:08:24,76] Build completado 

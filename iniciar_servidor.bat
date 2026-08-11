@@ -82,47 +82,70 @@ goto main_menu
 :opt_production
 cls
 color 0A
+
+set "LOGFILE=%~dp0startup_log.txt"
+echo [%DATE% %TIME%] === INICIO SERVIDOR PRODUCCION === > "%LOGFILE%"
+
 echo.
 echo  ==============================================================
-echo       INICIANDO SERVIDOR EN MODO PRODUCCION
+echo  #                                                            #
+echo  #        INICIANDO SERVIDOR EN MODO PRODUCCION               #
+echo  #                                                            #
 echo  ==============================================================
+echo.
+echo   Toda la salida detallada se guarda en: startup_log.txt
+echo   --------------------------------------------------------------
 echo.
 
-echo   [%TIME:~0,8%] [1/5] Liberando puerto %PORT%...
+:: --- Paso 1: Liberar puerto ---
+echo   [1/5] Liberando puerto %PORT%...
 for /f "tokens=5" %%a in ('netstat -aon ^| find ":%PORT%" ^| find "LISTENING"') do taskkill /f /pid %%a >nul 2>&1
-echo   [OK] Puerto %PORT% liberado.
+echo         [OK] Puerto %PORT% liberado.
+echo [%TIME%] Puerto %PORT% liberado >> "%LOGFILE%"
 echo.
 
-echo   [%TIME:~0,8%] [2/5] Verificando dependencias...
+:: --- Paso 2: Dependencias ---
+echo   [2/5] Verificando dependencias...
 if not exist node_modules (
-    echo   Instalando dependencias del proyecto...
-    call npm install
+    echo         Instalando dependencias, espere...
+    call npm install >> "%LOGFILE%" 2>&1
     if errorlevel 1 goto error_npm
 )
-echo   [OK] Dependencias listas.
+echo         [OK] Dependencias listas.
+echo [%TIME%] Dependencias listas >> "%LOGFILE%"
 echo.
 
-echo   [%TIME:~0,8%] [3/5] Ejecutando migraciones de base de datos...
+:: --- Paso 3: Migraciones ---
+echo   [3/5] Ejecutando migraciones de base de datos...
 if exist "run-all-migrations.js" (
-    call node run-all-migrations.js
+    call node run-all-migrations.js >> "%LOGFILE%" 2>&1
 )
-echo   [OK] Base de datos lista.
+echo         [OK] Base de datos actualizada.
+echo [%TIME%] Migraciones completas >> "%LOGFILE%"
 echo.
 
-echo   [%TIME:~0,8%] [4/5] Compilando aplicacion (esto toma 2-5 min)...
-echo.
-call npm run build
+:: --- Paso 4: Build ---
+echo   [4/5] Compilando aplicacion (esto puede tomar 2-5 min)...
+echo         Por favor espere, no cierre esta ventana...
+call npm run build >> "%LOGFILE%" 2>&1
 if errorlevel 1 goto error_build
-echo.
-echo   [OK] Compilacion exitosa.
+echo         [OK] Compilacion exitosa.
+echo [%TIME%] Build completado >> "%LOGFILE%"
 echo.
 
-echo   [%TIME:~0,8%] [5/5] Levantando servidor en produccion...
+:: --- Paso 5: Levantar servidor ---
+echo   [5/5] Levantando servidor en produccion...
+echo         [OK] Servidor listo.
 echo.
 echo  ==============================================================
-echo   SERVIDOR LISTO EN: http://localhost:%PORT%
+echo  #                                                            #
+echo  #   SERVIDOR LISTO EN: http://localhost:%PORT%                #
+echo  #                                                            #
 echo  ==============================================================
+echo.
 echo   Presiona Ctrl+C para detener el servidor.
+echo   Log completo en: startup_log.txt
+echo   --------------------------------------------------------------
 echo.
 start http://localhost:%PORT% >nul 2>&1
 call npm run start
@@ -134,36 +157,57 @@ goto the_end
 :opt_development
 cls
 color 0E
+
+set "LOGFILE=%~dp0startup_log.txt"
+echo [%DATE% %TIME%] === INICIO SERVIDOR DESARROLLO === > "%LOGFILE%"
+
 echo.
 echo  ==============================================================
-echo       INICIANDO SERVIDOR EN MODO DESARROLLO
+echo  #                                                            #
+echo  #        INICIANDO SERVIDOR EN MODO DESARROLLO               #
+echo  #                                                            #
 echo  ==============================================================
+echo.
+echo   Toda la salida detallada se guarda en: startup_log.txt
+echo   --------------------------------------------------------------
 echo.
 
-echo   [%TIME:~0,8%] [1/3] Liberando puerto %PORT%...
+:: --- Paso 1: Liberar puerto ---
+echo   [1/3] Liberando puerto %PORT%...
 for /f "tokens=5" %%a in ('netstat -aon ^| find ":%PORT%" ^| find "LISTENING"') do taskkill /f /pid %%a >nul 2>&1
-echo   [OK] Puerto liberado.
+echo         [OK] Puerto %PORT% liberado.
+echo [%TIME%] Puerto liberado >> "%LOGFILE%"
 echo.
 
-echo   [%TIME:~0,8%] [2/3] Verificando dependencias...
+:: --- Paso 2: Dependencias ---
+echo   [2/3] Verificando dependencias...
 if not exist node_modules (
-    call npm install
+    echo         Instalando dependencias, espere...
+    call npm install >> "%LOGFILE%" 2>&1
     if errorlevel 1 goto error_npm
 )
-echo   [OK] Dependencias listas.
+echo         [OK] Dependencias listas.
+echo [%TIME%] Dependencias listas >> "%LOGFILE%"
 echo.
 
-echo   [%TIME:~0,8%] [3/3] Ejecutando migraciones de base de datos...
+:: --- Paso 3: Migraciones ---
+echo   [3/3] Ejecutando migraciones de base de datos...
 if exist "run-all-migrations.js" (
-    call node run-all-migrations.js
+    call node run-all-migrations.js >> "%LOGFILE%" 2>&1
 )
-echo   [OK] Base de datos lista.
+echo         [OK] Base de datos actualizada.
+echo [%TIME%] Migraciones completas >> "%LOGFILE%"
 echo.
+
 echo  ==============================================================
-echo   SERVIDOR DEV EN: http://localhost:%PORT%
+echo  #                                                            #
+echo  #   SERVIDOR DEV EN: http://localhost:%PORT%                   #
+echo  #                                                            #
 echo  ==============================================================
+echo.
 echo   Los cambios en el codigo se reflejan en tiempo real.
 echo   Presiona Ctrl+C para detener.
+echo   --------------------------------------------------------------
 echo.
 start http://localhost:%PORT% >nul 2>&1
 call npm run dev
