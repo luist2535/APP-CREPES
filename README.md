@@ -67,31 +67,36 @@
   3. *Aprobación y Firma del Jefe de Área* con sus comentarios formales de revisión.
   - **Autocierre de Agenda, UX Modal y Exportación (PDF y Excel)**: Las ventanas modales de alerta y confirmación cuentan con botones de cierre rápido (`×`) en el encabezado. Al firmar y finalizar una visita, la cita vinculada en el calendario se marca automáticamente con visto bueno (`✓`). Pulsando **"Exportar PDF"**, el sistema genera un documento formateado para impresión. Además, el sistema **exporta de manera inteligente a plantillas de Excel corporativas**, interpretando de forma dinámica formatos complejos (texto enriquecido), mapeando encabezados combinados y rellenando automáticamente datos como fecha y hora exactas de ejecución, todo sin alterar el diseño visual original del documento.
 
-### 7. 📷 Fichas de Equipos, Mantenimiento Preventivo y Escáner QR
+### 7. 📊 Matriz de Frecuencia BPM y Automatización Excel
+- **Interfaz Dedicada para Calidad**: Módulo especializado (`/calidad-bpm`) para el registro semanal de las Buenas Prácticas de Manufactura en áreas clave (Almacén, Cocinas, Comedor, Despachos, Transporte).
+- **Diseño Mobile-First Avanzado**: Transformación automática de tablas complejas de escritorio en "Tarjetas Operativas" separadas por semanas, diseñadas para que los auditores califiquen cómodamente desde su celular.
+- **Exportación Inteligente e Inyección de Datos**: Lee la estructura del archivo original `Matriz de frecuencia de verificación de BPM - MACRO.xlsm` y, al exportar, inyecta los valores recolectados en las celdas exactas, preservando intactas todas las fórmulas, macros (VBA) y la estética corporativa.
+
+### 8. 📷 Fichas de Equipos, Mantenimiento Preventivo y Escáner QR
 - Escáner QR integrado que activa la cámara del celular o tablet para identificar al instante cualquier máquina o equipo en cocina, barra o cuarto frío.
 - Buscador manual y catálogo digital por código interno (ej: `EQ-1001`, `EQ-1002`) con ficha técnica (marca, modelo, serie y fecha de instalación).
 - Semáforo de mantenimiento preventivo y registro histórico completo del ciclo de vida e intervenciones sufridas por el equipo.
 
-### 8. 🔒 Control de Bloqueos de Horario y Suspensión de Puntos
+### 9. 🔒 Control de Bloqueos de Horario y Suspensión de Puntos
 - Herramienta para programar bloqueos y paradas operativas programadas por mantenimiento mayor, fumigación, remodelación o emergencias.
 - Al activarse un bloqueo, el PDV cambia a estado `Provisional / Bloqueado` y se previene la agendación de auditorías estándar hasta que los coordinadores liberen el bloqueo.
 
-### 9. 📁 Repositorio Documental Clasificado por Carpetas Físicas y BD
+### 10. 📁 Repositorio Documental Clasificado por Carpetas Físicas y BD
 - Módulo de almacenamiento digital estructurado por categorías (`evidencia_visita`, `reporte_excel`, `manual_equipo`, `documento_pdv`, `general`).
 - Sistema de sincronización híbrida que organiza los archivos físicamente en el servidor en carpetas especializadas (`public/archivos/excel`, `public/archivos/fotos`, `public/archivos/pdf`, `public/archivos/documentos`) respaldado con registros indexados e historiales de descarga en SQLite.
 
-### 10. 📈 Reportes Analíticos por Área, KPIs y Tarjetas Móviles (*Mobile Cards*)
+### 11. 📈 Reportes Analíticos por Área, KPIs y Tarjetas Móviles (*Mobile Cards*)
 - Centro analítico multi-filtro (por Ciudad, Área Operativa, Categoría, Estado de Visita y Rangos de Fechas) con indicadores cuantitativos (KPIs) de cumplimiento y resolución.
 - **Modal de Expediente Completo (Sin salir de la pantalla)**: Al hacer clic en **"👁️ Ver Detalle"**, se abre un expediente estructurado en 4 pestañas interactivas (*Resumen & Checklist*, *Repuestos & Hallazgos*, *Evidencias Fotográficas*, *Firmas y Trazabilidad*).
 - **Enlace Inter-módulos**: Botón **"🔗 Ir a Gestión en Módulo Operativo"** que redirige instantáneamente a la auditoría seleccionada dentro del módulo de Visitas para su edición o seguimiento.
 - **Experiencia de Usuario PWA / Mobile-First**: En pantallas móviles de campo (< 768px), las tablas de datos se convierten en **Tarjetas Operativas (*Mobile Cards*)** con carruseles de indicadores táctiles (`scroll-snap`), garantizando agilidad para el personal técnico sin necesidad de hacer zoom ni scroll horizontal en sus celulares.
 
-### 11. ⚙️ Panel de Control del Administrador (Variables Maestras)
+### 12. ⚙️ Panel de Control del Administrador (Variables Maestras)
 - Gestión completa de usuarios (asignación de roles de 1 a 17, vinculación de ciudades y asociación de Puntos de Venta PDV).
 - Catálogo y administración de Puntos de Venta (PDV), sus direcciones, ubicaciones y semáforos iniciales.
 - Mantenimiento del maestro de Ciudades y configuración de Áreas Operativas con personalización de paletas de color en formato hexadecimal y tipología de flujo.
 
-### 12. 🛡️ Seguridad y Protección de Datos
+### 13. 🛡️ Seguridad y Protección de Datos
 - **Seguridad de Base de Datos (SQLite):**
   - **Inmunidad contra Inyección SQL:** Todas las consultas al motor de base de datos se ejecutan estrictamente utilizando sentencias preparadas (Prepared Statements) a través de `better-sqlite3`, neutralizando cualquier intento de inyección de código malicioso.
   - **Aislamiento de Datos:** El archivo físico de la base de datos (`crepes.db`) reside protegido en el servidor de backend y nunca está expuesto al directorio público o accesible vía web directamente.
