@@ -1,6 +1,6 @@
-[mar. 11/08/2026 14:08:07,90] === INICIO SERVIDOR PRODUCCION === 
-[14:08:08,00] Puerto 3000 liberado 
-[14:08:08,01] Dependencias listas 
+[mi�. 12/08/2026 15:12:34,32] === INICIO SERVIDOR DESARROLLO === 
+[15:12:34,46] Puerto liberado 
+[15:12:34,48] Dependencias listas 
 ====================================================
 🗄️  VERIFICANDO Y ACTUALIZANDO BASE DE DATOS
 ====================================================
@@ -123,104 +123,4 @@ Encontrados 20 puntos de venta para crear accesos.
 ℹ️ La plantilla "Lista de Chequeo BPM" ya existe (ID: 15). Omitiendo creación.
 
 ✅  Base de datos verificada y lista para producción.
-[14:08:10,00] Migraciones completas 
-
-> crepes-app@0.1.0 build
-> next build
-
-⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
- We detected multiple lockfiles and selected the directory of C:\Users\p.tecbqa\Documents\App Crepes 2.0\package-lock.json as the root directory.
- To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
-   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
- Detected additional lockfiles: 
-   * C:\Users\p.tecbqa\Documents\App Crepes 2.0\crepes-app\package-lock.json
-
-▲ Next.js 16.2.9 (Turbopack)
-- Environments: .env.local, .env
-
-  Creating an optimized production build ...
-Turbopack build encountered 1 warnings:
-./crepes-app/next.config.mjs
-Encountered unexpected file in NFT list
-A file was traced that indicates that the whole project was traced unintentionally. Somewhere in the import trace below, there are:
-- filesystem operations (like path.join, path.resolve or fs.readFile), or
-- very dynamic requires (like require('./' + foo)).
-To resolve this, you can
-- remove them if possible, or
-- only use them in development, or
-- make sure they are statically scoped to some subfolder: path.join(process.cwd(), 'data', bar), or
-- add ignore comments: path.join(/*turbopackIgnore: true*/ process.cwd(), bar)
-
-Import trace:
-  App Route:
-    ./crepes-app/next.config.mjs
-    ./crepes-app/src/app/uploads/[filename]/route.js
-
-
-✓ Compiled successfully in 7.6s
-  Running TypeScript ...
-  Finished TypeScript in 352ms ...
-  Collecting page data using 7 workers ...
-  Generating static pages using 7 workers (0/48) ...
-  Generating static pages using 7 workers (12/48) 
-  Generating static pages using 7 workers (24/48) 
-  Generating static pages using 7 workers (36/48) 
-✓ Generating static pages using 7 workers (48/48) in 729ms
-  Finalizing page optimization ...
-
-Route (app)
-┌ ○ /
-├ ○ /_not-found
-├ ○ /admin
-├ ƒ /api/admin
-├ ƒ /api/admin/email-settings
-├ ƒ /api/archivos
-├ ƒ /api/auditorias
-├ ƒ /api/auth/force-change-password
-├ ƒ /api/auth/login
-├ ƒ /api/auth/logout
-├ ƒ /api/auth/me
-├ ƒ /api/auth/microsoft
-├ ƒ /api/auth/microsoft/callback
-├ ƒ /api/bloqueos
-├ ƒ /api/calendario
-├ ƒ /api/cargos
-├ ƒ /api/dashboard
-├ ƒ /api/equipos
-├ ƒ /api/historial
-├ ƒ /api/inspecciones
-├ ƒ /api/mantenimientos
-├ ƒ /api/mantenimientos/[id]
-├ ƒ /api/mantenimientos/reportes
-├ ƒ /api/notifications
-├ ƒ /api/pdv
-├ ƒ /api/plantillas
-├ ƒ /api/reportes
-├ ƒ /api/reportes/calidad-comportamiento
-├ ƒ /api/roles-permisos
-├ ƒ /api/solicitudes
-├ ƒ /api/uploads
-├ ƒ /api/users
-├ ƒ /api/users/notificaciones
-├ ƒ /api/visitas
-├ ƒ /api/visitas/export
-├ ƒ /api/visitas/export-general
-├ ○ /archivos
-├ ƒ /archivos/[...path]
-├ ○ /auditoria
-├ ○ /bloqueos
-├ ○ /calendario
-├ ○ /dashboard
-├ ○ /equipos
-├ ○ /mantenimiento
-├ ○ /reportes
-├ ○ /solicitudes
-├ ○ /territorial
-├ ƒ /uploads/[filename]
-└ ○ /visitas
-
-
-○  (Static)   prerendered as static content
-ƒ  (Dynamic)  server-rendered on demand
-
-[14:08:24,76] Build completado 
+[15:12:36,60] Migraciones completas 

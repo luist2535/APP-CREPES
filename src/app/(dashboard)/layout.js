@@ -199,7 +199,8 @@ export default function DashboardLayout({ children }) {
       '/archivos': 'archivos',
       '/admin': 'admin',
       '/mantenimiento': 'mantenimiento',
-      '/auditoria': 'auditoria'
+      '/auditoria': 'auditoria',
+      '/calidad-bpm': 'calidad-bpm'
     };
     const modKey = moduleMap[path];
     if (modKey && user.permisos_adicionales && user.permisos_adicionales[modKey] !== undefined) {
@@ -238,6 +239,9 @@ export default function DashboardLayout({ children }) {
       case '/auditoria':
         // Módulo de auditoría (logs), accesible únicamente para Administradores
         return rol === 1;
+      case '/calidad-bpm':
+        // Módulo BPM Calidad: Admin (1), Supervisor Calidad (5), Auxiliar Calidad (13), Coordinador (2)
+        return [1, 2, 5, 13].includes(rol);
       default:
         return false;
     }
@@ -377,6 +381,20 @@ export default function DashboardLayout({ children }) {
             </svg>
           )
         },
+        {
+          name: 'Matriz BPM',
+          path: '/calidad-bpm',
+          accessPath: '/calidad-bpm',
+          icon: (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <line x1="3" y1="9" x2="21" y2="9" />
+              <line x1="3" y1="15" x2="21" y2="15" />
+              <line x1="9" y1="3" x2="9" y2="21" />
+              <line x1="15" y1="3" x2="15" y2="21" />
+            </svg>
+          )
+        },
 
         {
           name: 'Modificar Ítems / Checklists',
@@ -492,6 +510,7 @@ export default function DashboardLayout({ children }) {
     if (pathname === '/admin') return 'Panel de Administración';
     if (pathname === '/mantenimiento') return 'Módulo de Mantenimiento';
     if (pathname === '/auditoria') return 'Validación de Auditorías';
+    if (pathname === '/calidad-bpm') return 'Matriz BPM — Calidad';
     return 'Crepes en Punto';
   };
 

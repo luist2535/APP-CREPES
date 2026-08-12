@@ -71,6 +71,24 @@ function getDb() {
     try { db.exec('ALTER TABLE mantenimientos ADD COLUMN pdv_id INTEGER'); } catch (e) {}
     try { db.exec('ALTER TABLE mantenimientos ADD COLUMN categoria_id INTEGER'); } catch (e) {}
 
+    // Tabla de calificaciones BPM (Matriz de frecuencia de verificación)
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS bpm_calificaciones (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          area TEXT NOT NULL,
+          row_number INTEGER NOT NULL,
+          semana_numero INTEGER NOT NULL,
+          valor INTEGER NOT NULL CHECK(valor BETWEEN 1 AND 5),
+          user_id INTEGER NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(area, row_number, semana_numero),
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+      `);
+    } catch (e) {}
+
     // Migración para separar Techos, Paredes y Pisos en plantillas existentes
     try {
       const plantillas = db.prepare("SELECT id, campos FROM plantillas WHERE campos LIKE '%techos, paredes%'").all();
