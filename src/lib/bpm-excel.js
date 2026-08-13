@@ -227,7 +227,12 @@ function getAreaData(areaName, calificaciones, mes) {
 
 /**
  * Genera un Excel llenado con los valores de la BD para descarga
- * Utiliza exceljs para preservar correctamente las macros (.xlsm)
+ * Utiliza xlsx-populate para preservar correctamente las macros (.xlsm)
+ * 
+ * IMPORTANTE: xlsx-populate NO recalcula fórmulas. Por eso escribimos
+ * tanto el valor "Obtenidos" como el porcentaje calculado directamente
+ * en las celdas correspondientes. Sin esto, los porcentajes aparecen
+ * como 0% cuando Excel no recalcula al abrir (ej. Excel Online).
  */
 async function generateFilledExcel(allCalificaciones) {
   ensureTemplate();
@@ -236,6 +241,9 @@ async function generateFilledExcel(allCalificaciones) {
   // xlsx-populate will mutate the file in memory while preserving everything
   const wb = await XlsxPopulate.fromFileAsync(TEMPLATE_PATH);
 
+  // Leer la estructura para conocer las filas de categoría y sus ítems
+  const structure = readStructure();
+
   for (const [areaName, config] of Object.entries(SHEET_CONFIG)) {
     const ws = wb.sheet(config.sheet);
     if (!ws) continue;
@@ -243,12 +251,52 @@ async function generateFilledExcel(allCalificaciones) {
     // Filtrar calificaciones de esta área
     const areaCals = allCalificaciones.filter(c => c.area === areaName);
 
+    // Crear mapa: { `${row}_${semana}` → valor }
+    const calMap = {};
+    for (const cal of areaCals) {
+      calMap[`${cal.row_number}_${cal.semana_numero}`] = cal.valor;
+    }
+
+    // Escribir valores de Obtenidos y porcentajes calculados
     for (const cal of areaCals) {
       // getObtenidosCol retorna 0-indexed, xlsx-populate usa 1-indexed
-      const col = getObtenidosCol(config, cal.semana_numero) + 1;
-      const row = cal.row_number; 
+      const obtenidosCol = getObtenidosCol(config, cal.semana_numero) + 1;
+      const percentCol = obtenidosCol + 2; // La columna % está 2 posiciones después
+      const row = cal.row_number;
+      const total = 5;
 
-      ws.cell(row, col).value(cal.valor);
+      // Escribir el valor obtenido
+      ws.cell(row, obtenidosCol).value(cal.valor);
+
+      // Escribir el porcentaje calculado directamente (valor/total como decimal para formato %)
+      ws.cell(row, percentCol).value(cal.valor / total);
+    }
+
+    // Calcular y escribir promedios de categoría en las celdas de AVERAGE
+    const areaStructure = structure[areaName];
+    if (areaStructure) {
+      for (const cat of areaStructure.categorias) {
+        // Para cada semana (1 a 48)
+        for (let w = 1; w <= 48; w++) {
+          const obtenidosCol = getObtenidosCol(config, w) + 1;
+          const percentCol = obtenidosCol + 2;
+
+          // Recopilar porcentajes de los ítems de esta categoría que tienen valor
+          const itemPercentages = [];
+          for (const item of cat.items) {
+            const val = calMap[`${item.row}_${w}`];
+            if (val !== undefined && val !== null) {
+              itemPercentages.push(val / 5);
+            }
+          }
+
+          // Escribir el promedio en la celda de categoría
+          if (itemPercentages.length > 0) {
+            const avg = itemPercentages.reduce((sum, p) => sum + p, 0) / itemPercentages.length;
+            ws.cell(cat.row, percentCol).value(avg);
+          }
+        }
+      }
     }
   }
 
