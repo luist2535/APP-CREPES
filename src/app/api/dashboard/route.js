@@ -4,12 +4,12 @@ export async function GET(request) {
   try {
     const { getUserFromRequest } = require('@/lib/auth');
     const { getDb } = require('@/lib/db');
-    
+
     const user = getUserFromRequest(request);
     if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    
+
     const db = getDb();
-    
+
     // Conteos por estado
     const totalPdv = db.prepare('SELECT COUNT(*) as count FROM pdv WHERE activo = 1').get().count;
     const pdvPorEstado = db.prepare(`
@@ -19,7 +19,7 @@ export async function GET(request) {
       WHERE p.activo = 1 
       GROUP BY e.id
     `).all();
-    
+
     // Conteos por ciudad
     const pdvPorCiudad = db.prepare(`
       SELECT c.nombre as ciudad, COUNT(p.id) as total,
@@ -32,14 +32,14 @@ export async function GET(request) {
       WHERE p.activo = 1
       GROUP BY c.id
     `).all();
-    
+
     // Visitas del mes
     const inicioMes = new Date();
     inicioMes.setDate(1);
     const visitasMes = db.prepare(`
       SELECT COUNT(*) as count FROM visitas WHERE fecha >= ?
     `).get(inicioMes.toISOString().split('T')[0]).count;
-    
+
     // Visitas por área
     const visitasPorArea = db.prepare(`
       SELECT a.nombre as area, COUNT(v.id) as count
@@ -47,12 +47,12 @@ export async function GET(request) {
       JOIN areas a ON v.area_id = a.id
       GROUP BY a.id
     `).all();
-    
+
     // Bloqueos activos
     const bloqueosActivos = db.prepare(`
       SELECT COUNT(*) as count FROM bloqueos_horario WHERE activo = 1 AND fecha >= date('now')
     `).get().count;
-    
+
     // Visitas pendientes
     const visitasPendientes = db.prepare(`
       SELECT COUNT(*) as count FROM visitas WHERE estado = 'pendiente'
@@ -70,7 +70,7 @@ export async function GET(request) {
       WHERE e.estado != 'cancelado' AND e.fecha = ?
       ORDER BY e.hora_inicio ASC
     `).all(localToday);
-    
+
     // Últimas actividades
     const ultimasActividades = db.prepare(`
       SELECT h.*, u.nombre as usuario, p.nombre as pdv_nombre, 
@@ -81,7 +81,7 @@ export async function GET(request) {
       JOIN estados_pdv en ON h.estado_nuevo_id = en.id
       ORDER BY h.created_at DESC LIMIT 10
     `).all();
-    
+
     return NextResponse.json({
       totalPdv,
       pdvPorEstado,

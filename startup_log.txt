@@ -1,6 +1,6 @@
-[mi�. 12/08/2026 15:12:34,32] === INICIO SERVIDOR DESARROLLO === 
-[15:12:34,46] Puerto liberado 
-[15:12:34,48] Dependencias listas 
+[mi�. 26/08/2026 11:52:02,79] === INICIO SERVIDOR DESARROLLO === 
+[11:52:02,96] Puerto liberado 
+[11:52:02,98] Dependencias listas 
 ====================================================
 🗄️  VERIFICANDO Y ACTUALIZANDO BASE DE DATOS
 ====================================================
@@ -123,4 +123,4 @@ Encontrados 20 puntos de venta para crear accesos.
 ℹ️ La plantilla "Lista de Chequeo BPM" ya existe (ID: 15). Omitiendo creación.
 
 ✅  Base de datos verificada y lista para producción.
-[15:12:36,60] Migraciones completas 
+[11:52:05,28] Migraciones completas 

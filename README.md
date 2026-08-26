@@ -29,6 +29,18 @@
   - **Jefes de Área (Sistemas, Mantenimiento, etc.)**: Aprobación de auditorías, gestión y supervisión analítica de todas las intervenciones de su especialidad.
   - **Supervisores y Auxiliares Operativos (Sistemas, Mantenimiento, Calidad, SST, VRH, Formación)**: Ejecución en sitio de visitas técnicas y auditorías específicas para su división o especialidad.
   - **Puntos de Venta (PDVs)**: Cuentas específicas para cada restaurante o módulo de atención, permitiendo al personal en sitio reportar novedades y generar tickets o solicitudes de asistencia técnica en tiempo real.
+
+#### 🛡️ Matriz de Permisos (Nativa)
+El sistema cuenta con una matriz de permisos modular por cargo (configurable desde el panel de Administrador). Por defecto:
+| Módulo | Admin | Coord. | Jefe/Super. | Auxiliar | PDV |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Territorial y Semáforo** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Calendario General** | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Ejecución Visitas / BPM** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Dashboard y Reportes** | ✅ | ✅ | ✅ (Su área) | ❌ | ❌ |
+| **Solicitudes Tickets** | ✅ | ✅ | ✅ | ❌ | ✅ |
+| **Admin y Variables Maestras** | ✅ | ❌ | ❌ | ❌ | ❌ |
+
 - **Gestión Segura de Usuarios y Soft Delete**: Eliminación simulada (lógica) de usuarios que preserva la integridad del historial operativo, liberando automáticamente el correo electrónico para permitir nuevos registros, todo bajo un marco de protección de integridad referencial.
 - **Auditoría Completa de Usuarios**: Registro automático e inmutable en la bitácora de auditoría de todas las acciones administrativas (creación de usuarios, modificación de datos, cambios de rol y activaciones/desactivaciones).
 
@@ -87,6 +99,7 @@
 
 ### 11. 📈 Reportes Analíticos por Área, KPIs y Tarjetas Móviles (*Mobile Cards*)
 - Centro analítico multi-filtro (por Ciudad, Área Operativa, Categoría, Estado de Visita y Rangos de Fechas) con indicadores cuantitativos (KPIs) de cumplimiento y resolución.
+- **Drill-Down de 3 Niveles (Área → Sub-Área → Ítem)**: El módulo de Calidad & Comportamiento incorpora un desglose analítico en cascada que extrae inteligentemente las métricas desde la Plantilla general (Área), agrupando resultados por sección (Sub-área) y hasta el nivel de la pregunta específica (Ítem). 
 - **Modal de Expediente Completo (Sin salir de la pantalla)**: Al hacer clic en **"👁️ Ver Detalle"**, se abre un expediente estructurado en 4 pestañas interactivas (*Resumen & Checklist*, *Repuestos & Hallazgos*, *Evidencias Fotográficas*, *Firmas y Trazabilidad*).
 - **Enlace Inter-módulos**: Botón **"🔗 Ir a Gestión en Módulo Operativo"** que redirige instantáneamente a la auditoría seleccionada dentro del módulo de Visitas para su edición o seguimiento.
 - **Experiencia de Usuario PWA / Mobile-First**: En pantallas móviles de campo (< 768px), las tablas de datos se convierten en **Tarjetas Operativas (*Mobile Cards*)** con carruseles de indicadores táctiles (`scroll-snap`), garantizando agilidad para el personal técnico sin necesidad de hacer zoom ni scroll horizontal en sus celulares.

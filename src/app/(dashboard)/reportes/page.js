@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 const ESTADO_LABELS = {
   pendiente: { label: 'Pendiente', color: '#f59e0b', bg: '#fef3c7' },
@@ -12,6 +13,20 @@ const ESTADO_LABELS = {
 };
 
 export default function ReportesPage() {
+  const [mounted, setMounted] = useState(false);
+  const [pdvsList, setPdvsList] = useState([]);
+  useEffect(() => {
+    setMounted(true);
+    fetch('/api/pdv')
+      .then(r => r.json())
+      .then(d => {
+        if (Array.isArray(d)) setPdvsList(d);
+        else if (d.pdvs) setPdvsList(d.pdvs);
+      })
+      .catch(console.error);
+  }, []);
+
+  const [activeTab, setActiveTab] = useState('general');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -33,10 +48,17 @@ export default function ReportesPage() {
   const [reporteTab, setReporteTab] = useState('general'); // 'general' | 'calidad'
   const [calidadData, setCalidadData] = useState(null);
   const [calidadLoading, setCalidadLoading] = useState(false);
-  const [calidadPeriodo, setCalidadPeriodo] = useState('trimestral');
+  const [calidadFechaInicio, setCalidadFechaInicio] = useState(
+    new Date(new Date().setMonth(new Date().getMonth() - 3)).toISOString().split('T')[0]
+  );
+  const [calidadFechaFin, setCalidadFechaFin] = useState(
+    new Date().toISOString().split('T')[0]
+  );
   const [calidadPdv, setCalidadPdv] = useState('all');
   const [calidadCiudad, setCalidadCiudad] = useState('all');
-  const [calidadSeccion, setCalidadSeccion] = useState('all');
+  const [calidadSeccion, setCalidadSeccion] = useState('all'); // Área (Nivel 0)
+  const [calidadSubArea, setCalidadSubArea] = useState('all'); // Sub-Área (Nivel 1)
+  const [calidadItem, setCalidadItem] = useState('all'); // Ítem (Nivel 2)
   const [calidadSubTab, setCalidadSubTab] = useState('evolucion'); // 'evolucion' | 'ranking' | 'historial' | 'comparador' | 'longitudinal'
   const [compPeriodoA, setCompPeriodoA] = useState('');
   const [compPeriodoB, setCompPeriodoB] = useState('');
@@ -204,10 +226,13 @@ export default function ReportesPage() {
     try {
       setCalidadLoading(true);
       const params = new URLSearchParams();
-      if (calidadPdv !== 'all') params.set('pdv_id', calidadPdv);
-      if (calidadCiudad !== 'all') params.set('ciudad_id', calidadCiudad);
-      params.set('periodo', calidadPeriodo);
-      if (calidadSeccion !== 'all') params.set('seccion', calidadSeccion);
+      params.set('pdv_id', calidadPdv);
+      params.set('ciudad_id', calidadCiudad);
+      params.set('fechaInicio', calidadFechaInicio);
+      params.set('fechaFin', calidadFechaFin);
+      params.set('area', calidadSeccion);
+      params.set('subarea', calidadSubArea);
+      params.set('item', calidadItem);
 
       const res = await fetch(`/api/reportes/calidad-comportamiento?${params.toString()}`);
       if (res.ok) {
@@ -219,8 +244,8 @@ export default function ReportesPage() {
             setCompPeriodoB(result.evaluaciones_por_periodo.length > 1 ? result.evaluaciones_por_periodo[1].periodo : result.evaluaciones_por_periodo[0].periodo);
           }
         }
-        if (result.secciones_disponibles && result.secciones_disponibles.length > 0 && !longitudinalSeccionSelected) {
-          setLongitudinalSeccionSelected(result.secciones_disponibles[0]);
+        if (result.areas_disponibles && result.areas_disponibles.length > 0 && !longitudinalSeccionSelected) {
+          setLongitudinalSeccionSelected(result.areas_disponibles[0]);
         }
       }
     } catch (err) {
@@ -228,7 +253,7 @@ export default function ReportesPage() {
     } finally {
       setCalidadLoading(false);
     }
-  }, [calidadPdv, calidadCiudad, calidadPeriodo, calidadSeccion]);
+  }, [calidadPdv, calidadCiudad, calidadFechaInicio, calidadFechaFin, calidadSeccion]);
 
   useEffect(() => {
     if (reporteTab === 'calidad') {
@@ -339,7 +364,9 @@ export default function ReportesPage() {
         const rankingStr = (calidadData.ranking_pdv || []).map((p, i) => `${i + 1}. ${p.pdv_nombre} (${p.ciudad_nombre || ''}) - Promedio: ${p.puntaje_promedio}%`).join('\n');
         const content = `REPORTE PDF EJECUTIVO - ANALÍTICA DE CALIDAD & L&D
 ==================================================
-Periodo de Análisis: ${calidadPeriodo || 'todos'}
+Ciudad: ${calidadCiudad === 'all' ? 'Todas' : calidadCiudad}
+Periodo de Análisis: ${calidadFechaInicio} al ${calidadFechaFin}
+Sección: ${calidadSeccion === 'all' ? 'Todas' : calidadSeccion}
 Fecha del Reporte: ${dateStr}
 Total PDVs Evaluados: ${calidadData.ranking_pdv?.length || 0}
 Promedio General: ${calidadData.kpis?.promedio_general || 0}%
@@ -795,19 +822,24 @@ Impreso y registrado en el repositorio el ${new Date().toLocaleString('es-ES')}
       {/* Filters Bar */}
       <div className="card" style={{ background: '#F8FAF6', border: '1px solid #DCFCE7', borderRadius: '14px', padding: '16px 20px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 180px' }}>
-          <label style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#166534', textTransform: 'uppercase' }}>📅 Periodo de Análisis</label>
-          <select
-            className="form-select"
-            value={calidadPeriodo}
-            onChange={(e) => setCalidadPeriodo(e.target.value)}
+          <label style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#166534', textTransform: 'uppercase' }}>📅 Fecha Inicio</label>
+          <input
+            type="date"
+            className="form-control"
+            value={calidadFechaInicio}
+            onChange={(e) => setCalidadFechaInicio(e.target.value)}
             style={{ border: '1px solid #86EFAC', borderRadius: '8px', padding: '8px 12px', fontWeight: '600' }}
-          >
-            <option value="mensual">Último Mes (Mensual)</option>
-            <option value="trimestral">Último Trimestre (3 meses)</option>
-            <option value="semestral">Último Semestre (6 meses)</option>
-            <option value="anual">Último Año (12 meses)</option>
-            <option value="todos">Histórico Total</option>
-          </select>
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 180px' }}>
+          <label style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#166534', textTransform: 'uppercase' }}>📅 Fecha Fin</label>
+          <input
+            type="date"
+            className="form-control"
+            value={calidadFechaFin}
+            onChange={(e) => setCalidadFechaFin(e.target.value)}
+            style={{ border: '1px solid #86EFAC', borderRadius: '8px', padding: '8px 12px', fontWeight: '600' }}
+          />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 200px' }}>
@@ -819,23 +851,62 @@ Impreso y registrado en el repositorio el ${new Date().toLocaleString('es-ES')}
             style={{ border: '1px solid #86EFAC', borderRadius: '8px', padding: '8px 12px' }}
           >
             <option value="all">📍 Todos los Puntos de Venta</option>
-            {(data?.visitas || []).map(v => ({ id: v.pdv_id, nombre: v.pdv_nombre })).filter((v, i, a) => a.findIndex(t => t.id === v.id) === i).map(pdv => (
+            {pdvsList.map(pdv => (
               <option key={pdv.id} value={pdv.id}>{pdv.nombre}</option>
             ))}
           </select>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 200px' }}>
-          <label style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#166534', textTransform: 'uppercase' }}>🔬 Sección / Sub-Área</label>
+          <label style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#166534', textTransform: 'uppercase' }}>🗂️ Área Evaluada</label>
           <select
             className="form-select"
             value={calidadSeccion}
-            onChange={(e) => setCalidadSeccion(e.target.value)}
+            onChange={(e) => {
+              setCalidadSeccion(e.target.value);
+              setCalidadSubArea('all'); // Reset sub-area on area change
+              setCalidadItem('all'); // Reset item
+            }}
             style={{ border: '1px solid #86EFAC', borderRadius: '8px', padding: '8px 12px' }}
           >
-            <option value="all">📑 Todas las Secciones y Sub-Áreas</option>
-            {(calidadData?.secciones_disponibles || []).map((sec, idx) => (
-              <option key={idx} value={sec}>{sec}</option>
+            <option value="all">📁 Todas las Áreas</option>
+            {(calidadData?.areas_disponibles || []).map((sec, idx) => (
+              <option key={sec} value={sec}>{sec}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 200px' }}>
+          <label style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#166534', textTransform: 'uppercase' }}>🔬 Sub-Área</label>
+          <select
+            className="form-select"
+            value={calidadSubArea}
+            onChange={(e) => {
+              setCalidadSubArea(e.target.value);
+              setCalidadItem('all'); // Reset item on subarea change
+            }}
+            style={{ border: '1px solid #86EFAC', borderRadius: '8px', padding: '8px 12px', opacity: calidadSeccion === 'all' ? 0.5 : 1 }}
+            disabled={calidadSeccion === 'all'}
+          >
+            <option value="all">📑 {calidadSeccion === 'all' ? 'Selecciona un Área primero' : 'Todas las Sub-áreas'}</option>
+            {(calidadData?.subareas_disponibles || []).map((sec, idx) => (
+              <option key={sec} value={sec}>{sec}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 200px' }}>
+          <label style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#166534', textTransform: 'uppercase' }}>📝 Ítem / Pregunta</label>
+          <select
+            className="form-select"
+            value={calidadItem}
+            onChange={(e) => setCalidadItem(e.target.value)}
+            style={{ border: '1px solid #86EFAC', borderRadius: '8px', padding: '8px 12px', opacity: calidadSubArea === 'all' ? 0.5 : 1 }}
+            disabled={calidadSubArea === 'all'}
+          >
+            <option value="all">🔍 {calidadSubArea === 'all' ? 'Selecciona una Sub-Área primero' : 'Todos los Ítems'}</option>
+            {(calidadData?.items_disponibles || []).map((sec, idx) => (
+              <option key={sec} value={sec}>{sec}</option>
             ))}
           </select>
         </div>
@@ -1000,6 +1071,25 @@ Impreso y registrado en el repositorio el ${new Date().toLocaleString('es-ES')}
               <h3 style={{ margin: '0 0 16px 0', color: '#166534', fontSize: '1.2rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 📊 Comportamiento y Evolución de cada Sección Evaluada
               </h3>
+              
+              {mounted && calidadData.evolucion_por_seccion && calidadData.evolucion_por_seccion.length > 0 && (
+                <div style={{ height: 400, marginBottom: '24px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={calidadData.evolucion_por_seccion}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="seccion_nombre" angle={-45} textAnchor="end" height={80} interval={0} tick={{fontSize: 11}} />
+                      <YAxis domain={[0, 100]} />
+                      <RechartsTooltip formatter={(val) => `${val}%`} />
+                      <Legend verticalAlign="top" />
+                      <Bar dataKey="puntaje_promedio" name="Puntaje Promedio (%)" fill="#16A34A" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
               <div className="table-responsive">
                 <table className="table">
                   <thead>
@@ -1229,7 +1319,7 @@ Impreso y registrado en el repositorio el ${new Date().toLocaleString('es-ES')}
                               </tr>
                             </thead>
                             <tbody>
-                              {(calidadData.secciones_disponibles || []).map((sec, idx) => {
+                              {(calidadData.areas_disponibles || []).map((sec, idx) => {
                                 const stA = objA.desglose_subareas?.find(s => s.seccion_nombre === sec);
                                 const stB = objB.desglose_subareas?.find(s => s.seccion_nombre === sec);
                                 const scoreA = stA ? stA.puntaje : null;
@@ -1320,7 +1410,7 @@ Impreso y registrado en el repositorio el ${new Date().toLocaleString('es-ES')}
                     style={{ fontWeight: 'bold', border: '2px solid #DDD6FE', background: '#F5F3FF', color: '#5B21B6', padding: '8px 14px', borderRadius: '8px' }}
                   >
                     {(calidadData.secciones_disponibles || []).map((s, idx) => (
-                      <option key={idx} value={s}>{s}</option>
+                      <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
                 </div>
@@ -1356,6 +1446,21 @@ Impreso y registrado en el repositorio el ${new Date().toLocaleString('es-ES')}
                         <span style={{ fontSize: '1.8rem', fontWeight: '900', color: '#1E293B' }}>{filteredHist.length}</span>
                       </div>
                     </div>
+
+                    {mounted && (
+                      <div style={{ height: 350, marginBottom: '20px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={filteredHist.slice().reverse()} margin={{ top: 10, right: 30, left: 0, bottom: 10 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="fecha" />
+                            <YAxis domain={[0, 100]} />
+                            <RechartsTooltip formatter={(val) => `${val}%`} />
+                            <Legend />
+                            <Line type="monotone" dataKey="puntaje" name="Puntaje Obtenido (%)" stroke="#7C3AED" strokeWidth={3} dot={{ r: 5 }} activeDot={{ r: 8 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
 
                     <div className="table-responsive">
                       <table className="table">
@@ -1517,7 +1622,7 @@ Impreso y registrado en el repositorio el ${new Date().toLocaleString('es-ES')}
             {slideIndex === 0 && (
               <div className="animate-fade-in" style={{ textAlign: 'center' }}>
                 <span style={{ color: '#4ADE80', fontSize: '1.1rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '2px' }}>
-                  Resumen Ejecutivo • {calidadPeriodo === 'todos' ? 'Histórico Total' : `Periodo ${calidadPeriodo}`}
+                  Resumen Ejecutivo • {`${calidadFechaInicio} al ${calidadFechaFin}`}
                 </span>
                 <h1 style={{ fontSize: '2.8rem', fontWeight: '800', margin: '16px 0 32px 0', color: '#FFF' }}>
                   Estado del Sistema de Calidad y BPM en Puntos de Venta

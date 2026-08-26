@@ -43,8 +43,11 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const pdvId = searchParams.get('pdv_id') || 'all';
     const ciudadId = searchParams.get('ciudad_id') || 'all';
-    const periodo = searchParams.get('periodo') || 'trimestral'; // mensual | trimestral | semestral | anual | todos
-    const seccionFiltro = searchParams.get('seccion') || 'all';
+    const fechaInicio = searchParams.get('fechaInicio');
+    const fechaFin = searchParams.get('fechaFin');
+    const areaFiltro = searchParams.get('area') || 'all';
+    const subareaFiltro = searchParams.get('subarea') || 'all';
+    const itemFiltro = searchParams.get('item') || 'all';
 
     const db = getDb();
 
@@ -71,28 +74,30 @@ export async function GET(request) {
       queryParams.push(parseInt(ciudadId));
     }
 
-    // Filtrar por fechas según periodo si aplica
-    if (periodo !== 'todos') {
-      const now = new Date();
-      let cutoffDate = new Date();
-      if (periodo === 'mensual') cutoffDate.setMonth(now.getMonth() - 1);
-      else if (periodo === 'trimestral') cutoffDate.setMonth(now.getMonth() - 3);
-      else if (periodo === 'semestral') cutoffDate.setMonth(now.getMonth() - 6);
-      else if (periodo === 'anual') cutoffDate.setFullYear(now.getFullYear() - 1);
-      
-      const cutoffStr = cutoffDate.toISOString().split('T')[0];
+    // Filtrar por fechas
+    if (fechaInicio && fechaInicio !== 'undefined' && fechaInicio !== 'null') {
       query += ` AND v.fecha >= ?`;
-      queryParams.push(cutoffStr);
+      queryParams.push(fechaInicio);
+    }
+    if (fechaFin && fechaFin !== 'undefined' && fechaFin !== 'null') {
+      query += ` AND v.fecha <= ?`;
+      queryParams.push(fechaFin);
     }
 
     query += ` ORDER BY v.fecha ASC, v.id ASC`;
     const visitasRows = db.prepare(query).all(...queryParams);
+    console.log(`[API Calidad] Visitas fetched: ${visitasRows.length} para pdv_id=${pdvId}, fechaInicio=${fechaInicio}, fechaFin=${fechaFin}`);
 
-    // 2. Procesar y agrupar por Sección (Sub-área)
+    // 2. Procesar y agrupar por Área, Sub-área o Ítem según el nivel de drill-down
     const rawHistorial = [];
     
-    // Un mapa temporal de resultados anteriores por clave `${pdv_id}-${seccion_nombre}` para comparar longitudinalmente
+    // Un mapa temporal de resultados anteriores por clave `${pdv_id}-${agrupacion_nombre}`
     const previousScoresMap = {};
+
+    // Conjuntos para recolectar opciones disponibles para los selectores
+    const allAreasSet = new Set();
+    const allSubareasSet = new Set();
+    const allItemsSet = new Set();
 
     for (const v of visitasRows) {
       let answers = {};
@@ -109,25 +114,44 @@ export async function GET(request) {
         templateConfig = [];
       }
 
-      // Estructurar ítems y secciones evaluados
-      // Mapa seccion_nombre -> { si: 0, no: 0, na: 0 }
-      const seccionStats = {};
+      // Extraer el nombre principal del formato como el "Área" (ej. "Verificación L&D Cocina" -> "Cocina")
+      const rawPlantillaNombre = v.plantilla_nombre || 'Área General';
+      const areaName = rawPlantillaNombre
+        .replace(/Verificaci[oó]n (de )?L&D /i, '')
+        .replace(/Lista de chequeo /i, '')
+        .trim();
+
+      // 2.1 Extraer ítems individuales de la visita
+      const visitItems = []; // Array de { areaName, secName, itemName, val }
 
       if (Array.isArray(templateConfig) && templateConfig.length > 0) {
         const rootItem = templateConfig[0];
-        if (rootItem && rootItem.secciones && Array.isArray(rootItem.secciones)) {
-          // Plantilla con formato de secciones explícitas (ej. Lista de Chequeo BPM)
+        
+        if (rootItem && rootItem.tipo === 'matrix') {
+          // Es un formulario tipo matriz
+          Object.entries(answers).forEach(([key, val]) => {
+            if (val === 'SI' || val === 'NO' || val === 'NA' || typeof val === 'boolean') {
+              if (key.includes('__sec_') && key.split('__').length === 3) {
+                const parts = key.split('__');
+                const itemName = parts[0].trim();
+                const secName = parts[2].trim();
+                visitItems.push({ areaName, secName, itemName, val });
+              }
+            }
+          });
+        } else if (rootItem && rootItem.secciones && Array.isArray(rootItem.secciones)) {
+          // Plantilla con formato de secciones explícitas
           rootItem.secciones.forEach((sec, secIdx) => {
             const secName = sec.nombre || `Sección ${secIdx + 1}`;
-            if (!seccionStats[secName]) seccionStats[secName] = { si: 0, no: 0, na: 0 };
             
             if (Array.isArray(sec.filas)) {
               sec.filas.forEach((filaTexto, rowIdx) => {
                 const qKey = `q_${secIdx}_${rowIdx}`;
-                const ans = answers[qKey];
-                if (ans === 'SI' || ans === true || ans === 1 || ans === 'Cumple') seccionStats[secName].si++;
-                else if (ans === 'NO' || ans === false || ans === 0 || ans === 'No Cumple') seccionStats[secName].no++;
-                else if (ans === 'NA' || ans === 'N/A' || ans === 'No Aplica') seccionStats[secName].na++;
+                const val = answers[qKey];
+                if (val !== undefined) {
+                  const itemName = filaTexto.trim() || `Pregunta ${rowIdx + 1}`;
+                  visitItems.push({ areaName, secName, itemName, val });
+                }
               });
             }
           });
@@ -136,37 +160,77 @@ export async function GET(request) {
           templateConfig.forEach((item, itemIdx) => {
             if (item.tipo === 'checkbox' || item.tipo === 'radio' || item.tipo === 'select' || item.label) {
               const secName = item.seccion || categorizarPregunta(item.label || item.nombre);
-              if (!seccionStats[secName]) seccionStats[secName] = { si: 0, no: 0, na: 0 };
-              const ans = answers[item.nombre || `item_${itemIdx}`];
-              if (ans === true || ans === 'SI' || ans === 'Cumple' || ans === 1) seccionStats[secName].si++;
-              else if (ans === false || ans === 'NO' || ans === 'No Cumple' || ans === 0) seccionStats[secName].no++;
-              else if (ans === 'NA' || ans === 'N/A') seccionStats[secName].na++;
+              const itemName = item.label || item.nombre || `Pregunta ${itemIdx + 1}`;
+              const val = answers[item.nombre || `item_${itemIdx}`];
+              if (val !== undefined) {
+                visitItems.push({ areaName, secName, itemName, val });
+              }
             }
           });
         }
       }
 
-      // Si después de inspeccionar la plantilla no se extrajeron preguntas evaluadas con precisión,
-      // revisar directamente las llaves guardadas en answers
-      if (Object.keys(seccionStats).length === 0 && Object.keys(answers).length > 0) {
+      // Si no se extrajeron preguntas con la plantilla, revisar directo el JSON
+      if (visitItems.length === 0 && Object.keys(answers).length > 0) {
         Object.entries(answers).forEach(([key, val]) => {
           if (val === 'SI' || val === 'NO' || val === 'NA' || typeof val === 'boolean') {
-            const secName = categorizarPregunta(key);
-            if (!seccionStats[secName]) seccionStats[secName] = { si: 0, no: 0, na: 0 };
-            if (val === 'SI' || val === true) seccionStats[secName].si++;
-            else if (val === 'NO' || val === false) seccionStats[secName].no++;
-            else if (val === 'NA') seccionStats[secName].na++;
+            let secName;
+            let itemName = key;
+            if (key.includes('__sec_') && key.split('__').length === 3) {
+              const parts = key.split('__');
+              itemName = parts[0].trim();
+              secName = parts[2].trim();
+            } else {
+              secName = categorizarPregunta(key);
+            }
+            visitItems.push({ areaName, secName, itemName, val });
           }
         });
       }
 
-      // Calcular puntaje por cada sub-área / sección de esta visita
-      Object.entries(seccionStats).forEach(([secName, counts]) => {
+      // 2.2 Agrupar y filtrar basado en el drill-down
+      const agrupacionStats = {}; // { [agrupacion_nombre]: { si, no, na } }
+
+      visitItems.forEach(item => {
+        const { areaName, secName, itemName, val } = item;
+        
+        // Alimentar selectores dinámicamente
+        allAreasSet.add(areaName);
+        if (areaFiltro === 'all' || areaName === areaFiltro) {
+          allSubareasSet.add(secName);
+          if (subareaFiltro === 'all' || secName === subareaFiltro) {
+            allItemsSet.add(itemName);
+          }
+        }
+
+        // Filtrar
+        if (areaFiltro !== 'all' && areaName !== areaFiltro) return;
+        if (subareaFiltro !== 'all' && secName !== subareaFiltro) return;
+        if (itemFiltro !== 'all' && itemName !== itemFiltro) return;
+
+        // Determinar el nivel de detalle a mostrar en las gráficas
+        let agrupacion_nombre = areaName; // Nivel 0 (Áreas)
+        if (areaFiltro !== 'all') {
+          agrupacion_nombre = secName;    // Nivel 1 (Sub-áreas)
+        }
+        if (subareaFiltro !== 'all') {
+          agrupacion_nombre = itemName;   // Nivel 2 (Ítems)
+        }
+
+        if (!agrupacionStats[agrupacion_nombre]) agrupacionStats[agrupacion_nombre] = { si: 0, no: 0, na: 0 };
+        
+        if (val === 'SI' || val === true || val === 1 || val === 'Cumple') agrupacionStats[agrupacion_nombre].si++;
+        else if (val === 'NO' || val === false || val === 0 || val === 'No Cumple') agrupacionStats[agrupacion_nombre].no++;
+        else if (val === 'NA' || val === 'N/A' || val === 'No Aplica') agrupacionStats[agrupacion_nombre].na++;
+      });
+
+      // 2.3 Calcular puntaje por cada nivel de agrupación
+      Object.entries(agrupacionStats).forEach(([agrupName, counts]) => {
         const totalEval = counts.si + counts.no;
-        if (totalEval === 0 && counts.na === 0) return; // omitir secciones sin datos
+        if (totalEval === 0 && counts.na === 0) return; // omitir sin datos
 
         const puntaje = totalEval > 0 ? Math.round((counts.si / totalEval) * 100 * 10) / 10 : 100;
-        const pdvSecKey = `${v.pdv_id}_${secName}`;
+        const pdvSecKey = `${v.pdv_id}_${agrupName}`;
         const puntajeAnterior = previousScoresMap[pdvSecKey] !== undefined ? previousScoresMap[pdvSecKey] : null;
         const diferencia = puntajeAnterior !== null ? Math.round((puntaje - puntajeAnterior) * 10) / 10 : 0;
         const alertaDisminucion = puntajeAnterior !== null && diferencia < 0;
@@ -174,11 +238,8 @@ export async function GET(request) {
         // Actualizar el score anterior para la siguiente visita de esta línea de tiempo
         previousScoresMap[pdvSecKey] = puntaje;
 
-        // Filtrar por sección si el usuario eligió una en particular
-        if (seccionFiltro !== 'all' && secName !== seccionFiltro) return;
-
         rawHistorial.push({
-          id: `${v.id}_${secName.replace(/[^a-zA-Z0-9]/g, '')}`,
+          id: `${v.id}_${agrupName.replace(/[^a-zA-Z0-9]/g, '')}`,
           visita_id: v.id,
           pdv_id: v.pdv_id,
           pdv_nombre: v.pdv_nombre || `PDV #${v.pdv_id}`,
@@ -187,7 +248,7 @@ export async function GET(request) {
           fecha: v.fecha,
           plantilla_id: v.plantilla_id,
           plantilla_nombre: v.plantilla_nombre || 'Inspección Calidad',
-          seccion_nombre: secName,
+          seccion_nombre: agrupName,
           puntaje,
           puntaje_anterior: puntajeAnterior,
           diferencia,
@@ -199,26 +260,31 @@ export async function GET(request) {
       });
     }
 
+    console.log(`[API Calidad] rawHistorial items: ${rawHistorial.length}`);
+
     // 3. Sincronizar en la tabla historial_secciones_calidad (opcional para indexación rápida)
-    try {
-      const upsertStmt = db.prepare(`
-        INSERT OR REPLACE INTO historial_secciones_calidad 
-        (visita_id, pdv_id, pdv_nombre, ciudad_id, fecha, plantilla_id, plantilla_nombre, seccion_nombre, puntaje, puntaje_anterior, diferencia, alerta_disminucion, preguntas_si, preguntas_no, preguntas_na)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-      db.transaction(() => {
-        for (const h of rawHistorial) {
-          try {
-            upsertStmt.run(
-              h.visita_id, h.pdv_id, h.pdv_nombre, h.ciudad_id, h.fecha, h.plantilla_id || null,
-              h.plantilla_nombre, h.seccion_nombre, h.puntaje, h.puntaje_anterior, h.diferencia,
-              h.alerta_disminucion, h.preguntas_si, h.preguntas_no, h.preguntas_na
-            );
-          } catch (e) {}
-        }
-      })();
-    } catch (e) {
-      console.warn('Sync to historial_secciones_calidad non-blocking warning:', e.message);
+    // Se deshabilita durante el drill-down para no contaminar la base de datos con ítems finos
+    if (areaFiltro === 'all' && subareaFiltro === 'all') {
+      try {
+        const upsertStmt = db.prepare(`
+          INSERT OR REPLACE INTO historial_secciones_calidad 
+          (visita_id, pdv_id, pdv_nombre, ciudad_id, fecha, plantilla_id, plantilla_nombre, seccion_nombre, puntaje, puntaje_anterior, diferencia, alerta_disminucion, preguntas_si, preguntas_no, preguntas_na)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        db.transaction(() => {
+          for (const h of rawHistorial) {
+            try {
+              upsertStmt.run(
+                h.visita_id, h.pdv_id, h.pdv_nombre, h.ciudad_id, h.fecha, h.plantilla_id || null,
+                h.plantilla_nombre, h.seccion_nombre, h.puntaje, h.puntaje_anterior, h.diferencia,
+                h.alerta_disminucion, h.preguntas_si, h.preguntas_no, h.preguntas_na
+              );
+            } catch (e) {}
+          }
+        })();
+      } catch (e) {
+        console.warn('Sync to historial_secciones_calidad non-blocking warning:', e.message);
+      }
     }
 
     // 4. Calcular Métricas Agregadas Gerenciales (Ranking por PDV y Evolución por Sección)
@@ -431,7 +497,10 @@ export async function GET(request) {
       evolucion_por_seccion: evolucionPorSeccion,
       evolucion_temporal: evolucionTemporal,
       evaluaciones_por_periodo: evaluaciones_por_periodo,
-      secciones_disponibles: [...new Set(rawHistorial.map(r => r.seccion_nombre))].sort()
+      areas_disponibles: [...allAreasSet].sort(),
+      subareas_disponibles: [...allSubareasSet].sort(),
+      items_disponibles: [...allItemsSet].sort(),
+      nivel_drilldown: subareaFiltro !== 'all' ? 'item' : (areaFiltro !== 'all' ? 'subarea' : 'area')
     });
 
   } catch (error) {
