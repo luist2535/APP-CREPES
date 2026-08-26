@@ -52,3 +52,4 @@ next-env.d.ts
 
 # executables
 cloudflared.exe
+startup_log.txt
