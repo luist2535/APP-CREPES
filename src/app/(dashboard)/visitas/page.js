@@ -448,8 +448,10 @@ const calculateVisitScore = (visit, plantillas) => {
     // Detect BPM scale (1-5) from template columns
     // NOTE: Columns like ["SATISFACTORIO","NA","OBSERVACIONES"] are SI/NO/NA checklists, NOT BPM 1-5.
     // BPM is only detected by: template name containing 'BPM', specific BPM codes, or purely numeric columns (1-5).
-    const hasBPMName = templateConfig && String(templateConfig.nombre || '').toUpperCase().includes('BPM');
-    const hasBPMCode = templateConfig && templateConfig.code && ['DCM-F-DPR-25'].includes(String(templateConfig.code).toUpperCase());
+    const templateName = template?.nombre || visit.plantilla_nombre || '';
+    const templateCode = template?.code || visit.plantilla_code || '';
+    const hasBPMName = String(templateName).toUpperCase().includes('BPM');
+    const hasBPMCode = ['DCM-F-DPR-25'].includes(String(templateCode).toUpperCase());
     const hasNumericColumns = Array.isArray(firstField.columnas) && firstField.columnas.some(c => {
       const u = String(c || '').toUpperCase();
       return ['1','2','3','4','5'].includes(u);
