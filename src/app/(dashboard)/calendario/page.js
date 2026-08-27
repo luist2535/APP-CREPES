@@ -736,9 +736,8 @@ export default function CalendarioPage() {
               <button className="btn btn-secondary btn-sm" onClick={handleNextMonth}>▶</button>
             </div>
             <div className="card-body">
-              {/* Day headers */}
               <div className="calendar-week-headers">
-                <span>Dom</span><span>Lun</span><span>Mar</span><span>Mie</span><span>Jue</span><span>Vie</span><span>Sab</span>
+                <span>D</span><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span>
               </div>
               
               {/* Day cells */}
@@ -770,7 +769,7 @@ export default function CalendarioPage() {
                             <span 
                               key={evIdx} 
                               className="ev-dot"
-                              style={{ backgroundColor: ev.area_color || 'var(--color-secondary)' }}
+                              style={{ backgroundColor: '#8B6914' }}
                             ></span>
                           ))}
                         </span>
@@ -865,7 +864,7 @@ export default function CalendarioPage() {
                             <div className="event-action-box">
                               {userCanFill ? (
                                 <button 
-                                  className="btn btn-primary btn-sm btn-block"
+                                  className="btn btn-calendar-action btn-block"
                                   onClick={() => handleCompleteAudit(ev)}
                                 >
                                   📋 Realizar Auditoría / Cargar Evidencias
@@ -1119,6 +1118,9 @@ export default function CalendarioPage() {
           display: flex;
           flex-direction: column;
           gap: var(--spacing-lg);
+          background-color: #faf8f5;
+          padding: 10px;
+          border-radius: 8px;
         }
 
         .calendar-layout-grid {
@@ -1137,21 +1139,36 @@ export default function CalendarioPage() {
           display: flex;
           align-items: center;
           justify-content: space-between;
+          padding-bottom: 12px;
+          border-bottom: 1px solid #eaeaea;
+          margin-bottom: 12px;
         }
 
         .calendar-month-header h2 {
-          color: var(--color-primary-dark);
+          color: #3a2113;
           font-family: 'Playfair Display', serif;
+          font-size: 1.3rem;
+          font-weight: 700;
+          margin: 0;
+        }
+
+        .calendar-month-header .btn {
+          background-color: #e2e8f0;
+          color: #475569;
+          border: none;
+          border-radius: 6px;
+          padding: 4px 12px;
+          font-size: 0.9rem;
         }
 
         .calendar-week-headers {
           display: grid;
           grid-template-columns: repeat(7, 1fr);
           text-align: center;
-          font-size: 0.75rem;
-          font-weight: 700;
-          color: var(--color-text-secondary);
-          margin-bottom: var(--spacing-sm);
+          font-size: 0.85rem;
+          font-weight: 800;
+          color: #111;
+          margin-bottom: 8px;
         }
 
         .calendar-days-grid {
@@ -1161,37 +1178,46 @@ export default function CalendarioPage() {
         }
 
         .calendar-day.empty {
-          height: 60px;
+          height: 45px;
           background: transparent;
         }
 
         .calendar-day-btn {
-          height: 60px;
-          border-radius: var(--radius-md);
-          border: 1px solid var(--color-border-light);
-          background-color: var(--color-bg-card);
+          height: 45px;
+          border-radius: 6px;
+          border: 1px solid #d1d5db;
+          background-color: #fff;
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: space-between;
-          padding: 6px 4px;
+          justify-content: center;
+          padding: 4px;
           transition: all var(--transition-fast);
           position: relative;
+          color: #111;
         }
 
         .calendar-day-btn:hover {
-          border-color: var(--color-primary);
-          background-color: var(--color-bg-secondary);
+          border-color: #8B6914;
+          background-color: #fefcf8;
         }
 
-        .calendar-day-btn.selected {
-          background-color: var(--color-primary);
-          color: white;
-          border-color: var(--color-primary);
-        }
-
+        .calendar-day-btn.selected,
         .calendar-day-btn.today {
-          border: 2px solid var(--color-secondary);
+          background-color: #3a2113;
+          color: white;
+          border-color: #3a2113;
+        }
+
+        .day-number {
+          font-weight: 600;
+          font-size: 0.9rem;
+          z-index: 2;
+        }
+
+        .calendar-day-btn.selected .day-number,
+        .calendar-day-btn.today .day-number {
+          color: white;
         }
 
         .day-number {
@@ -1205,19 +1231,23 @@ export default function CalendarioPage() {
 
         .calendar-day-events-dots {
           display: flex;
-          gap: 3px;
+          gap: 4px;
           justify-content: center;
           width: 100%;
+          position: absolute;
+          bottom: 4px;
         }
 
         .ev-dot {
-          width: 6px;
-          height: 6px;
+          width: 5px;
+          height: 5px;
           border-radius: 50%;
+          background-color: #8B6914 !important;
         }
 
-        .calendar-day-btn.selected .ev-dot {
-          border: 1px solid white;
+        .calendar-day-btn.selected .ev-dot,
+        .calendar-day-btn.today .ev-dot {
+          background-color: #fff !important;
         }
 
         /* Right Column Day Event details */
@@ -1242,10 +1272,10 @@ export default function CalendarioPage() {
         }
 
         .event-item-card {
-          border: 1px solid var(--color-border-light);
-          border-radius: var(--radius-md);
-          padding: var(--spacing-md);
-          background-color: var(--color-bg-primary);
+          border: 1px solid #e5dbce;
+          border-radius: 8px;
+          padding: 16px;
+          background-color: #fdfbf6;
           position: relative;
         }
 
@@ -1253,24 +1283,24 @@ export default function CalendarioPage() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: var(--spacing-xs);
+          margin-bottom: 8px;
         }
 
         .event-time-badge {
           display: inline-block;
-          font-size: 0.7rem;
+          font-size: 0.75rem;
           font-weight: 700;
           color: white;
-          background-color: var(--color-primary-light);
-          padding: 2px 8px;
-          border-radius: var(--radius-sm);
+          background-color: #4b443f;
+          padding: 4px 10px;
+          border-radius: 16px;
         }
 
         .event-area-badge {
           font-size: 0.75rem;
           font-weight: 700;
-          border-left: 3.5px solid #8B6914;
-          padding-left: 6px;
+          border-left: none;
+          padding-left: 0;
           color: var(--color-text-primary);
         }
 
@@ -1282,44 +1312,61 @@ export default function CalendarioPage() {
         }
 
         .event-details h4 {
-          font-size: 0.9rem;
-          color: var(--color-primary-dark);
+          font-size: 1rem;
+          color: #3a2113;
           line-height: 1.2;
+          font-weight: 800;
         }
 
         .status-badge-text {
-          font-size: 0.7rem;
+          font-size: 0.75rem;
           font-weight: 700;
-          padding: 2px 6px;
-          border-radius: var(--radius-sm);
+          padding: 4px 10px;
+          border-radius: 6px;
         }
 
         .status-badge-text.programado {
-          background-color: var(--color-yellow-bg);
-          color: #854D0E;
+          background-color: #fef08a;
+          color: #854d0e;
         }
 
         .status-badge-text.completado {
-          background-color: #DCFCE7;
+          background-color: #dcfce7;
           color: #166534;
         }
 
         .event-pdv, .event-desc, .event-author {
-          font-size: 0.75rem;
-          color: var(--color-text-secondary);
-          margin-bottom: 2px;
+          font-size: 0.8rem;
+          color: #475569;
+          margin-bottom: 4px;
         }
 
         .event-desc {
           margin-top: var(--spacing-xs);
-          color: var(--color-text-primary);
+          color: #333;
           font-style: italic;
         }
 
         .event-action-box {
-          margin-top: var(--spacing-md);
-          border-top: 1px dashed var(--color-border);
-          padding-top: var(--spacing-sm);
+          margin-top: 16px;
+          border-top: 1px dashed #e5dbce;
+          padding-top: 12px;
+        }
+        
+        .btn-calendar-action {
+          background-color: #3a2113;
+          color: white;
+          border: none;
+          padding: 10px;
+          border-radius: 6px;
+          font-weight: 600;
+          width: 100%;
+          cursor: pointer;
+          transition: background-color 0.2s;
+        }
+        
+        .btn-calendar-action:hover {
+          background-color: #2a150c;
         }
 
         .maint-notice-badge {
