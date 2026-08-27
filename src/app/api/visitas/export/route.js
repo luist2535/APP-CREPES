@@ -194,11 +194,18 @@ export async function GET(request) {
     };
 
     // Detect BPM (1-5 scale) from template columns
-    const isBPMScale = Array.isArray(templateConfig.columnas) &&
-      templateConfig.columnas.some(c => {
-        const u = String(c || '').toUpperCase();
-        return u === 'SATISFACTORIO' || ['1','2','3','4','5'].includes(u);
-      });
+    // NOTE: Columns like ["SATISFACTORIO","NA","OBSERVACIONES"] are SI/NO/NA checklists, NOT BPM.
+    // BPM is detected by: template name containing 'BPM', specific BPM codes, or purely numeric columns (1-5).
+    const BPM_CODES = ['DCM-F-DPR-25'];
+    const isBPMScale = (
+      (templateConfig.code && BPM_CODES.includes(String(templateConfig.code).toUpperCase())) ||
+      (templateConfig.nombre && String(templateConfig.nombre).toUpperCase().includes('BPM')) ||
+      (Array.isArray(templateConfig.columnas) &&
+        templateConfig.columnas.some(c => {
+          const u = String(c || '').toUpperCase();
+          return ['1','2','3','4','5'].includes(u);
+        }))
+    );
 
     // Find column mapping from sheet
     // Array of { subArea: string, type: 'SI'|'NO'|'NA'|'1'|'2'|'3'|'4'|'5'|'OBSERVACIONES', colNumber: number }

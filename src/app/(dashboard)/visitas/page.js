@@ -446,10 +446,15 @@ const calculateVisitScore = (visit, plantillas) => {
     });
 
     // Detect BPM scale (1-5) from template columns
-    const isBPMScaleGlobal = Array.isArray(firstField.columnas) && firstField.columnas.some(c => {
+    // NOTE: Columns like ["SATISFACTORIO","NA","OBSERVACIONES"] are SI/NO/NA checklists, NOT BPM 1-5.
+    // BPM is only detected by: template name containing 'BPM', specific BPM codes, or purely numeric columns (1-5).
+    const hasBPMName = templateConfig && String(templateConfig.nombre || '').toUpperCase().includes('BPM');
+    const hasBPMCode = templateConfig && templateConfig.code && ['DCM-F-DPR-25'].includes(String(templateConfig.code).toUpperCase());
+    const hasNumericColumns = Array.isArray(firstField.columnas) && firstField.columnas.some(c => {
       const u = String(c || '').toUpperCase();
-      return u === 'SATISFACTORIO' || ['1','2','3','4','5'].includes(u);
+      return ['1','2','3','4','5'].includes(u);
     });
+    const isBPMScaleGlobal = hasBPMName || hasBPMCode || hasNumericColumns;
 
     if (Array.isArray(firstField.secciones)) {
       if (hasSubareaTabs && Array.isArray(firstField.columnas)) {
@@ -843,14 +848,15 @@ const MatrixChecklistForm = ({
   // Detect BPM (1-5 scale):
   // 1) By template code (DCM-F-DPR-25 is the BPM checklist)
   // 2) By template name containing 'BPM'
-  // 3) By columns containing 'SATISFACTORIO', 'NA', 'N/A', or numbers 1-5
+  // 3) By columns containing purely numeric values 1-5
+  // NOTE: Columns like ["SATISFACTORIO","NA","OBSERVACIONES"] are SI/NO/NA checklists, NOT BPM.
   const BPM_CODES = ['DCM-F-DPR-25'];
   const isBPMScale = (
     (template?.code && BPM_CODES.includes(String(template.code).toUpperCase())) ||
     (template?.nombre && String(template.nombre).toUpperCase().includes('BPM')) ||
     (safeColumnas.length > 0 && safeColumnas.some(c => {
       const u = String(c || '').toUpperCase();
-      return u === 'SATISFACTORIO' || ['1','2','3','4','5'].includes(u);
+      return ['1','2','3','4','5'].includes(u);
     }))
   );
 
