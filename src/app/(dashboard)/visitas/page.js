@@ -440,10 +440,34 @@ const calculateVisitScore = (visit, plantillas) => {
     let noAplica = 0;
     const seccionesScores = [];
 
-    const hasSubareaTabs = Array.isArray(firstField.columnas) && firstField.columnas.length > 0 && !firstField.columnas.some(c => {
+    let hasSubareaTabs = false;
+    const globalCols = Array.isArray(firstField.columnas) ? firstField.columnas : [];
+    if (globalCols.length > 0 && !globalCols.some(c => {
       const cStr = String(c || '').toUpperCase();
       return cStr.includes('SATISFACTORIO') || cStr.includes('OBSERVACION') || cStr === 'NA' || cStr === 'N/A';
-    });
+    })) {
+      hasSubareaTabs = true;
+    }
+    
+    const allTabs = new Set();
+    if (hasSubareaTabs) {
+      globalCols.forEach(c => allTabs.add(c));
+    }
+
+    if (Array.isArray(firstField.secciones)) {
+      firstField.secciones.forEach(sec => {
+        if (Array.isArray(sec.columnas) && sec.columnas.length > 0) {
+          const secHasTabs = !sec.columnas.some(c => {
+            const cStr = String(c || '').toUpperCase();
+            return cStr.includes('SATISFACTORIO') || cStr.includes('OBSERVACION') || cStr === 'NA' || cStr === 'N/A';
+          });
+          if (secHasTabs) {
+            hasSubareaTabs = true;
+            sec.columnas.forEach(c => allTabs.add(c));
+          }
+        }
+      });
+    }
 
     // Detect BPM scale (1-5) from template columns
     // NOTE: Columns like ["SATISFACTORIO","NA","OBSERVACIONES"] are SI/NO/NA checklists, NOT BPM 1-5.
@@ -459,15 +483,24 @@ const calculateVisitScore = (visit, plantillas) => {
     const isBPMScaleGlobal = hasBPMName || hasBPMCode || hasNumericColumns;
 
     if (Array.isArray(firstField.secciones)) {
-      if (hasSubareaTabs && Array.isArray(firstField.columnas)) {
-        firstField.columnas.forEach((col, idx) => {
+      if (hasSubareaTabs && allTabs.size > 0) {
+        let idx = 0;
+        Array.from(allTabs).forEach((col) => {
           let colTotal = 0;
           let colSi = 0;
           let colNo = 0;
           let colNa = 0;
           firstField.secciones.forEach((sec, sIdx) => {
             const hasMultiSec = firstField.secciones.length > 1;
-            if (sec && Array.isArray(sec.filas)) {
+            
+            let secHasCol = false;
+            if (Array.isArray(sec.columnas) && sec.columnas.length > 0) {
+              secHasCol = sec.columnas.includes(col);
+            } else if (globalCols.length > 0) {
+              secHasCol = globalCols.includes(col);
+            }
+
+            if (secHasCol && sec && Array.isArray(sec.filas)) {
               sec.filas.forEach(fila => {
                 const filaUpper = String(fila || '').trim().toUpperCase();
                 if (filaUpper === 'ASPECTO' || filaUpper === 'ASPECTOS' || filaUpper === '') return;
@@ -483,23 +516,27 @@ const calculateVisitScore = (visit, plantillas) => {
               });
             }
           });
-          const denom = colTotal - colNa;
-          const por = denom > 0 ? Math.round((colSi / denom) * 100) : (colSi > 0 ? 100 : 0);
-          let badgeCol = '#15803D';
-          let badgeBgCol = '#DCFCE7';
-          if (por < 70) { badgeCol = '#991B1B'; badgeBgCol = '#FEE2E2'; }
-          else if (por < 90) { badgeCol = '#92400E'; badgeBgCol = '#FEF3C7'; }
+          
+          if (colTotal > 0) {
+            const denom = colTotal - colNa;
+            const por = denom > 0 ? Math.round((colSi / denom) * 100) : (colSi > 0 ? 100 : 0);
+            let badgeCol = '#15803D';
+            let badgeBgCol = '#DCFCE7';
+            if (por < 70) { badgeCol = '#991B1B'; badgeBgCol = '#FEE2E2'; }
+            else if (por < 90) { badgeCol = '#92400E'; badgeBgCol = '#FEF3C7'; }
 
-          seccionesScores.push({
-            nombre: String(col || `Área ${idx + 1}`),
-            totalAspectos: colTotal,
-            satisfactorios: colSi,
-            noSatisfactorios: colNo,
-            noAplica: colNa,
-            porcentaje: por,
-            badgeColor: badgeCol,
-            badgeBg: badgeBgCol
-          });
+            seccionesScores.push({
+              nombre: String(col || `Área ${idx + 1}`),
+              totalAspectos: colTotal,
+              satisfactorios: colSi,
+              noSatisfactorios: colNo,
+              noAplica: colNa,
+              porcentaje: por,
+              badgeColor: badgeCol,
+              badgeBg: badgeBgCol
+            });
+            idx++;
+          }
         });
       } else {
         let sumPuntajeBPM = 0;
@@ -839,6 +876,7 @@ const MatrixChecklistForm = ({
   evidenciasUploading
 }) => {
   const [collapsedSections, setCollapsedSections] = useState({});
+  const [activeSectionTabs, setActiveSectionTabs] = useState({});
 
   const toggleSection = (sIdx) => {
     setCollapsedSections(prev => ({ ...prev, [sIdx]: !prev[sIdx] }));
@@ -874,6 +912,16 @@ const MatrixChecklistForm = ({
     if (isBPMScale) {
       return base;
     }
+    
+    // Check if section has its own columns
+    const secCols = Array.isArray(sec?.columnas) ? sec.columnas : null;
+    const isSectionTabs = secCols && secCols.length > 0 && !isBPMScale && !secCols.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
+
+    if (isSectionTabs) {
+      const secActiveTab = activeSectionTabs[sIdx] || secCols[0];
+      return `${base}__${secActiveTab}`;
+    }
+
     if (hasSubareaTabs) {
       return `${base}__${activeTab}`;
     }
@@ -1040,8 +1088,8 @@ const MatrixChecklistForm = ({
           }
         }
       `}</style>
-      {/* Scrollable sub-area tabs (only when checklist has actual sub-areas) */}
-      {hasSubareaTabs && (
+      {/* Scrollable sub-area tabs (only when checklist has actual sub-areas and NO per-section columns) */}
+      {hasSubareaTabs && !safeSecciones.some(s => Array.isArray(s?.columnas) && s.columnas.length > 0) && (
         <div className="matrix-tabs-header" style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '20px', borderBottom: '2px solid #E8DDD4', justifyContent: 'flex-start', flexWrap: 'nowrap' }}>
           {safeColumnas.map((col) => {
             const isActive = activeTab === col;
@@ -1100,6 +1148,10 @@ const MatrixChecklistForm = ({
         {safeSecciones.map((sec, sIdx) => {
           const isCollapsed = !!collapsedSections[sIdx];
           const safeFilas = Array.isArray(sec?.filas) ? sec.filas : [];
+          const secCols = Array.isArray(sec?.columnas) ? sec.columnas : null;
+          const hasSectionTabs = secCols && secCols.length > 0 && !isBPMScale && !secCols.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
+          const currentSecTab = hasSectionTabs ? (activeSectionTabs[sIdx] || secCols[0]) : null;
+
           return (
             <div key={sIdx} className="section-block shadow-sm" style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
 
@@ -1162,6 +1214,57 @@ const MatrixChecklistForm = ({
               {/* Column Headers + Rows (when not collapsed) */}
               {!isCollapsed && (
                 <div className="section-content animate-fade-in">
+                  {/* Per-section scrollable tabs */}
+                  {hasSectionTabs && (
+                    <div className="matrix-tabs-header-section" style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '16px 18px', backgroundColor: '#fdfdfd', borderBottom: '1px solid #e2e8f0', justifyContent: 'flex-start', flexWrap: 'nowrap' }}>
+                      {secCols.map((col) => {
+                        const isActive = currentSecTab === col;
+                        const isFormulaciones = String(col || '').toUpperCase() === 'FORMULACIONES';
+                        return (
+                          <button
+                            key={col}
+                            type="button"
+                            className={`matrix-tab-btn ${isActive ? 'active' : ''}`}
+                            onClick={() => setActiveSectionTabs(prev => ({ ...prev, [sIdx]: col }))}
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              padding: '10px 14px',
+                              minWidth: '85px',
+                              borderRadius: '10px',
+                              border: isActive ? '2px solid #6B3A2A' : '1px solid #e2e8f0',
+                              backgroundColor: isActive ? '#fdf8f5' : '#ffffff',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              boxShadow: isActive ? '0 2px 8px rgba(107, 58, 42, 0.1)' : '0 1px 2px rgba(0,0,0,0.04)',
+                              flexShrink: 0
+                            }}
+                          >
+                            <span style={{
+                              fontSize: '0.75rem',
+                              fontWeight: isActive ? '700' : '600',
+                              color: isActive ? '#6B3A2A' : '#64748b',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.03em',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {isFormulaciones ? (
+                                <>
+                                  <span className="desktop-only-inline">FORMULACIONES</span>
+                                  <span className="mobile-only-inline">FORM.</span>
+                                </>
+                              ) : (
+                                col
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {/* Column Headers Badge Row */}
                   <div className="section-column-headers" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', backgroundColor: '#ffffff', borderBottom: '1px solid #f1f5f9' }}>
@@ -1418,8 +1521,10 @@ const MatrixChecklistForm = ({
         const liveCategorias = [];
 
         if (template) {
-          if (hasSubareaTabs && template.columnas && template.columnas.length > 0) {
-            // El checklist está dividido por columnas/áreas (Ej: Helados, Conos, Bebidas, etc.)
+          const hasGlobalSubTabs = hasSubareaTabs && !safeSecciones.some(s => Array.isArray(s?.columnas) && s.columnas.length > 0);
+          
+          if (hasGlobalSubTabs && template.columnas && template.columnas.length > 0) {
+            // El checklist está dividido por columnas/áreas globales (Ej: Helados, Conos, Bebidas, etc.)
             template.columnas.forEach((col) => {
               let colTotal = 0;
               let colSi = 0; 
@@ -1465,15 +1570,64 @@ const MatrixChecklistForm = ({
               });
             });
           } else if (template.secciones) {
-            // El checklist está dividido por Formatos/Secciones (Ej: Aspectos Generales, Equipos y Utensilios)
+            // El checklist está dividido por Formatos/Secciones o cada sección tiene sus propias columnas
             template.secciones.forEach((sec, idx) => {
-              let secTotal = 0;
-              let secSi = 0;
-              let secNo = 0;
-              let secNa = 0;
-              let secPuntos = 0;
-              let isBPM = false;
-              if (sec.filas) {
+              const secCols = Array.isArray(sec.columnas) ? sec.columnas : null;
+              
+              if (secCols && secCols.length > 0) {
+                // Esta sección tiene sus propias columnas (pestañas), crear una categoría por cada pestaña
+                secCols.forEach(col => {
+                  let secColTotal = 0;
+                  let secColSi = 0;
+                  let secColNo = 0;
+                  let secColNa = 0;
+                  let secColPuntos = 0;
+                  let isBPM = false;
+                  
+                  if (sec.filas) {
+                    sec.filas.forEach(fila => {
+                      secColTotal++;
+                      const base = `${fila}__sec_${idx}`;
+                      const key = `${base}__${col}`;
+                      const val = answers[key];
+                      
+                      if (val === 'SI') secColSi++;
+                      else if (val === 'NO') secColNo++;
+                      else if (val === 'NA' || val === 'N/A') secColNa++;
+                      else if (['1','2','3','4','5'].includes(val)) {
+                        isBPM = true;
+                        secColSi++;
+                        secColPuntos += parseInt(val);
+                      }
+                    });
+                  }
+                  
+                  let denom = secColTotal - secColNa;
+                  let maxPoints = isBPM ? denom * 5 : denom;
+                  let scoreValue = isBPM ? secColPuntos : secColSi;
+                  const por = maxPoints > 0 ? Math.round((scoreValue / maxPoints) * 100) : (scoreValue > 0 ? 100 : 0);
+                  
+                  liveCategorias.push({
+                    nombre: `${sec.nombre} — ${col}`,
+                    total: secColTotal,
+                    si: secColSi,
+                    no: secColNo,
+                    na: secColNa,
+                    puntos: secColPuntos,
+                    maxPoints: maxPoints,
+                    isBPM: isBPM,
+                    porcentaje: por
+                  });
+                });
+              } else {
+                // Sección normal sin pestañas
+                let secTotal = 0;
+                let secSi = 0;
+                let secNo = 0;
+                let secNa = 0;
+                let secPuntos = 0;
+                let isBPM = false;
+                if (sec.filas) {
                 sec.filas.forEach(fila => {
                   secTotal++;
                   let base = fila;
@@ -1510,6 +1664,7 @@ const MatrixChecklistForm = ({
                 isBPM: isBPM,
                 porcentaje: por
               });
+              }
             });
           }
         }
@@ -6774,34 +6929,88 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                     {(() => {
                       const firstField = Array.isArray(selectedVisit.fields) && selectedVisit.fields[0];
                       if (firstField && (firstField.tipo === 'matrix' || firstField.tipo === 'simple_checklist')) {
-                        const hasSubTabs = firstField.columnas && firstField.columnas.length > 0 && !firstField.columnas.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
+                        const hasGlobalSubTabs = firstField.columnas && firstField.columnas.length > 0 && !firstField.columnas.some(c => String(c || '').toUpperCase().includes('SATISFACTORIO') || String(c || '').toUpperCase().includes('OBSERVACION') || c === 'NA' || c === 'N/A');
 
-                        if (hasSubTabs) {
-                          return (
-                            <div className="matrix-results">
-                              {firstField.columnas.map((col) => (
-                                <div key={col} className="matrix-col-section" style={{ marginBottom: '18px', backgroundColor: '#fdf8f5', padding: '12px', borderRadius: '10px', border: '1px solid #E8DDD4' }}>
-                                  <h5 style={{ color: '#6B3A2A', borderBottom: '2px solid #E8DDD4', paddingBottom: '6px', marginBottom: '10px', fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <span>📍</span> Sub-área: {col}
-                                  </h5>
-                                  <div className="responses-grid" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    {firstField.secciones.flatMap((sec, sIdx) => 
-                                      sec.filas.filter(fila => {
+                        return (
+                          <div className="matrix-results">
+                            {firstField.secciones.map((sec, sIdx) => {
+                              const secCols = sec.columnas && sec.columnas.length > 0 ? sec.columnas : (hasGlobalSubTabs ? firstField.columnas : null);
+
+                              if (secCols && secCols.length > 0) {
+                                return (
+                                  <div key={sIdx} className="matrix-col-section" style={{ marginBottom: '18px', backgroundColor: '#fdf8f5', padding: '12px', borderRadius: '10px', border: '1px solid #E8DDD4' }}>
+                                    <h5 style={{ color: '#1e293b', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px', marginBottom: '10px', fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase' }}>
+                                      <span>📁</span> {sec.nombre}
+                                    </h5>
+                                    {secCols.map(col => (
+                                      <div key={col} style={{ marginBottom: '12px' }}>
+                                        <h6 style={{ color: '#6B3A2A', fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '6px' }}>📍 Sub-área: {col}</h6>
+                                        <div className="responses-grid" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                          {sec.filas.filter(fila => {
+                                            const fUp = String(fila || '').trim().toUpperCase();
+                                            return fUp !== 'ASPECTO' && fUp !== 'ASPECTOS' && fUp !== '';
+                                          }).map((fila, fIdx) => {
+                                            let base = fila;
+                                            if (firstField.secciones.length > 1) base = `${fila}__sec_${sIdx}`;
+                                            const answer = selectedVisit.data[`${base}__${col}`] || selectedVisit.data[`${fila}__${col}`];
+                                            const obs = selectedVisit.data[`${base}__${col}__obs`] || selectedVisit.data[`${base}__${col}_obs`] || selectedVisit.data[`${fila}__${col}__obs`] || selectedVisit.data[`${fila}__${col}_obs`];
+                                            let colorClass = 'text-muted';
+                                            let emoji = '⚪';
+                                            if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
+                                            else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
+                                            else if (answer === 'NA') { colorClass = 'text-muted'; emoji = '🔘'; }
+                                            
+                                            return (
+                                              <div key={`${sIdx}-${fIdx}`} className="response-row" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '6px', borderBottom: '1px solid #e2e8f0' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                                  <span className="response-label" style={{ fontWeight: '500', color: '#334155' }}>{fila}</span>
+                                                  <span className={`response-value ${colorClass}`} style={{ fontWeight: '700' }}>
+                                                    {emoji} {answer || 'Sin responder'}
+                                                  </span>
+                                                </div>
+                                                {obs && (
+                                                  <span style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', paddingLeft: '8px', backgroundColor: '#ffffff', padding: '4px 8px', borderRadius: '4px', borderLeft: '3px solid #6B3A2A', marginTop: '2px' }}>
+                                                    💬 {obs}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              } else {
+                                // NO COLUMNS (Standard)
+                                return (
+                                  <div key={sIdx} className="matrix-col-section" style={{ marginBottom: '18px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                                    <h5 style={{ color: '#1e293b', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px', marginBottom: '10px', fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase' }}>
+                                      <span>📁</span> {sec.nombre}
+                                    </h5>
+                                    <div className="responses-grid" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                      {sec.filas.filter(fila => {
                                         const fUp = String(fila || '').trim().toUpperCase();
                                         return fUp !== 'ASPECTO' && fUp !== 'ASPECTOS' && fUp !== '';
                                       }).map((fila, fIdx) => {
                                         let base = fila;
                                         if (firstField.secciones.length > 1) base = `${fila}__sec_${sIdx}`;
-                                        const answer = selectedVisit.data[`${base}__${col}`] || selectedVisit.data[`${fila}__${col}`];
-                                        const obs = selectedVisit.data[`${base}__${col}__obs`] || selectedVisit.data[`${base}__${col}_obs`] || selectedVisit.data[`${fila}__${col}__obs`] || selectedVisit.data[`${fila}__${col}_obs`];
+                                        let defaultColKey = base;
+                                        if (firstField.tipo === 'matrix' && firstField.columnas && firstField.columnas[0]) {
+                                          defaultColKey = `${base}__${firstField.columnas[0]}`;
+                                        }
+                                        const fallbackColKey = (firstField.tipo === 'matrix' && firstField.columnas && firstField.columnas[0]) ? `${fila}__${firstField.columnas[0]}` : fila;
+                                        
+                                        const answer = selectedVisit.data[defaultColKey] || selectedVisit.data[base] || selectedVisit.data[fallbackColKey] || selectedVisit.data[fila] || selectedVisit.data[`${fila}__SATISFACTORIO`];
+                                        const obs = selectedVisit.data[`${defaultColKey}__obs`] || selectedVisit.data[`${base}__obs`] || selectedVisit.data[`${base}_obs`] || selectedVisit.data[`${fallbackColKey}__obs`] || selectedVisit.data[`${fila}__obs`] || selectedVisit.data[`${fila}_obs`];
                                         let colorClass = 'text-muted';
                                         let emoji = '⚪';
                                         if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
                                         else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
                                         else if (answer === 'NA') { colorClass = 'text-muted'; emoji = '🔘'; }
-                                        
+
                                         return (
-                                          <div key={`${sIdx}-${fIdx}`} className="response-row" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '6px', borderBottom: '1px solid #e2e8f0' }}>
+                                          <div key={fIdx} className="response-row" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '6px', borderBottom: '1px solid #e2e8f0' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                                               <span className="response-label" style={{ fontWeight: '500', color: '#334155' }}>{fila}</span>
                                               <span className={`response-value ${colorClass}`} style={{ fontWeight: '700' }}>
@@ -6815,64 +7024,14 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
                                             )}
                                           </div>
                                         );
-                                      })
-                                    )}
+                                      })}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        } else {
-                          return (
-                            <div className="matrix-results">
-                              {firstField.secciones.map((sec, sIdx) => (
-                                <div key={sIdx} className="matrix-col-section" style={{ marginBottom: '18px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                                  <h5 style={{ color: '#1e293b', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px', marginBottom: '10px', fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase' }}>
-                                    <span>📁</span> {sec.nombre}
-                                  </h5>
-                                  <div className="responses-grid" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    {sec.filas.filter(fila => {
-                                      const fUp = String(fila || '').trim().toUpperCase();
-                                      return fUp !== 'ASPECTO' && fUp !== 'ASPECTOS' && fUp !== '';
-                                    }).map((fila, fIdx) => {
-                                      let base = fila;
-                                      if (firstField.secciones.length > 1) base = `${fila}__sec_${sIdx}`;
-                                      let defaultColKey = base;
-                                      if (firstField.tipo === 'matrix' && firstField.columnas && firstField.columnas[0]) {
-                                        defaultColKey = `${base}__${firstField.columnas[0]}`;
-                                      }
-                                      const fallbackColKey = (firstField.tipo === 'matrix' && firstField.columnas && firstField.columnas[0]) ? `${fila}__${firstField.columnas[0]}` : fila;
-                                      
-                                      const answer = selectedVisit.data[defaultColKey] || selectedVisit.data[base] || selectedVisit.data[fallbackColKey] || selectedVisit.data[fila] || selectedVisit.data[`${fila}__SATISFACTORIO`];
-                                      const obs = selectedVisit.data[`${defaultColKey}__obs`] || selectedVisit.data[`${base}__obs`] || selectedVisit.data[`${base}_obs`] || selectedVisit.data[`${fallbackColKey}__obs`] || selectedVisit.data[`${fila}__obs`] || selectedVisit.data[`${fila}_obs`];
-                                      let colorClass = 'text-muted';
-                                      let emoji = '⚪';
-                                      if (answer === 'SI') { colorClass = 'green-text'; emoji = '🟢'; }
-                                      else if (answer === 'NO') { colorClass = 'red-text'; emoji = '❌'; }
-                                      else if (answer === 'NA') { colorClass = 'text-muted'; emoji = '🔘'; }
-
-                                      return (
-                                        <div key={fIdx} className="response-row" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '6px', borderBottom: '1px solid #e2e8f0' }}>
-                                          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                                            <span className="response-label" style={{ fontWeight: '500', color: '#334155' }}>{fila}</span>
-                                            <span className={`response-value ${colorClass}`} style={{ fontWeight: '700' }}>
-                                              {emoji} {answer || 'Sin responder'}
-                                            </span>
-                                          </div>
-                                          {obs && (
-                                            <span style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', paddingLeft: '8px', backgroundColor: '#ffffff', padding: '4px 8px', borderRadius: '4px', borderLeft: '3px solid #6B3A2A', marginTop: '2px' }}>
-                                              💬 {obs}
-                                            </span>
-                                          )}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        }
+                                );
+                              }
+                            })}
+                          </div>
+                        );
                       } else {
                         return (
                           <div className="responses-grid">

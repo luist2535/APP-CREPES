@@ -186,10 +186,10 @@ export async function GET(request) {
     const isMatrix = templateConfig.tipo === 'matrix';
 
     // Helper: detect if a header value is a valid answer type (SI/NO/NA or numeric 1-5 or N/A)
-    const VALID_ANSWER_TYPES = new Set(['SI', 'NO', 'NA', 'N/A', '1', '2', '3', '4', '5']);
+    const VALID_ANSWER_TYPES = new Set(['SI', 'NO', 'NA', 'N/A', '1', '2', '3', '4', '5', '8']);
     const normalizeHeaderType = (raw) => {
       const t = String(raw || '').trim().toUpperCase();
-      if (t === 'N/A') return 'NA';
+      if (t === 'N/A' || t === '8') return 'NA';
       return t;
     };
 
@@ -207,14 +207,54 @@ export async function GET(request) {
         }))
     );
 
+    // Helper: Normalize strings for robust comparison (removes accents, extra spaces, lowercase)
+    const normalizeString = (str) => {
+      if (!str) return '';
+      return String(str)
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[.,;:()\[\]{}¿?¡!"'\-]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
+
     // Find column mapping from sheet
     // Array of { subArea: string, type: 'SI'|'NO'|'NA'|'1'|'2'|'3'|'4'|'5'|'OBSERVACIONES', colNumber: number }
     const colMappings = [];
+    
+    const expectedColumnNames = new Set();
+    if (templateConfig.columnas) {
+      templateConfig.columnas.forEach(c => expectedColumnNames.add(normalizeString(c)));
+    }
+    if (templateConfig.secciones) {
+      templateConfig.secciones.forEach(sec => {
+        if (sec.columnas) sec.columnas.forEach(c => expectedColumnNames.add(normalizeString(c)));
+      });
+    }
 
-    // Scan rows 5-7 for headers — supports both classic (SI/NO/NA) and BPM (1-5/NA/OBSERVACIONES)
+    const scanColHeadersDynamic = (startCol, endCol, subAreaName, rowA, rowB) => {
+      let foundNA = false;
+      for (let c = startCol; c <= endCol; c++) {
+        const hB = getCellValueStr(sheet.getRow(rowB).getCell(c));
+        const hA = getCellValueStr(sheet.getRow(rowA).getCell(c));
+        const raw = hB || hA;
+        const type = normalizeHeaderType(raw);
+        if (VALID_ANSWER_TYPES.has(type)) {
+          colMappings.push({ subArea: subAreaName, type, colNumber: c });
+          if (type === 'NA') foundNA = true;
+        } else if (type.includes('OBSERVAC')) {
+          colMappings.push({ subArea: subAreaName, type: 'OBSERVACIONES', colNumber: c });
+        } else if (raw.trim() !== '') {
+           if (isMatrix && !isBPMScale && !foundNA) {
+              colMappings.push({ subArea: subAreaName, type: 'NA', colNumber: c });
+              foundNA = true;
+           }
+        }
+      }
+    };
+
     const scanColHeaders = (startCol, endCol, subAreaName) => {
       for (let c = startCol; c <= endCol; c++) {
-        // Try rows 7 → 6 → 5 for the header label
         const h7 = getCellValueStr(sheet.getRow(7).getCell(c));
         const h6 = getCellValueStr(sheet.getRow(6).getCell(c));
         const h5 = getCellValueStr(sheet.getRow(5).getCell(c));
@@ -229,39 +269,31 @@ export async function GET(request) {
     };
 
     if (isMatrix && !isBPMScale) {
-      // Classic matrix: sub-areas in Row 5 (CONOS, REPOSTERÍA, etc.), SI/NO/NA in rows 6-7
-      const row5 = sheet.getRow(5);
-      const subAreas = [];
-      row5.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        const val = getCellValueStr(cell).trim();
-        if (val !== '' && val !== 'ASPECTO' && val !== 'ASPECTOS' && colNumber >= 3) {
-          if (!subAreas.some(sa => sa.name === val)) {
-            subAreas.push({ name: val, startCol: colNumber });
+      for (let r = 1; r <= 50; r++) {
+        const row = sheet.getRow(r);
+        const subAreasInRow = [];
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          const val = getCellValueStr(cell).trim();
+          if (val !== '' && val !== 'ASPECTO' && val !== 'ASPECTOS' && colNumber >= 3) {
+            if (!subAreasInRow.some(sa => sa.name === val)) {
+              subAreasInRow.push({ name: val, startCol: colNumber });
+            }
           }
+        });
+        
+        const hasExpected = subAreasInRow.some(sa => expectedColumnNames.has(normalizeString(sa.name)));
+        if (hasExpected) {
+          subAreasInRow.forEach((sa, idx) => {
+            const endCol = idx < subAreasInRow.length - 1 ? subAreasInRow[idx + 1].startCol - 1 : sheet.columnCount;
+            scanColHeadersDynamic(sa.startCol, endCol, sa.name, r + 1, r + 2);
+          });
         }
-      });
-      subAreas.forEach((sa, idx) => {
-        const endCol = idx < subAreas.length - 1 ? subAreas[idx + 1].startCol - 1 : sheet.columnCount;
-        scanColHeaders(sa.startCol, endCol, sa.name);
-      });
+      }
     } else {
-      // Simple checklist or BPM: scan columns 2-20 for SI/NO/NA/1-5/OBSERVACIONES headers
       scanColHeaders(2, Math.min(sheet.columnCount, 20), 'EVALUACION');
     }
 
-    // 7. Write answers to checklist rows
     let commentRowIndex = -1;
-
-    // Helper: Normalize strings for robust comparison (removes accents, extra spaces, lowercase)
-    const normalizeString = (str) => {
-      if (!str) return '';
-      return String(str)
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .replace(/[.,;:()\[\]{}¿?¡!"'\-]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-    };
 
     // Helper: get answer by key (normalized)
     const normalizedAnswers = {};
@@ -367,7 +399,9 @@ export async function GET(request) {
 
         if (isMatrix && !isBPMScale) {
           // Classic matrix: write X for each sub-area
-          templateConfig.columnas.forEach((subArea) => {
+          const secCols = templateConfig.secciones && templateConfig.secciones[sIdx] && Array.isArray(templateConfig.secciones[sIdx].columnas) && templateConfig.secciones[sIdx].columnas.length > 0 ? templateConfig.secciones[sIdx].columnas : (templateConfig.columnas || []);
+          
+          secCols.forEach((subArea) => {
             const base = multiSec ? `${fila}__sec_${sIdx}` : fila;
             const colKey = `${base}__${subArea}`;
             const fallKey = `${fila}__${subArea}`;
