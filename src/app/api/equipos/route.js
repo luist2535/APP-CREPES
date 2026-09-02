@@ -4,10 +4,10 @@ export async function GET(request) {
   try {
     const { getUserFromRequest } = require('@/lib/auth');
     const { getDb } = require('@/lib/db');
-    
+
     const user = getUserFromRequest(request);
     if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    
+
     const db = getDb();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id'); // e.g. 'EQ-1001'
@@ -77,9 +77,9 @@ export async function GET(request) {
       if (sugerencias.length === 1) {
         equipo = sugerencias[0];
       } else if (sugerencias.length > 1) {
-        return NextResponse.json({ 
-          error: `Se encontraron ${sugerencias.length} equipos coincidentes con la terminación o dígitos "${cleanedId}". Por favor selecciona el correcto en la lista:`, 
-          equipos_sugeridos: sugerencias 
+        return NextResponse.json({
+          error: `Se encontraron ${sugerencias.length} equipos coincidentes con la terminación o dígitos "${cleanedId}". Por favor selecciona el correcto en la lista:`,
+          equipos_sugeridos: sugerencias
         }, { status: 404 });
       }
     }
@@ -116,7 +116,7 @@ export async function GET(request) {
 
     try {
       db.prepare('ALTER TABLE archivos_repositorio ADD COLUMN tipo_documento TEXT').run();
-    } catch (e) {}
+    } catch (e) { }
 
     const archivos = db.prepare(`
       SELECT a.*, u.nombre as usuario_nombre
@@ -145,34 +145,34 @@ export async function POST(request) {
   try {
     const { getUserFromRequest } = require('@/lib/auth');
     const { getDb } = require('@/lib/db');
-    
+
     const user = getUserFromRequest(request);
     if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    
+
     const db = getDb();
     const body = await request.json();
-    
+
     // Case 1: Register/Create new equipment
     if (body.is_creation) {
       const { hasPermission } = require('@/lib/auth');
       if (!hasPermission(user, 'equipos', db)) {
         return NextResponse.json({ error: 'No tienes permisos para registrar equipos' }, { status: 403 });
       }
-      
+
       const { id, nombre, pdv_id, marca, modelo, serie, datos_tecnicos, proximo_mantenimiento } = body;
-      
+
       if (!id || !nombre || !pdv_id) {
         return NextResponse.json({ error: 'Faltan datos obligatorios (Código/Sticker, Nombre, Punto de Venta)' }, { status: 400 });
       }
-      
+
       const cleanedId = id.trim();
-      
+
       // Check duplicate primary key
       const duplicate = db.prepare('SELECT id FROM equipos WHERE LOWER(id) = LOWER(?)').get(cleanedId);
       if (duplicate) {
         return NextResponse.json({ error: 'El código/Sticker ya está registrado para otro equipo.' }, { status: 400 });
       }
-      
+
       db.prepare(`
         INSERT INTO equipos (id, nombre, pdv_id, marca, modelo, serie, datos_tecnicos, ultimo_mantenimiento, proximo_mantenimiento, activo)
         VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, 1)
@@ -186,29 +186,29 @@ export async function POST(request) {
         datos_tecnicos || '{}',
         proximo_mantenimiento || null
       );
-      
+
       return NextResponse.json({ message: 'Equipo registrado exitosamente' });
     }
-    
+
     // Case 2: Existing Maintenance log flow
     const { equipo_id, observaciones, proximo_mantenimiento, soportes } = body;
-    
+
     if (!equipo_id || !observaciones || !proximo_mantenimiento) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (Equipo, Observaciones, Próximo Mantenimiento)' }, { status: 400 });
     }
-    
+
     // Check if equipment exists
     const equipo = db.prepare('SELECT id, pdv_id FROM equipos WHERE id = ?').get(equipo_id);
     if (!equipo) {
       return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 });
     }
-    
+
     const hoy = new Date().toISOString().split('T')[0];
-    
+
     // Update equipment dates
     db.prepare('UPDATE equipos SET ultimo_mantenimiento = ?, proximo_mantenimiento = ? WHERE id = ?')
       .run(hoy, proximo_mantenimiento, equipo_id);
-      
+
     // Log a closed visit for this maintenance (area_id = 3, tipo_visita_id = 3)
     const result = db.prepare(`
       INSERT INTO visitas (
@@ -224,15 +224,15 @@ export async function POST(request) {
       observaciones,
       equipo_id
     );
-    
+
     const visitId = result.lastInsertRowid;
-    
+
     // Log historical action
     db.prepare(`
       INSERT INTO historial_visitas (visita_id, accion, user_id, detalle)
       VALUES (?, 'finalizar', ?, ?)
     `).run(visitId, user.id, 'Mantenimiento reportado y cerrado desde Inventario/Ficha Técnica');
-    
+
     // Insert uploaded documents/invoices
     if (soportes && Array.isArray(soportes)) {
       const insertStmt = db.prepare(`
@@ -245,9 +245,9 @@ export async function POST(request) {
         }
       }
     }
-    
-    return NextResponse.json({ 
-      message: 'Mantenimiento registrado exitosamente', 
+
+    return NextResponse.json({
+      message: 'Mantenimiento registrado exitosamente',
       ultimo_mantenimiento: hoy,
       proximo_mantenimiento: proximo_mantenimiento
     });
@@ -261,10 +261,10 @@ export async function PUT(request) {
   try {
     const { getUserFromRequest } = require('@/lib/auth');
     const { getDb } = require('@/lib/db');
-    
+
     const user = getUserFromRequest(request);
     if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    
+
     // Auth check
     const db = getDb();
     const { hasPermission } = require('@/lib/auth');
@@ -272,17 +272,17 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'No tienes permisos para modificar equipos' }, { status: 403 });
     }
     const { id, nombre, pdv_id, marca, modelo, serie, datos_tecnicos, activo } = await request.json();
-    
+
     if (!id || !nombre || !pdv_id) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (Código, Nombre, Punto de Venta)' }, { status: 400 });
     }
-    
+
     // Verify if it exists
     const existing = db.prepare('SELECT id FROM equipos WHERE id = ?').get(id);
     if (!existing) {
       return NextResponse.json({ error: 'El equipo no existe' }, { status: 404 });
     }
-    
+
     db.prepare(`
       UPDATE equipos 
       SET nombre = ?, pdv_id = ?, marca = ?, modelo = ?, serie = ?, datos_tecnicos = ?, activo = ?
@@ -297,7 +297,7 @@ export async function PUT(request) {
       activo !== undefined ? parseInt(activo) : 1,
       id
     );
-    
+
     return NextResponse.json({ message: 'Equipo actualizado exitosamente' });
   } catch (error) {
     console.error('Equipos PUT error:', error);

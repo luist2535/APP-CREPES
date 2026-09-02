@@ -3835,12 +3835,26 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
               <h3 style={{ margin: 0, color: '#fff', fontSize: '1.1rem' }}>Detalles del Equipo</h3>
               <button onClick={() => setEquipoDetailsModal({ open: false, equipo: null, isConfirming: false })} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '1.4rem', cursor: 'pointer' }}>×</button>
             </div>
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '420px', overflowY: 'auto' }}>
               <div><strong style={{ color: '#6B3A2A' }}>Nombre:</strong> <span style={{ fontSize: '1.05rem', fontWeight: 'bold' }}>{equipoDetailsModal.equipo.nombre}</span></div>
               <div><strong style={{ color: '#6B3A2A' }}>ID / Código:</strong> {equipoDetailsModal.equipo.id}</div>
+              {(() => {
+                let dt = {};
+                try { dt = typeof equipoDetailsModal.equipo.datos_tecnicos === 'string' ? JSON.parse(equipoDetailsModal.equipo.datos_tecnicos) : (equipoDetailsModal.equipo.datos_tecnicos || {}); } catch(e) {}
+                return (
+                  <>
+                    {dt.ubicacion && <div><strong style={{ color: '#6B3A2A' }}>📍 Ubicación:</strong> <span style={{ fontWeight: 700, color: '#166534', background: '#DCFCE7', padding: '2px 8px', borderRadius: '6px' }}>{dt.ubicacion}</span></div>}
+                    {dt.activo_fijo && dt.activo_fijo !== equipoDetailsModal.equipo.id && <div><strong style={{ color: '#6B3A2A' }}>Placa Activo Fijo:</strong> {dt.activo_fijo}</div>}
+                    {dt.referencia && dt.referencia !== equipoDetailsModal.equipo.serie && <div><strong style={{ color: '#6B3A2A' }}>Referencia:</strong> {dt.referencia}</div>}
+                    {dt.estado && <div><strong style={{ color: '#6B3A2A' }}>Estado:</strong> <span style={{ fontWeight: 600 }}>{dt.estado}</span></div>}
+                    {dt.estado_niif && <div><strong style={{ color: '#6B3A2A' }}>Estado NIIF:</strong> {dt.estado_niif}</div>}
+                    {dt.observacion && <div><strong style={{ color: '#6B3A2A' }}>Observación:</strong> {dt.observacion}</div>}
+                  </>
+                );
+              })()}
               {equipoDetailsModal.equipo.marca && <div><strong style={{ color: '#6B3A2A' }}>Marca:</strong> {equipoDetailsModal.equipo.marca}</div>}
               {equipoDetailsModal.equipo.modelo && <div><strong style={{ color: '#6B3A2A' }}>Modelo:</strong> {equipoDetailsModal.equipo.modelo}</div>}
-              {equipoDetailsModal.equipo.serie && <div><strong style={{ color: '#6B3A2A' }}>Serie:</strong> {equipoDetailsModal.equipo.serie}</div>}
+              {equipoDetailsModal.equipo.serie && <div><strong style={{ color: '#6B3A2A' }}>Serie / Ref:</strong> {equipoDetailsModal.equipo.serie}</div>}
               {equipoDetailsModal.equipo.pdv_nombre && <div><strong style={{ color: '#6B3A2A' }}>Punto de Venta:</strong> {equipoDetailsModal.equipo.pdv_nombre}</div>}
             </div>
             <div style={{ padding: '16px 20px', background: '#F9FAFB', borderTop: '1px solid #E5E7EB', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
