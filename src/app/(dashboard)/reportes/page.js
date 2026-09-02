@@ -626,7 +626,7 @@ Impreso y registrado en el repositorio el ${new Date().toLocaleString('es-ES')}
                   <th>PDV / Ciudad</th>
                   <th>Área</th>
                   <th>Categoría</th>
-                  <th>Tipo de Visita</th>
+                  <th>Tipo / Detalle</th>
                   <th>Responsable</th>
                   <th>Estado</th>
                   <th>Horario</th>
@@ -660,7 +660,14 @@ Impreso y registrado en el repositorio el ${new Date().toLocaleString('es-ES')}
                           )}
                           <span className="cat-nombre">{v.categoria_nombre || '—'}</span>
                         </td>
-                        <td className="cell-tipo">{v.tipo_visita_nombre || '—'}</td>
+                        <td className="cell-tipo">
+                          <div style={{ fontWeight: 600, color: '#374151' }}>{v.tipo_visita_nombre || '—'}</div>
+                          {v.hallazgos && (
+                            <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '4px', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={v.hallazgos}>
+                              {v.hallazgos}
+                            </div>
+                          )}
+                        </td>
                         <td className="cell-resp">{v.responsable_nombre || '—'}</td>
                         <td>
                           <span className="estado-badge" style={{ background: estado.bg, color: estado.color }}>
@@ -715,7 +722,14 @@ Impreso y registrado en el repositorio el ${new Date().toLocaleString('es-ES')}
                       </div>
                       <div className="mobile-metric">
                         <span className="m-label">📋 Visita / Cat.</span>
-                        <span className="m-val">{v.categoria_nombre || v.tipo_visita_nombre || '—'}</span>
+                        <div className="m-val">
+                          <div>{v.categoria_nombre || v.tipo_visita_nombre || '—'}</div>
+                          {v.hallazgos && (
+                            <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
+                              {v.hallazgos}
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div className="mobile-metric">
                         <span className="m-label">👤 Responsable</span>

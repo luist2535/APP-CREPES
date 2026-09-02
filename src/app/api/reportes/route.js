@@ -81,10 +81,84 @@ export async function GET(request) {
 
     const whereClause = conditions.join(' AND ');
 
+    // Common Table Expression para unificar visitas y mantenimientos
+    const cteAllData = `
+      WITH AllData AS (
+        SELECT 
+          'V-' || v.id as global_id,
+          v.id as original_id,
+          'visita' as origen,
+          v.fecha as fecha,
+          v.hora_inicio,
+          v.hora_fin,
+          v.estado,
+          v.observaciones,
+          v.hallazgos,
+          v.acciones_correctivas,
+          v.datos_formulario,
+          v.repuestos,
+          v.firma_auxiliar,
+          v.firma_jefe,
+          v.comentarios_jefe,
+          v.firma_pdv,
+          v.solicitante_nombre,
+          v.equipo_id,
+          v.created_at,
+          v.pdv_id,
+          v.area_id,
+          v.tipo_visita_id,
+          v.user_id,
+          v.responsable_id,
+          v.categoria_id,
+          NULL as tipo_mantenimiento
+        FROM visitas v
+        
+        UNION ALL
+        
+        SELECT 
+          m.id as global_id,
+          m.id as original_id,
+          'mantenimiento' as origen,
+          DATE(m.fecha_registro) as fecha,
+          TIME(m.fecha_inicio_ejecucion) as hora_inicio,
+          TIME(m.fecha_real_finalizacion) as hora_fin,
+          CASE 
+            WHEN m.estado IN ('Pendiente', 'Asignado') THEN 'pendiente'
+            WHEN m.estado IN ('En proceso', 'Por Aprobar') THEN 'en_progreso'
+            WHEN m.estado = 'Finalizado' THEN 'finalizada'
+            WHEN m.estado = 'Cancelado' THEN 'devuelta'
+            ELSE 'pendiente'
+          END as estado,
+          m.observaciones as observaciones,
+          m.descripcion as hallazgos,
+          m.solucion_aplicada as acciones_correctivas,
+          NULL as datos_formulario,
+          NULL as repuestos,
+          m.firma_tecnico as firma_auxiliar,
+          m.firma_jefe as firma_jefe,
+          m.observaciones_aprobacion as comentarios_jefe,
+          m.firma_solicitante as firma_pdv,
+          NULL as solicitante_nombre,
+          m.equipo_id as equipo_id,
+          m.created_at as created_at,
+          COALESCE(m.pdv_id, e.pdv_id, ur.pdv_id) as pdv_id,
+          CASE WHEN m.prefijo = 'ST' THEN 7 ELSE 3 END as area_id,
+          NULL as tipo_visita_id,
+          m.user_id_registro as user_id,
+          m.tecnico_id as responsable_id,
+          m.categoria_id as categoria_id,
+          m.tipo_mantenimiento as tipo_mantenimiento
+        FROM mantenimientos m
+        LEFT JOIN equipos e ON m.equipo_id = e.id
+        LEFT JOIN users ur ON m.user_id_registro = ur.id
+      )
+    `;
+
     // Main report query
     const visitas = db.prepare(`
+      ${cteAllData}
       SELECT 
-        v.id, v.fecha, v.hora_inicio, v.hora_fin, v.estado,
+        v.global_id as id, v.original_id, v.origen, v.fecha, v.hora_inicio, v.hora_fin, v.estado,
         v.observaciones, v.hallazgos, v.acciones_correctivas,
         v.datos_formulario, v.repuestos, v.firma_auxiliar, v.firma_jefe, v.comentarios_jefe,
         v.firma_pdv, v.solicitante_nombre, v.equipo_id,
@@ -92,18 +166,18 @@ export async function GET(request) {
         p.nombre as pdv_nombre,
         c.nombre as ciudad_nombre,
         a.nombre as area_nombre, a.color as area_color,
-        tv.nombre as tipo_visita_nombre,
+        COALESCE(tv.nombre, v.tipo_mantenimiento) as tipo_visita_nombre,
         u.nombre as creador_nombre,
         resp.nombre as responsable_nombre,
         cat.nombre as categoria_nombre,
         cat_padre.nombre as categoria_padre_nombre,
         e.nombre as equipo_nombre, e.marca as equipo_marca, e.modelo as equipo_modelo
-      FROM visitas v
-      JOIN pdv p ON v.pdv_id = p.id
-      JOIN ciudades c ON p.ciudad_id = c.id
-      JOIN areas a ON v.area_id = a.id
+      FROM AllData v
+      LEFT JOIN pdv p ON v.pdv_id = p.id
+      LEFT JOIN ciudades c ON p.ciudad_id = c.id
+      LEFT JOIN areas a ON v.area_id = a.id
       LEFT JOIN tipos_visita tv ON v.tipo_visita_id = tv.id
-      JOIN users u ON v.user_id = u.id
+      LEFT JOIN users u ON v.user_id = u.id
       LEFT JOIN users resp ON v.responsable_id = resp.id
       LEFT JOIN categorias_visita cat ON v.categoria_id = cat.id
       LEFT JOIN categorias_visita cat_padre ON cat.padre_id = cat_padre.id
@@ -115,16 +189,17 @@ export async function GET(request) {
 
     // Summary by area
     const resumenPorArea = db.prepare(`
+      ${cteAllData}
       SELECT 
         a.id as area_id, a.nombre as area_nombre, a.color as area_color,
-        COUNT(v.id) as total,
+        COUNT(v.global_id) as total,
         SUM(CASE WHEN v.estado = 'cerrada' THEN 1 ELSE 0 END) as cerradas,
         SUM(CASE WHEN v.estado = 'finalizada' THEN 1 ELSE 0 END) as finalizadas,
         SUM(CASE WHEN v.estado = 'pendiente' THEN 1 ELSE 0 END) as pendientes,
         SUM(CASE WHEN v.estado = 'en_progreso' THEN 1 ELSE 0 END) as en_progreso,
         SUM(CASE WHEN v.estado = 'devuelta' THEN 1 ELSE 0 END) as devueltas
       FROM areas a
-      LEFT JOIN visitas v ON v.area_id = a.id
+      LEFT JOIN AllData v ON v.area_id = a.id
         ${fecha_desde ? 'AND v.fecha >= ?' : ''}
         ${fecha_hasta ? 'AND v.fecha <= ?' : ''}
       WHERE a.activa = 1
@@ -137,16 +212,17 @@ export async function GET(request) {
 
     // Summary by category (for the filtered area/categories)
     const resumenPorCategoria = db.prepare(`
+      ${cteAllData}
       SELECT 
         cat.id, cat.nombre as categoria_nombre, 
         cat_padre.nombre as padre_nombre,
         a.nombre as area_nombre,
-        COUNT(v.id) as total,
+        COUNT(v.global_id) as total,
         SUM(CASE WHEN v.estado IN ('cerrada','finalizada') THEN 1 ELSE 0 END) as completadas
       FROM categorias_visita cat
       LEFT JOIN categorias_visita cat_padre ON cat.padre_id = cat_padre.id
       LEFT JOIN areas a ON cat.area_id = a.id
-      LEFT JOIN visitas v ON v.categoria_id = cat.id
+      LEFT JOIN AllData v ON v.categoria_id = cat.id
         ${fecha_desde ? 'AND v.fecha >= ?' : ''}
         ${fecha_hasta ? 'AND v.fecha <= ?' : ''}
       WHERE cat.activa = 1 AND cat.padre_id IS NOT NULL

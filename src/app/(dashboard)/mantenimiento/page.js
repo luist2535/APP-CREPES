@@ -1515,7 +1515,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                           onMouseEnter={e => e.currentTarget.style.background = '#FAF6F0'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                           <td style={{ padding: '14px 16px' }}>
-                            <span style={{ fontWeight: 800, fontSize: '0.84rem', background: '#FFFBEB', color: '#92400E', border: '1px solid #FDE68A', padding: '4px 12px', borderRadius: '8px' }}>{t.id}</span>
+                            <span style={{ fontWeight: 800, fontSize: '0.84rem', background: '#FFFBEB', color: '#92400E', border: '1px solid #FDE68A', padding: '4px 12px', borderRadius: '8px', whiteSpace: 'nowrap' }}>{t.id}</span>
                           </td>
                           <td style={{ padding: '14px 16px', color: '#4B5563', fontWeight: 600 }}>{t.tipo_mantenimiento}</td>
                           <td style={{ padding: '14px 16px', color: '#4B5563', fontWeight: 600 }}>{t.area_registro}</td>
