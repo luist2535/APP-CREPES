@@ -124,7 +124,70 @@ function getDb() {
         }
       }
     } catch (e) {
-      console.error('Error migrando plantillas techos/paredes:', e);
+      console.error('Error migrando plantillas:', e);
+    }
+
+    // Auto-importar activos fijos de Logika si aún no están en la BD
+    try {
+      const countLogika = db.prepare("SELECT count(*) as c FROM equipos WHERE pdv_id = 17").get();
+      if (countLogika && countLogika.c < 50) {
+        const excelPath = path.join(process.cwd(), 'MANTENIMIENTO', 'ACTIVOS FIJOS PLANTA LOGIKA (1).xlsx');
+        if (fs.existsSync(excelPath)) {
+          const XLSX = require('xlsx');
+          const wb = XLSX.readFile(excelPath);
+          const sheet = wb.Sheets['Sheet1'] || wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          const upsertStmt = db.prepare(`
+            INSERT INTO equipos (id, nombre, pdv_id, marca, modelo, serie, datos_tecnicos, ultimo_mantenimiento, proximo_mantenimiento, activo)
+            VALUES (@id, @nombre, 17, NULL, NULL, @serie, @datos_tecnicos, NULL, NULL, 1)
+            ON CONFLICT(id) DO UPDATE SET
+              nombre = excluded.nombre,
+              pdv_id = excluded.pdv_id,
+              serie = excluded.serie,
+              datos_tecnicos = excluded.datos_tecnicos,
+              activo = 1
+          `);
+          const runTx = db.transaction(() => {
+            for (let i = 2; i < rows.length; i++) {
+              const r = rows[i];
+              if (!r || r.length === 0) continue;
+              const activoFijo = r[0] != null ? String(r[0]).trim() : '';
+              const co = r[1] != null ? String(r[1]).trim() : '';
+              const referencia = r[2] != null ? String(r[2]).trim() : '';
+              const descripcion = r[3] != null ? String(r[3]).trim() : '';
+              const estadoNiif = r[4] != null ? String(r[4]).trim() : '';
+              const estado = r[5] != null ? String(r[5]).trim() : '';
+              const ubicacion = r[6] != null ? String(r[6]).trim() : '';
+              const observacion = r[7] != null ? String(r[7]).trim() : '';
+              if (!activoFijo && !referencia && !descripcion) continue;
+              const id = activoFijo || referencia || `EQ-LOGIKA-${String(i).padStart(4, '0')}`;
+              const nombre = descripcion || (referencia ? `ACTIVO REF. ${referencia}` : `ACTIVO ${id}`);
+              const datosTecnicos = {
+                activo_fijo: activoFijo,
+                referencia: referencia,
+                co: co,
+                descripcion: descripcion,
+                estado_niif: estadoNiif,
+                estado: estado || 'OPERATIVO',
+                ubicacion: ubicacion || 'PLANTA LOGIKA',
+                observacion: observacion,
+                sticker: activoFijo || referencia || id,
+                hoja_origen: 'ACTIVOS FIJOS PLANTA LOGIKA'
+              };
+              upsertStmt.run({
+                id,
+                nombre,
+                serie: referencia || null,
+                datos_tecnicos: JSON.stringify(datosTecnicos)
+              });
+            }
+          });
+          runTx();
+          console.log('✅ Activos fijos de Logika auto-importados exitosamente a la base de datos.');
+        }
+      }
+    } catch (e) {
+      console.error('Error auto-importando activos fijos de Logika:', e);
     }
   }
   return db;
