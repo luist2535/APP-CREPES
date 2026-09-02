@@ -41,6 +41,8 @@ export async function GET(request) {
     }
 
     const cleanedId = id.trim();
+    const cleanDigits = cleanedId.replace(/[^a-zA-Z0-9]/g, '');
+    const cleanNum = cleanedId.replace(/^[^0-9]+/, '').replace(/^0+/, ''); // e.g. PPP0000003372 -> 3372
 
     let equipo = db.prepare(`
       SELECT e.*, p.nombre as pdv_nombre, c.nombre as ciudad_nombre
@@ -50,9 +52,36 @@ export async function GET(request) {
       WHERE (
         LOWER(e.id) = LOWER(?)
         OR LOWER(json_extract(e.datos_tecnicos, '$.sticker')) = LOWER(?)
+        OR LOWER(json_extract(e.datos_tecnicos, '$.activo_fijo')) = LOWER(?)
+        OR LOWER(json_extract(e.datos_tecnicos, '$.referencia')) = LOWER(?)
         OR LOWER(e.serie) = LOWER(?)
+        OR (length(?) >= 4 AND LOWER(e.id) LIKE LOWER(?) || '-%')
+        OR (length(?) >= 4 AND REPLACE(REPLACE(LOWER(e.id), '-', ''), ' ', '') = LOWER(?))
+        OR (length(?) >= 4 AND REPLACE(REPLACE(LOWER(json_extract(e.datos_tecnicos, '$.activo_fijo')), '-', ''), ' ', '') = LOWER(?))
+        OR (length(?) >= 3 AND (
+          LOWER(e.id) LIKE '%' || ? || '%'
+          OR LOWER(e.serie) LIKE '%' || ? || '%'
+          OR LOWER(json_extract(e.datos_tecnicos, '$.referencia')) LIKE '%' || ? || '%'
+          OR LOWER(json_extract(e.datos_tecnicos, '$.activo_fijo')) LIKE '%' || ? || '%'
+        ))
       ) AND e.activo = 1
-    `).get(cleanedId, cleanedId, cleanedId);
+      ORDER BY 
+        CASE 
+          WHEN LOWER(e.id) = LOWER(?) THEN 1
+          WHEN LOWER(json_extract(e.datos_tecnicos, '$.referencia')) = LOWER(?) THEN 2
+          WHEN LOWER(e.serie) = LOWER(?) THEN 3
+          WHEN LOWER(json_extract(e.datos_tecnicos, '$.activo_fijo')) = LOWER(?) THEN 4
+          ELSE 5
+        END ASC
+      LIMIT 1
+    `).get(
+      cleanedId, cleanedId, cleanedId, cleanedId, cleanedId,
+      cleanedId, cleanedId,
+      cleanDigits, cleanDigits,
+      cleanDigits, cleanDigits,
+      cleanNum, cleanNum, cleanNum, cleanNum, cleanNum,
+      cleanedId, cleanedId, cleanedId, cleanedId
+    );
 
     if (!equipo && cleanedId.length >= 3) {
       const sugerencias = db.prepare(`
@@ -61,25 +90,38 @@ export async function GET(request) {
         JOIN pdv p ON e.pdv_id = p.id
         JOIN ciudades c ON p.ciudad_id = c.id
         WHERE (
-          LOWER(e.id) LIKE '%' || LOWER(?)
-          OR LOWER(json_extract(e.datos_tecnicos, '$.sticker')) LIKE '%' || LOWER(?)
-          OR LOWER(e.serie) LIKE '%' || LOWER(?)
+          LOWER(e.id) LIKE '%' || LOWER(?) || '%'
+          OR LOWER(json_extract(e.datos_tecnicos, '$.sticker')) LIKE '%' || LOWER(?) || '%'
+          OR LOWER(json_extract(e.datos_tecnicos, '$.activo_fijo')) LIKE '%' || LOWER(?) || '%'
+          OR LOWER(json_extract(e.datos_tecnicos, '$.referencia')) LIKE '%' || LOWER(?) || '%'
+          OR LOWER(e.serie) LIKE '%' || LOWER(?) || '%'
+          OR LOWER(e.nombre) LIKE '%' || LOWER(?) || '%'
+          OR (length(?) >= 3 AND (
+            LOWER(e.id) LIKE '%' || ? || '%'
+            OR LOWER(e.serie) LIKE '%' || ? || '%'
+            OR LOWER(json_extract(e.datos_tecnicos, '$.referencia')) LIKE '%' || ? || '%'
+          ))
         ) AND e.activo = 1
         ORDER BY 
           CASE 
-            WHEN LOWER(e.id) LIKE '%' || LOWER(?) THEN 1
-            WHEN LOWER(json_extract(e.datos_tecnicos, '$.sticker')) LIKE '%' || LOWER(?) THEN 2
-            ELSE 3
+            WHEN LOWER(e.id) = LOWER(?) THEN 1
+            WHEN LOWER(json_extract(e.datos_tecnicos, '$.referencia')) = LOWER(?) THEN 2
+            WHEN LOWER(e.id) LIKE '%' || LOWER(?) THEN 3
+            ELSE 4
           END ASC
         LIMIT 10
-      `).all(cleanedId, cleanedId, cleanedId, cleanedId, cleanedId);
+      `).all(
+        cleanedId, cleanedId, cleanedId, cleanedId, cleanedId, cleanedId,
+        cleanNum, cleanNum, cleanNum, cleanNum,
+        cleanedId, cleanedId, cleanedId
+      );
 
       if (sugerencias.length === 1) {
         equipo = sugerencias[0];
       } else if (sugerencias.length > 1) {
-        return NextResponse.json({
-          error: `Se encontraron ${sugerencias.length} equipos coincidentes con la terminación o dígitos "${cleanedId}". Por favor selecciona el correcto en la lista:`,
-          equipos_sugeridos: sugerencias
+        return NextResponse.json({ 
+          error: `Se encontraron ${sugerencias.length} equipos coincidentes con "${cleanedId}". Por favor selecciona el correcto en la lista:`, 
+          equipos_sugeridos: sugerencias 
         }, { status: 404 });
       }
     }
