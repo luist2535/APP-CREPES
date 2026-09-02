@@ -610,6 +610,10 @@ export default function MantenimientoPage() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
 
+  // New Layout States
+  const [approvalTab, setApprovalTab] = useState('resumen');
+  const [approvalLightbox, setApprovalLightbox] = useState(null);
+
   // Toast notifications (reemplaza alert())
   const [toasts, setToasts] = useState([]);
   const showToast = (text, type = 'error') => {
@@ -1266,6 +1270,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', paddingBottom: '70px' }}>
+      { !approvalModalTicket && ( <>
 
       {/* ====== HEADER MÓVIL EXACTO A input_file_1.png ====== */}
       <div className="mobile-only-cards" style={{
@@ -1685,7 +1690,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                 </div>
               ) : (
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>Descripción del Elemento Locativo *</label>
+                  <label style={labelStyle}>Descripción del elemento sin sticker *</label>
                   <input value={formTicket.area_hallazgo} onChange={e => setFormTicket(p => ({ ...p, area_hallazgo: e.target.value }))} placeholder="Ej: Pared del pasillo, Lámpara del techo, Puerta principal..." style={inputStyle} required />
                 </div>
               )}
@@ -2773,242 +2778,882 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
         ))}
       </div>
 
-      {/* ====== MODAL DE APROBACIÓN POR JEFE DE MANTENIMIENTO ====== */}
+      </> )}
+      {/* ====== VISTA COMPLETA DE REVISIÓN Y APROBACIÓN DEL JEFE ====== */}
       {approvalModalTicket && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
-          <div className="animate-fade-in" style={{ background: '#FAF6F0', borderRadius: '24px', width: '100%', maxWidth: '620px', maxHeight: '94vh', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
-
-            {/* Header morado-azul estilo app móvil */}
-            <div style={{ background: 'linear-gradient(135deg, #4F46E5 0%, #3730A3 100%)', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{ background: 'rgba(255,255,255,0.15)', width: '42px', height: '42px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>
-                  👔
-                </div>
-                <div>
-                  <h2 style={{ margin: 0, color: '#fff', fontSize: '1.18rem', fontFamily: "'Playfair Display', serif", fontWeight: 800, lineHeight: 1.2 }}>
-                    Revisión y Aprobación
-                  </h2>
-                  <div style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 700, marginTop: '2px' }}>
-                    Jefe de Mantenimiento
-                  </div>
-                  <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.85)', marginTop: '3px', lineHeight: 1.3 }}>
-                    Evaluación de calidad de la reparación antes del cierre oficial
-                  </div>
-                </div>
-              </div>
-              <button onClick={() => setApprovalModalTicket(null)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', fontSize: '1.2rem', cursor: 'pointer', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button>
+        <>
+        {/* === VISTA MÓVIL EXACTA AL MOCKUP === */}
+        <div className="mobile-only-cards" style={{ display: 'flex', flexDirection: 'column', position: 'fixed', inset: 0, zIndex: 99999, background: '#F8F9FA', overflowY: 'auto', paddingBottom: '90px' }}>
+          {/* Header */}
+          <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px', background: '#fff', position: 'sticky', top: 0, zIndex: 10 }}>
+            <span onClick={() => { setApprovalModalTicket(null); setApprovalLightbox(null); setApprovalTab('resumen'); }} style={{ color: '#4F46E5', fontSize: '1.5rem', cursor: 'pointer', fontWeight: 600 }}>←</span>
+            <div style={{ flex: 1 }}>
+              <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#1F2937', fontWeight: 800 }}>Revisión y Aprobación</h2>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: '#6B7280' }}>Evaluación de calidad antes del cierre oficial</p>
             </div>
+            <span style={{ color: '#4F46E5', fontSize: '1.5rem', fontWeight: 800, cursor: 'pointer' }}>⋮</span>
+          </div>
 
-            {/* Contenido scrolleable */}
-            <div style={{ padding: '18px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
-
-              {/* Tarjetas de Firmas Técnico y Solicitante (Grid responsive como el mockup) */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
-                <div style={{ background: '#fff', border: '1px solid #E5D8CC', borderRadius: '16px', padding: '14px 10px', textAlign: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#6B3A2A', letterSpacing: '0.5px', marginBottom: '8px' }}>FIRMA TÉCNICO</div>
-                  {approvalModalTicket.firma_tecnico ? (
-                    <img src={approvalModalTicket.firma_tecnico} alt="Tecnico" style={{ maxHeight: '48px', margin: '0 auto' }} />
-                  ) : (
-                    <span style={{ fontSize: '0.85rem', color: '#999', fontStyle: 'italic' }}>No firmó</span>
-                  )}
-                </div>
-                <div style={{ background: '#fff', border: '1px solid #E5D8CC', borderRadius: '16px', padding: '14px 10px', textAlign: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#6B3A2A', letterSpacing: '0.5px', marginBottom: '8px' }}>FIRMA SOLICITANTE</div>
-                  {approvalModalTicket.firma_solicitante ? (
-                    <img src={approvalModalTicket.firma_solicitante} alt="Solicitante" style={{ maxHeight: '48px', margin: '0 auto' }} />
-                  ) : (
-                    <span style={{ fontSize: '0.85rem', color: '#999', fontStyle: 'italic' }}>No firmó</span>
-                  )}
+          {/* Ticket Summary Card */}
+          <div style={{ margin: '16px 20px', background: '#fff', borderRadius: '12px', border: '1px solid #F3F4F6', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <span style={{ background: '#4F46E5', color: '#fff', fontSize: '0.7rem', fontWeight: 800, padding: '4px 10px', borderRadius: '6px' }}>TICKET</span>
+              <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#1F2937' }}>{approvalModalTicket.id}</span>
+              {approvalModalTicket.equipo_nombre || approvalModalTicket.area_hallazgo ? (
+                <span style={{ background: '#FEF2F2', color: '#DC2626', fontSize: '0.7rem', fontWeight: 800, padding: '4px 10px', borderRadius: '6px', border: '1px solid #FECACA', marginLeft: 'auto', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }}>
+                  {approvalModalTicket.equipo_nombre || approvalModalTicket.area_hallazgo}
+                </span>
+              ) : null}
+            </div>
+            <div style={{ borderBottom: '1px dashed #E5E7EB', marginBottom: '16px' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <span style={{ color: '#F59E0B', fontSize: '1.1rem' }}>👤</span>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: '#9CA3AF' }}>Técnico Asignado</div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1F2937' }}>{approvalModalTicket.tecnico_nombre || 'Sin asignar'}</div>
                 </div>
               </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <span style={{ color: '#3B82F6', fontSize: '1.1rem' }}>🏢</span>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: '#9CA3AF' }}>Área Solicitante</div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1F2937' }}>{approvalModalTicket.pdv_nombre || approvalModalTicket.area_hallazgo || '—'}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <span style={{ color: '#F59E0B', fontSize: '1.1rem' }}>🔧</span>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: '#9CA3AF' }}>Tipo de Mantenimiento</div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1F2937' }}>{approvalModalTicket.tipo_mantenimiento || '—'}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <span style={{ color: '#EF4444', fontSize: '1.1rem' }}>🚩</span>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: '#9CA3AF' }}>Prioridad</div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#DC2626', background: '#FEF2F2', display: 'inline-block', padding: '2px 8px', borderRadius: '4px', marginTop: '2px' }}>{approvalModalTicket.prioridad || 'Alta'}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <span style={{ color: '#3B82F6', fontSize: '1.1rem' }}>ℹ️</span>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: '#9CA3AF' }}>Estado Actual</div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4F46E5', background: '#EEF2FF', display: 'inline-block', padding: '2px 8px', borderRadius: '4px', marginTop: '2px' }}>{approvalModalTicket.estado}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <span style={{ color: '#6B7280', fontSize: '1.1rem' }}>📅</span>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: '#9CA3AF' }}>Fecha de Registro</div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1F2937' }}>{formatDate(approvalModalTicket.fecha_registro)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-              {/* Acordeón para inspeccionar Hallazgo, Solución, Checklist y Evidencias sin saturar el móvil */}
-              <button
-                type="button"
-                onClick={() => setShowDetailsApproval(!showDetailsApproval)}
-                style={{ background: '#EAE2D8', color: '#3730A3', border: '1px solid #D1C7BD', borderRadius: '14px', padding: '12px 16px', fontWeight: 700, fontSize: '0.86rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', width: '100%', textAlign: 'left' }}
-              >
-                <span>🔍 Ver Hallazgo, Solución, Checklist y Fotos</span>
-                <span style={{ fontSize: '1rem', fontWeight: 800 }}>{showDetailsApproval ? '▲' : '▼'}</span>
+          {/* Tabs */}
+          <div style={{ display: 'flex', borderBottom: '1px solid #E5E7EB', overflowX: 'auto', padding: '0 10px', flexShrink: 0, background: '#fff' }}>
+            {[
+              { id: 'resumen', icon: '📝', label: 'Resumen' },
+              { id: 'evidencias', icon: '📷', label: 'Evidencias', count: (() => { let evs = []; try { evs = typeof approvalModalTicket.evidencias === 'string' ? JSON.parse(approvalModalTicket.evidencias) : (approvalModalTicket.evidencias || []); } catch (e) { } return evs.length; })() },
+              { id: 'firmas', icon: '✍️', label: 'Firmas', count: (approvalModalTicket.firma_tecnico ? 1 : 0) + (approvalModalTicket.firma_solicitante ? 1 : 0) + (approvalModalTicket.firma_jefe ? 1 : 0) },
+              { id: 'historial', icon: '🕒', label: 'Historial', count: 4 },
+              { id: 'comentarios', icon: '💬', label: 'Comentarios', count: 1 },
+            ].map(tab => (
+              <button key={tab.id} onClick={() => setApprovalTab(tab.id)} style={{
+                background: 'none', border: 'none', padding: '12px 10px',
+                borderBottom: approvalTab === tab.id ? '2px solid #4F46E5' : '2px solid transparent',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: '85px', cursor: 'pointer'
+              }}>
+                <span style={{ fontSize: '1.2rem', color: approvalTab === tab.id ? '#4F46E5' : '#6B7280' }}>{tab.icon}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: approvalTab === tab.id ? 800 : 600, color: approvalTab === tab.id ? '#4F46E5' : '#6B7280' }}>{tab.label}</span>
+                  {tab.count > 0 && <span style={{ background: approvalTab === tab.id ? '#4F46E5' : '#E5E7EB', color: approvalTab === tab.id ? '#fff' : '#6B7280', fontSize: '0.65rem', padding: '1px 6px', borderRadius: '8px', fontWeight: 800 }}>{tab.count}</span>}
+                </div>
               </button>
+            ))}
+          </div>
 
-              {showDetailsApproval && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: '#fff', padding: '16px', borderRadius: '16px', border: '1px solid #E5D8CC', fontSize: '0.88rem' }}>
-                  <div>
-                    <strong style={{ color: '#6B3A2A', display: 'block', marginBottom: '4px' }}>📌 ID #{approvalModalTicket.id} - {approvalModalTicket.equipo_nombre || approvalModalTicket.area_hallazgo || 'Locativo'}</strong>
-                    <div style={{ fontSize: '0.82rem', color: '#666' }}>Técnico: {approvalModalTicket.tecnico_nombre || 'Sin asignar'} | Estado: {approvalModalTicket.estado}</div>
+          {/* Content */}
+          <div style={{ padding: '16px 20px' }}>
+            {approvalTab === 'resumen' && (
+              <>
+                {/* REPORTE DEL TRABAJO EJECUTADO */}
+                <div style={{ background: '#fff', border: '1px solid #F3F4F6', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                    <span style={{ fontSize: '1.2rem' }}>📄</span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#4F46E5', letterSpacing: '0.5px' }}>REPORTE DEL TRABAJO EJECUTADO</span>
                   </div>
-                  <div style={{ borderTop: '1px dashed #E5D8CC', paddingTop: '10px' }}>
-                    <strong style={{ color: '#6B3A2A', display: 'block', marginBottom: '4px' }}>🔍 Hallazgo Original:</strong>
-                    <p style={{ margin: 0, color: '#444', whiteSpace: 'pre-wrap' }}>{approvalModalTicket.descripcion}</p>
+                  <h4 style={{ margin: '0 0 8px', fontSize: '0.9rem', color: '#1F2937', fontWeight: 800 }}>Descripción del Trabajo</h4>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#4B5563', lineHeight: 1.6 }}>
+                    {approvalModalTicket.solucion_aplicada || approvalModalTicket.descripcion || 'Sin descripción registrada.'}
+                  </p>
+                  <div style={{ textAlign: 'center', margin: '12px 0' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#4F46E5', fontWeight: 700, cursor: 'pointer' }}>Ver más ⌄</span>
                   </div>
-                  <div style={{ borderTop: '1px dashed #E5D8CC', paddingTop: '10px' }}>
-                    <strong style={{ color: '#166534', display: 'block', marginBottom: '4px' }}>🛠️ Solución Aplicada:</strong>
-                    <p style={{ margin: 0, color: '#166534', fontWeight: 600, whiteSpace: 'pre-wrap' }}>{approvalModalTicket.solucion_aplicada || 'Sin solución registrada aún'}</p>
-                    {approvalModalTicket.observaciones && <div style={{ fontSize: '0.82rem', color: '#065F46', marginTop: '4px' }}><strong>Obs:</strong> {approvalModalTicket.observaciones}</div>}
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #F3F4F6', borderRadius: '8px', padding: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ background: '#DCFCE7', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#166534', fontSize: '0.8rem' }}>✔</div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F2937' }}>Actividades Realizadas</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ background: '#DCFCE7', color: '#166534', fontSize: '0.7rem', fontWeight: 700, padding: '4px 10px', borderRadius: '12px' }}>
+                          {(() => { const chkList = parseChecklist(approvalModalTicket.checklist_tareas); return chkList.filter(c => c.completada).length; })()} actividades
+                        </span>
+                        <span style={{ color: '#9CA3AF', fontSize: '1.2rem' }}>›</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #F3F4F6', borderRadius: '8px', padding: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ background: '#EEF2FF', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4F46E5', fontSize: '0.8rem' }}>📦</div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F2937' }}>Materiales e Insumos</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ background: '#EEF2FF', color: '#4F46E5', fontSize: '0.7rem', fontWeight: 700, padding: '4px 10px', borderRadius: '12px' }}>4 elementos</span>
+                        <span style={{ color: '#9CA3AF', fontSize: '1.2rem' }}>›</span>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ borderTop: '1px dashed #E5D8CC', paddingTop: '10px' }}>
-                    <strong style={{ color: '#6B3A2A', display: 'block', marginBottom: '6px' }}>📋 Checklist Verificado:</strong>
-                    {(() => {
-                      const chkList = parseChecklist(approvalModalTicket.checklist_tareas);
-                      if (chkList.length === 0) return <span style={{ color: '#888', fontStyle: 'italic', fontSize: '0.82rem' }}>Sin checklist.</span>;
-                      return (
-                        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
-                          {chkList.map((chk, idx) => (
-                            <li key={idx} style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: chk.completada ? '#F0FDF4' : '#FEF2F2', borderRadius: '6px', border: `1px solid ${chk.completada ? '#BBF7D0' : '#FECACA'}` }}>
-                              <span>{chk.completada ? '✅' : '❌'}</span>
-                              <span style={{ fontWeight: chk.completada ? 600 : 400 }}>{chk.texto || chk.tarea || (typeof chk === 'string' ? chk : '(Tarea sin texto)')}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      );
-                    })()}
-                  </div>
-                  <div style={{ borderTop: '1px dashed #E5D8CC', paddingTop: '10px' }}>
-                    <strong style={{ color: '#6B3A2A', display: 'block', marginBottom: '6px' }}>📷 Evidencias Fotográficas:</strong>
+                </div>
+
+                {/* EVIDENCIAS FOTOGRAFICAS */}
+                <div style={{ background: '#fff', border: '1px solid #F3F4F6', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.2rem' }}>🖼️</span>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#4F46E5', letterSpacing: '0.5px' }}>EVIDENCIAS FOTOGRÁFICAS</span>
+                    </div>
                     {(() => {
                       let evs = [];
                       try { evs = typeof approvalModalTicket.evidencias === 'string' ? JSON.parse(approvalModalTicket.evidencias) : (approvalModalTicket.evidencias || []); } catch (e) { }
-                      if (evs.length === 0) return <span style={{ color: '#888', fontStyle: 'italic', fontSize: '0.82rem' }}>Sin fotos adjuntas.</span>;
+                      return <span style={{ background: '#4F46E5', color: '#fff', fontSize: '0.7rem', fontWeight: 700, padding: '4px 12px', borderRadius: '6px' }}>{evs.length} fotos</span>;
+                    })()}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                    {(() => {
+                      let evs = [];
+                      try { evs = typeof approvalModalTicket.evidencias === 'string' ? JSON.parse(approvalModalTicket.evidencias) : (approvalModalTicket.evidencias || []); } catch (e) { }
+                      const displayEvs = evs.slice(0, 3);
                       return (
-                        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-                          {evs.map((img, i) => (
-                            <a key={i} href={img} target="_blank" rel="noopener noreferrer" style={{ display: 'block', flexShrink: 0, width: '80px', height: '65px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #DDD' }}>
-                              <img src={img} alt="Evidencia" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            </a>
+                        <>
+                          {displayEvs.map((img, i) => (
+                            <div key={i} onClick={() => setApprovalLightbox(img)} style={{ aspectRatio: '1', borderRadius: '8px', overflow: 'hidden', border: '1px solid #E5E7EB' }}>
+                              <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Evidencia" />
+                            </div>
                           ))}
-                        </div>
+                          <div style={{ aspectRatio: '1', borderRadius: '8px', border: '1.5px dashed #C7D2FE', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC', cursor: 'pointer' }} onClick={() => setApprovalTab('evidencias')}>
+                            <span style={{ fontSize: '1.2rem', color: '#4F46E5' }}>🖼️</span>
+                            <span style={{ fontSize: '0.65rem', color: '#4F46E5', fontWeight: 700, marginTop: '4px', textAlign: 'center' }}>Ver todas</span>
+                          </div>
+                        </>
                       );
                     })()}
                   </div>
                 </div>
-              )}
 
-              {/* TÍTULO Y PANEL DE DECISIÓN DEL JEFE */}
-              {approvalModalTicket.estado === 'Por Aprobar' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '2px' }}>
-                  <h3 style={{ margin: '4px 0 0 0', color: '#3730A3', fontFamily: "'Playfair Display', serif", fontSize: '1.08rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    🎯 Decisión de Cierre y Aprobación del Jefe de Mantenimiento
-                  </h3>
-
-                  {/* Tarjeta Opción 1: APROBAR TRABAJO */}
-                  <div style={{ background: '#F0FDF4', padding: '16px', borderRadius: '18px', border: '2px solid #16A34A', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 4px 14px rgba(22,163,74,0.08)' }}>
-                    <div
-                      onClick={() => setOpenApprovalAccordion(openApprovalAccordion === 'aprobar' ? '' : 'aprobar')}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-                    >
-                      <div style={{ fontWeight: 800, color: '#166534', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>✅ Opción 1: APROBAR TRABAJO Y CERRAR GESTIÓN</span>
-                      </div>
-                      <span style={{ fontSize: '1.2rem', color: '#166534', fontWeight: 800 }}>{openApprovalAccordion === 'aprobar' ? '︿' : '﹀'}</span>
-                    </div>
-
-                    {openApprovalAccordion === 'aprobar' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px dashed #86EFAC', paddingTop: '12px' }}>
-                        <div>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#166534', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>OBSERVACIONES DE APROBACIÓN</label>
-                          <textarea
-                            placeholder="Ej: Trabajo verificado a satisfacción, se confirma reemplazo correcto."
-                            value={approvalData.observaciones_aprobacion}
-                            onChange={e => setApprovalData(p => ({ ...p, observaciones_aprobacion: e.target.value }))}
-                            style={{ background: '#fff', border: '1px solid #86EFAC', borderRadius: '10px', padding: '12px', fontSize: '0.88rem', color: '#166534', width: '100%', boxSizing: 'border-box', minHeight: '72px', outline: 'none' }}
-                          />
-                        </div>
-
-                        <div>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#166534', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>FIRMA DIGITAL DEL JEFE DE MANTENIMIENTO *</label>
-                          <SignaturePad
-                            value={approvalData.firma_jefe}
-                            onSave={dataUrl => setApprovalData(p => ({ ...p, firma_jefe: dataUrl }))}
-                            onClear={() => setApprovalData(p => ({ ...p, firma_jefe: '' }))}
-                            label=""
-                          />
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={handleAprobarTicket}
-                          style={{ background: '#166534', color: '#fff', border: 'none', borderRadius: '12px', padding: '15px', fontSize: '0.95rem', fontWeight: 800, width: '100%', cursor: 'pointer', boxShadow: '0 4px 14px rgba(22,101,52,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '2px' }}
-                        >
-                          ✅ APROBAR Y FINALIZADO OFICIALMENTE
-                        </button>
-                      </div>
-                    )}
+                {/* LINEA DE APROBACION */}
+                <div style={{ background: '#fff', border: '1px solid #F3F4F6', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                    <span style={{ fontSize: '1.2rem' }}>👥</span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#4F46E5', letterSpacing: '0.5px' }}>LÍNEA DE APROBACIÓN</span>
                   </div>
-
-                  {/* Tarjeta Opción 2: DEVOLVER TRABAJO */}
-                  <div style={{ background: '#FEF2F2', padding: '16px', borderRadius: '18px', border: '2px solid #EF4444', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 4px 14px rgba(239,68,68,0.08)' }}>
-                    <div
-                      onClick={() => setOpenApprovalAccordion(openApprovalAccordion === 'devolver' ? '' : 'devolver')}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-                    >
-                      <div style={{ fontWeight: 800, color: '#991B1B', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>🔄 Opción 2: DEVOLVER TRABAJO AL TÉCNICO</span>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {/* Step 1 */}
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: approvalModalTicket.firma_tecnico ? '#22C55E' : '#E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: 800 }}>✔</div>
+                        <div style={{ width: '2px', height: '50px', background: approvalModalTicket.firma_tecnico ? '#22C55E' : '#E5E7EB' }} />
                       </div>
-                      <span style={{ fontSize: '1.2rem', color: '#991B1B', fontWeight: 800 }}>{openApprovalAccordion === 'devolver' ? '︿' : '﹀'}</span>
-                    </div>
-
-                    {openApprovalAccordion === 'devolver' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px dashed #FECACA', paddingTop: '12px' }}>
-                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#7F1D1D', lineHeight: 1.4 }}>
-                          Si el trabajo quedó incompleto o faltan evidencias, indícalo abajo. El ticket volverá a estado <strong>En proceso</strong> para el técnico.
-                        </p>
-                        <div>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#991B1B', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>MOTIVO DE DEVOLUCIÓN / QUÉ CORREGIR *</label>
-                          <textarea
-                            placeholder="Ej: Falta cambiar la válvula secundaria y adjuntar la foto del repuesto instalado."
-                            value={approvalData.motivo_devolucion}
-                            onChange={e => setApprovalData(p => ({ ...p, motivo_devolucion: e.target.value }))}
-                            style={{ background: '#fff', border: '1px solid #FECACA', borderRadius: '10px', padding: '12px', fontSize: '0.88rem', color: '#991B1B', width: '100%', boxSizing: 'border-box', minHeight: '80px', outline: 'none' }}
-                          />
+                      <div style={{ flex: 1, paddingBottom: '12px' }}>
+                        <div style={{ border: `1px solid ${approvalModalTicket.firma_tecnico ? '#BBF7D0' : '#E5E7EB'}`, borderRadius: '8px', padding: '10px 12px', background: approvalModalTicket.firma_tecnico ? '#F0FDF4' : '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: approvalModalTicket.firma_tecnico ? '#166534' : '#374151' }}>1. Técnico Ejecutor</div>
+                            <div style={{ fontSize: '0.7rem', color: '#6B7280' }}>{approvalModalTicket.tecnico_nombre || 'Sin asignar'}</div>
+                            {approvalModalTicket.fecha_real_finalizacion && <div style={{ fontSize: '0.65rem', color: '#9CA3AF' }}>{formatDate(approvalModalTicket.fecha_real_finalizacion)}</div>}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', background: approvalModalTicket.firma_tecnico ? '#DCFCE7' : '#F3F4F6', color: approvalModalTicket.firma_tecnico ? '#166534' : '#6B7280' }}>
+                              {approvalModalTicket.firma_tecnico ? 'APROBADO' : 'PENDIENTE'}
+                            </span>
+                            {approvalModalTicket.firma_tecnico && <img src={approvalModalTicket.firma_tecnico} style={{ height: '20px' }} alt="firma" />}
+                          </div>
                         </div>
-
-                        <button
-                          type="button"
-                          onClick={handleDevolverTicket}
-                          style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: '12px', padding: '15px', fontSize: '0.95rem', fontWeight: 800, width: '100%', cursor: 'pointer', boxShadow: '0 4px 14px rgba(220,38,38,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '2px' }}
-                        >
-                          🔄 DEVOLVER AL TÉCNICO PARA CORREGIR
-                        </button>
                       </div>
-                    )}
+                    </div>
+                    {/* Step 2 */}
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: approvalModalTicket.firma_solicitante ? '#22C55E' : '#E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: 800 }}>✔</div>
+                        <div style={{ width: '2px', height: '50px', background: approvalModalTicket.firma_solicitante ? '#22C55E' : '#E5E7EB' }} />
+                      </div>
+                      <div style={{ flex: 1, paddingBottom: '12px' }}>
+                        <div style={{ border: `1px solid ${approvalModalTicket.firma_solicitante ? '#BBF7D0' : '#E5E7EB'}`, borderRadius: '8px', padding: '10px 12px', background: approvalModalTicket.firma_solicitante ? '#F0FDF4' : '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: approvalModalTicket.firma_solicitante ? '#166534' : '#374151' }}>2. Coordinador de Mantenimiento</div>
+                            <div style={{ fontSize: '0.7rem', color: '#6B7280' }}>Carlos Ramírez</div>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', background: approvalModalTicket.firma_solicitante ? '#DCFCE7' : '#F3F4F6', color: approvalModalTicket.firma_solicitante ? '#166534' : '#6B7280' }}>
+                              {approvalModalTicket.firma_solicitante ? 'APROBADO' : 'PENDIENTE'}
+                            </span>
+                            {approvalModalTicket.firma_solicitante && <img src={approvalModalTicket.firma_solicitante} style={{ height: '20px' }} alt="firma" />}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Step 3 */}
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#4F46E5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: 800 }}>⋮</div>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ border: `1px dashed #A5B4FC`, borderRadius: '8px', padding: '10px 12px', background: '#EEF2FF', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#3730A3' }}>3. Jefe de Mantenimiento (Actual)</div>
+                            <div style={{ fontSize: '0.7rem', color: '#4F46E5' }}>Juan Pérez</div>
+                            <div style={{ fontSize: '0.65rem', color: '#6B7280' }}>Pendiente de revisión y aprobación</div>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', background: '#E0E7FF', color: '#4338CA' }}>PENDIENTE</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              )}
+              </>
+            )}
 
-              {approvalModalTicket.estado === 'Finalizado' && (
-                <div style={{ background: '#DCFCE7', padding: '18px', borderRadius: '16px', border: '1px solid #16A34A', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ fontWeight: 800, color: '#166534', fontSize: '1.05rem' }}>✅ GESTIÓN APROBADA Y FINALIZADA POR JEFE DE MANTENIMIENTO</div>
-                  <div style={{ fontSize: '0.86rem', color: '#15803D' }}><strong>Observaciones:</strong> {approvalModalTicket.observaciones_aprobacion || 'Aprobado a satisfacción'}</div>
-                  {approvalModalTicket.firma_jefe && (
-                    <div style={{ textAlign: 'center', background: '#fff', padding: '10px', borderRadius: '12px', border: '1px solid #BBF7D0', width: 'fit-content', margin: '0 auto' }}>
-                      <div style={{ fontSize: '0.72rem', color: '#166534', fontWeight: 700, marginBottom: '6px' }}>FIRMA JEFE DE MANTENIMIENTO</div>
-                      <img src={approvalModalTicket.firma_jefe} alt="Firma Jefe" style={{ maxHeight: '55px', margin: '0 auto' }} />
+            {approvalTab === 'evidencias' && (
+              <div style={{ background: '#fff', border: '1px solid #F3F4F6', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <span style={{ fontSize: '1.2rem' }}>📷</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1F2937' }}>EVIDENCIAS FOTOGRÁFICAS</span>
+                </div>
+                {(() => {
+                  let evs = [];
+                  try { evs = typeof approvalModalTicket.evidencias === 'string' ? JSON.parse(approvalModalTicket.evidencias) : (approvalModalTicket.evidencias || []); } catch (e) { }
+                  if (evs.length === 0) return (
+                    <div style={{ textAlign: 'center', padding: '30px 20px' }}>
+                      <div style={{ fontSize: '2.5rem', marginBottom: '8px', opacity: 0.3 }}>📷</div>
+                      <div style={{ color: '#9CA3AF', fontSize: '0.9rem', fontWeight: 600 }}>No hay fotografías</div>
+                    </div>
+                  );
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                      {evs.map((img, i) => (
+                        <div key={i} onClick={() => setApprovalLightbox(img)} style={{ aspectRatio: '1', borderRadius: '10px', overflow: 'hidden', border: '1px solid #E5E7EB', cursor: 'pointer' }}>
+                          <img src={img} alt={`Evidencia ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {approvalTab === 'firmas' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ background: '#fff', border: '1px solid #F3F4F6', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '12px', textAlign: 'center' }}>👷 Firma del Técnico Ejecutor</div>
+                  {approvalModalTicket.firma_tecnico ? (
+                    <div style={{ background: '#F9FAFB', borderRadius: '10px', padding: '12px', display: 'flex', justifyContent: 'center' }}>
+                      <img src={approvalModalTicket.firma_tecnico} alt="Firma Técnico" style={{ maxHeight: '60px' }} />
+                    </div>
+                  ) : (
+                    <div style={{ background: '#FEF2F2', borderRadius: '10px', padding: '16px', border: '1px dashed #FECACA', textAlign: 'center', color: '#EF4444', fontSize: '0.8rem' }}>No firmó</div>
+                  )}
+                  <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '8px', textAlign: 'center', fontWeight: 600 }}>{approvalModalTicket.tecnico_nombre || 'Sin asignar'}</div>
+                </div>
+
+                <div style={{ background: '#fff', border: '1px solid #F3F4F6', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '12px', textAlign: 'center' }}>🏪 Firma del Solicitante</div>
+                  {approvalModalTicket.firma_solicitante ? (
+                    <div style={{ background: '#F9FAFB', borderRadius: '10px', padding: '12px', display: 'flex', justifyContent: 'center' }}>
+                      <img src={approvalModalTicket.firma_solicitante} alt="Firma Solicitante" style={{ maxHeight: '60px' }} />
+                    </div>
+                  ) : (
+                    <div style={{ background: '#FEF2F2', borderRadius: '10px', padding: '16px', border: '1px dashed #FECACA', textAlign: 'center', color: '#EF4444', fontSize: '0.8rem' }}>No firmó</div>
+                  )}
+                  <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '8px', textAlign: 'center', fontWeight: 600 }}>{approvalModalTicket.pdv_nombre || 'Punto de Venta'}</div>
+                </div>
+
+                {approvalModalTicket.firma_jefe && (
+                  <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#166534', marginBottom: '12px', textAlign: 'center' }}>👔 Firma del Jefe de Mantenimiento</div>
+                    <div style={{ background: '#fff', borderRadius: '10px', padding: '12px', display: 'flex', justifyContent: 'center' }}>
+                      <img src={approvalModalTicket.firma_jefe} alt="Firma Jefe" style={{ maxHeight: '60px' }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {(approvalTab === 'historial' || approvalTab === 'comentarios') && (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '8px', opacity: 0.3 }}>{approvalTab === 'historial' ? '🕒' : '💬'}</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>Sin {approvalTab}</div>
+                <div style={{ fontSize: '0.8rem', marginTop: '6px' }}>No hay registros para mostrar en esta pestaña.</div>
+              </div>
+            )}
+          </div>
+
+          {/* Fixed Bottom Bar */}
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', borderTop: '1px solid #E5E7EB', padding: '12px 16px', display: 'flex', gap: '10px', zIndex: 10, boxShadow: '0 -4px 12px rgba(0,0,0,0.05)' }}>
+            <button onClick={() => setApprovalTab('firmas')} style={{ flex: 1, background: '#166534', color: '#fff', border: 'none', borderRadius: '10px', padding: '14px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}>
+              ✔ Aprobar Trabajo
+            </button>
+            <button onClick={() => setApprovalTab('firmas')} style={{ flex: 1, background: '#DC2626', color: '#fff', border: 'none', borderRadius: '10px', padding: '14px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}>
+              ↩ Devolver al Técnico
+            </button>
+          </div>
+        </div>
+
+        {/* === VISTA DESKTOP === */}
+        <div className="desktop-only-table" style={{ display: 'flex', flexDirection: 'column', flex: 1, background: '#F3F4F6', overflow: 'hidden', borderRadius: '16px', border: '1px solid #E5E7EB' }}>
+          <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '16px', padding: '16px 0' }}>
+
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 28px' }}>
+              <div 
+                onClick={() => { setApprovalModalTicket(null); setApprovalLightbox(null); setApprovalTab('resumen'); }}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4F46E5', fontWeight: 600, fontSize: '0.95rem', cursor: 'pointer', userSelect: 'none' }}
+              >
+                <span style={{ fontSize: '1.4rem', marginTop: '-2px' }}>←</span> Volver a la lista de tickets
+              </div>
+              <button
+                onClick={() => handlePrintMantenimientoPDF(approvalModalTicket)}
+                style={{ background: '#fff', border: '1px solid #D1D5DB', borderRadius: '8px', padding: '6px 14px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', color: '#374151', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+              >
+                🖨️ Imprimir Resumen
+              </button>
+            </div>
+
+            <div style={{ padding: '0 28px' }}>
+              <h1 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: '#1F2937', fontFamily: "'Playfair Display', serif", display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '1.5rem', color: '#4F46E5' }}>👔</span> Revisión y Aprobación del Trabajo
+              </h1>
+              <p style={{ margin: '2px 0 0', fontSize: '0.85rem', color: '#6B7280' }}>Evalúa la calidad de la reparación antes del cierre oficial</p>
+            </div>
+            {/* ── BARRA DE INFO DEL TICKET ── */}
+            <div style={{ background: '#fff', borderBottom: '1px solid #E5E7EB', padding: '16px 28px', flexShrink: 0 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
+                <div style={{ background: '#4F46E5', color: '#fff', fontSize: '0.72rem', fontWeight: 800, padding: '5px 12px', borderRadius: '8px', letterSpacing: '0.5px' }}>TICKET</div>
+                <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#1F2937', fontFamily: "'Playfair Display', serif" }}>{approvalModalTicket.id}</span>
+                {approvalModalTicket.equipo_nombre && (
+                  <span style={{ background: approvalModalTicket.estado === 'Finalizado' ? '#DCFCE7' : '#FEF3C7', color: approvalModalTicket.estado === 'Finalizado' ? '#166534' : '#92400E', fontSize: '0.75rem', fontWeight: 700, padding: '4px 12px', borderRadius: '8px', border: `1px solid ${approvalModalTicket.estado === 'Finalizado' ? '#BBF7D0' : '#FDE68A'}` }}>
+                    {approvalModalTicket.equipo_nombre || approvalModalTicket.area_hallazgo || 'Locativo'}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
+                {[
+                  { icon: '👷', label: 'Técnico Asignado', value: approvalModalTicket.tecnico_nombre || 'Sin asignar' },
+                  { icon: '📍', label: 'Área Solicitante', value: approvalModalTicket.pdv_nombre || approvalModalTicket.area_hallazgo || '—' },
+                  { icon: '🏷️', label: 'Tipo de Mantenimiento', value: approvalModalTicket.tipo_mantenimiento || '—' },
+                  { icon: '⚠️', label: 'Prioridad', value: approvalModalTicket.prioridad || 'Media', highlight: approvalModalTicket.prioridad === 'Alta' || approvalModalTicket.prioridad === 'Urgente' },
+                  { icon: 'ℹ️', label: 'Estado Actual', value: approvalModalTicket.estado, highlight: true },
+                  { icon: '📅', label: 'Fecha de Registro', value: formatDate(approvalModalTicket.fecha_registro) },
+                ].map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#9CA3AF', fontWeight: 600 }}>{item.icon} {item.label}</span>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 700, color: item.highlight ? '#4F46E5' : '#1F2937' }}>{item.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── INFORMACIÓN GENERAL (cards fila) ── */}
+            <div style={{ background: '#fff', borderBottom: '1px solid #E5E7EB', padding: '14px 28px', flexShrink: 0 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+                {[
+                  { icon: '📅', label: 'Fecha de Ejecución', value: approvalModalTicket.fecha_inicio_ejecucion ? formatDate(approvalModalTicket.fecha_inicio_ejecucion) : formatDate(approvalModalTicket.fecha_programada) },
+                  { icon: '📍', label: 'Ubicación', value: approvalModalTicket.pdv_nombre || '—' },
+                  { icon: '🔧', label: 'Activo / Equipo', value: approvalModalTicket.equipo_nombre || 'Locativo' },
+                  { icon: '🏷️', label: 'Código del Activo', value: approvalModalTicket.equipo_id ? `EQ-${approvalModalTicket.equipo_id}` : '—' },
+                  { icon: '⏱️', label: 'Tiempo de Ejecución', value: (() => { if (approvalModalTicket.fecha_inicio_ejecucion && approvalModalTicket.fecha_real_finalizacion) { const diff = Math.abs(new Date(approvalModalTicket.fecha_real_finalizacion) - new Date(approvalModalTicket.fecha_inicio_ejecucion)); const hrs = Math.floor(diff / 3600000); const mins = Math.floor((diff % 3600000) / 60000); return `${hrs}h ${mins}m`; } return '—'; })() },
+                ].map((item, idx) => (
+                  <div key={idx} style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '12px 14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#9CA3AF', fontWeight: 600, marginBottom: '4px' }}>{item.icon} {item.label}</div>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1F2937' }}>{item.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── TABS ── */}
+            <div style={{ background: '#fff', borderBottom: '2px solid #E5E7EB', padding: '0 28px', flexShrink: 0, display: 'flex', gap: '0', overflowX: 'auto' }}>
+              {[
+                { id: 'resumen', icon: '📋', label: 'Resumen del Trabajo' },
+                { id: 'evidencias', icon: '📷', label: 'Evidencias Fotográficas', count: (() => { let evs = []; try { evs = typeof approvalModalTicket.evidencias === 'string' ? JSON.parse(approvalModalTicket.evidencias) : (approvalModalTicket.evidencias || []); } catch (e) { } return evs.length; })() },
+                { id: 'firmas', icon: '✍️', label: 'Firmas de Conformidad', count: (approvalModalTicket.firma_tecnico ? 1 : 0) + (approvalModalTicket.firma_solicitante ? 1 : 0) + (approvalModalTicket.firma_jefe ? 1 : 0) },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setApprovalTab(tab.id)}
+                  style={{
+                    background: 'none', border: 'none', borderBottom: approvalTab === tab.id ? '3px solid #4F46E5' : '3px solid transparent',
+                    padding: '14px 20px', fontSize: '0.88rem', fontWeight: approvalTab === tab.id ? 700 : 500,
+                    color: approvalTab === tab.id ? '#4F46E5' : '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', transition: 'all 0.2s'
+                  }}
+                >
+                  <span>{tab.icon}</span>
+                  {tab.label}
+                  {tab.count > 0 && <span style={{ background: approvalTab === tab.id ? '#4F46E5' : '#E5E7EB', color: approvalTab === tab.id ? '#fff' : '#374151', fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', marginLeft: '4px' }}>{tab.count}</span>}
+                </button>
+              ))}
+            </div>
+
+            {/* ── CONTENIDO PRINCIPAL (2 columnas) ── */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', background: '#F3F4F6' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 380px', gap: '24px', maxWidth: '1400px', margin: '0 auto' }}>
+
+                {/* ═══ COLUMNA IZQUIERDA ═══ */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                  {/* TAB: RESUMEN DEL TRABAJO */}
+                  {approvalTab === 'resumen' && (
+                    <>
+                      {/* REPORTE DEL TRABAJO EJECUTADO */}
+                      <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                        <div style={{ padding: '16px 22px', borderBottom: '1px solid #F3F4F6', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '1.1rem' }}>📋</span>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1F2937', letterSpacing: '0.3px' }}>REPORTE DEL TRABAJO EJECUTADO</span>
+                        </div>
+                        <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                          {/* Descripción del Trabajo Realizado */}
+                          <div>
+                            <h4 style={{ margin: '0 0 8px', fontSize: '0.92rem', fontWeight: 700, color: '#1F2937' }}>Descripción del Trabajo Realizado</h4>
+                            <p style={{ margin: 0, fontSize: '0.88rem', color: '#4B5563', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                              {approvalModalTicket.solucion_aplicada || approvalModalTicket.descripcion || 'Sin descripción registrada'}
+                            </p>
+                          </div>
+
+                          {/* Actividades Realizadas + Checklist */}
+                          <div>
+                            <h4 style={{ margin: '0 0 10px', fontSize: '0.92rem', fontWeight: 700, color: '#1F2937' }}>Actividades Realizadas</h4>
+                            {(() => {
+                              const chkList = parseChecklist(approvalModalTicket.checklist_tareas);
+                              if (chkList.length === 0) return <p style={{ margin: 0, color: '#9CA3AF', fontSize: '0.85rem', fontStyle: 'italic' }}>Sin checklist de actividades asignado.</p>;
+                              const completadas = chkList.filter(c => c.completada).length;
+                              return (
+                                <div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                                    <div style={{ flex: 1, height: '8px', background: '#E5E7EB', borderRadius: '4px', overflow: 'hidden' }}>
+                                      <div style={{ width: `${(completadas / chkList.length) * 100}%`, height: '100%', background: completadas === chkList.length ? '#22C55E' : '#F59E0B', borderRadius: '4px', transition: 'width 0.5s ease' }} />
+                                    </div>
+                                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: completadas === chkList.length ? '#166534' : '#92400E' }}>{completadas}/{chkList.length}</span>
+                                  </div>
+                                  <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {chkList.map((chk, idx) => (
+                                      <li key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.88rem', color: chk.completada ? '#166534' : '#6B7280' }}>
+                                        <span style={{ fontSize: '0.75rem', color: chk.completada ? '#22C55E' : '#D1D5DB' }}>{chk.completada ? '✔' : '○'}</span>
+                                        <span style={{ fontWeight: chk.completada ? 500 : 400 }}>{chk.texto || chk.tarea || (typeof chk === 'string' ? chk : '(Tarea)')}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              );
+                            })()}
+                          </div>
+
+                          {/* Hallazgo Original */}
+                          <div style={{ background: '#FEF2F2', borderRadius: '12px', padding: '14px 18px', borderLeft: '4px solid #EF4444' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '1rem' }}>🔍</span>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#991B1B' }}>Hallazgo Original</span>
+                            </div>
+                            <p style={{ margin: 0, fontSize: '0.86rem', color: '#7F1D1D', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{approvalModalTicket.descripcion || 'Sin hallazgo registrado'}</p>
+                          </div>
+
+                          {/* Observaciones del Técnico */}
+                          {approvalModalTicket.observaciones && (
+                            <div style={{ background: '#FFF7ED', borderRadius: '12px', padding: '14px 18px', borderLeft: '4px solid #F59E0B' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                <span style={{ fontSize: '1rem' }}>⚠️</span>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#92400E' }}>Observaciones del Técnico</span>
+                              </div>
+                              <p style={{ margin: 0, fontSize: '0.86rem', color: '#78350F', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{approvalModalTicket.observaciones}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* DECISIÓN DEL JEFE DE MANTENIMIENTO */}
+                      <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                        <div style={{ padding: '16px 22px', borderBottom: '1px solid #F3F4F6', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '1.1rem' }}>🎯</span>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#4F46E5', letterSpacing: '0.3px' }}>DECISIÓN DEL JEFE DE MANTENIMIENTO</span>
+                        </div>
+
+                        {approvalModalTicket.estado === 'Por Aprobar' && (
+                          <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+
+                            {/* 2 cards: Aprobar / Devolver */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+                              {/* Aprobar */}
+                              <div style={{ background: '#F0FDF4', border: '2px solid #22C55E', borderRadius: '14px', padding: '18px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                  <span style={{ background: '#22C55E', color: '#fff', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 800 }}>✔</span>
+                                  <span style={{ fontWeight: 700, color: '#166534', fontSize: '0.92rem' }}>Aprobar Trabajo y Cerrar Gestión</span>
+                                </div>
+                                <p style={{ margin: '0 0 12px', fontSize: '0.82rem', color: '#15803D', lineHeight: 1.4 }}>El trabajo cumple con los estándares de calidad y puede cerrarse el ticket.</p>
+                                <button
+                                  onClick={() => {
+                                    if (!approvalData.firma_jefe) {
+                                      showToast('Por favor dibuja la firma del Jefe de Mantenimiento (sección inferior) antes de aprobar.', 'error');
+                                      return;
+                                    }
+                                    handleAprobarTicket();
+                                  }}
+                                  style={{ background: '#22C55E', color: '#fff', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'transform 0.15s', width: '100%' }}
+                                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
+                                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                >
+                                  ✅ Aprobar y Cerrar Ticket
+                                </button>
+                              </div>
+
+                              {/* Devolver */}
+                              <div style={{ background: '#FEF2F2', border: '2px solid #EF4444', borderRadius: '14px', padding: '18px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                  <span style={{ background: '#EF4444', color: '#fff', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 800 }}>✕</span>
+                                  <span style={{ fontWeight: 700, color: '#991B1B', fontSize: '0.92rem' }}>Devolver Trabajo al Técnico</span>
+                                </div>
+                                <p style={{ margin: '0 0 12px', fontSize: '0.82rem', color: '#B91C1C', lineHeight: 1.4 }}>El trabajo no cumple con los estándares y debe realizarse nuevamente.</p>
+                                <button
+                                  onClick={() => setOpenApprovalAccordion(openApprovalAccordion === 'devolver' ? '' : 'devolver')}
+                                  style={{ background: '#EF4444', color: '#fff', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'transform 0.15s', width: '100%' }}
+                                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
+                                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                >
+                                  🔄 Devolver para Corrección
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Devolver expandido */}
+                            {openApprovalAccordion === 'devolver' && (
+                              <div className="animate-fade-in" style={{ background: '#FEF2F2', borderRadius: '12px', padding: '16px', border: '1px solid #FECACA' }}>
+                                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#991B1B', display: 'block', marginBottom: '8px' }}>Motivo de Devolución / Qué Corregir *</label>
+                                <textarea
+                                  placeholder="Ej: Falta cambiar la válvula secundaria y adjuntar la foto del repuesto instalado."
+                                  value={approvalData.motivo_devolucion}
+                                  onChange={e => setApprovalData(p => ({ ...p, motivo_devolucion: e.target.value }))}
+                                  style={{ background: '#fff', border: '1px solid #FECACA', borderRadius: '10px', padding: '12px', fontSize: '0.88rem', color: '#991B1B', width: '100%', boxSizing: 'border-box', minHeight: '80px', outline: 'none' }}
+                                />
+                                <button
+                                  onClick={handleDevolverTicket}
+                                  style={{ marginTop: '12px', background: '#DC2626', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px 24px', fontSize: '0.88rem', fontWeight: 700, cursor: 'pointer', width: '100%' }}
+                                >
+                                  🔄 Confirmar Devolución al Técnico
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Observaciones + Firma del Jefe */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginTop: '8px' }}>
+                              <div>
+                                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#374151', display: 'block', marginBottom: '8px' }}>Observaciones (Opcional)</label>
+                                <textarea
+                                  placeholder="Agrega observaciones sobre tu decisión..."
+                                  value={approvalData.observaciones_aprobacion}
+                                  onChange={e => setApprovalData(p => ({ ...p, observaciones_aprobacion: e.target.value }))}
+                                  style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '10px', padding: '12px', fontSize: '0.88rem', color: '#374151', width: '100%', boxSizing: 'border-box', minHeight: '100px', outline: 'none', resize: 'vertical' }}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#374151', display: 'block', marginBottom: '8px' }}>Firma Digital del Jefe de Mantenimiento *</label>
+                                <div style={{ border: '1px solid #E5E7EB', borderRadius: '10px', overflow: 'hidden' }}>
+                                  <SignaturePad
+                                    value={approvalData.firma_jefe}
+                                    onSave={dataUrl => setApprovalData(p => ({ ...p, firma_jefe: dataUrl }))}
+                                    onClear={() => setApprovalData(p => ({ ...p, firma_jefe: '' }))}
+                                    label=""
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {approvalModalTicket.estado === 'Finalizado' && (
+                          <div style={{ padding: '20px 22px' }}>
+                            <div style={{ background: '#DCFCE7', padding: '18px', borderRadius: '12px', border: '1px solid #BBF7D0' }}>
+                              <div style={{ fontWeight: 800, color: '#166534', fontSize: '1rem', marginBottom: '8px' }}>✅ GESTIÓN APROBADA Y FINALIZADA</div>
+                              <div style={{ fontSize: '0.88rem', color: '#15803D' }}><strong>Observaciones:</strong> {approvalModalTicket.observaciones_aprobacion || 'Aprobado a satisfacción'}</div>
+                              {approvalModalTicket.firma_jefe && (
+                                <div style={{ marginTop: '12px', textAlign: 'center', background: '#fff', padding: '12px', borderRadius: '10px', border: '1px solid #BBF7D0', width: 'fit-content' }}>
+                                  <div style={{ fontSize: '0.72rem', color: '#166534', fontWeight: 700, marginBottom: '6px' }}>FIRMA JEFE DE MANTENIMIENTO</div>
+                                  <img src={approvalModalTicket.firma_jefe} alt="Firma Jefe" style={{ maxHeight: '55px' }} />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {/* TAB: EVIDENCIAS FOTOGRÁFICAS */}
+                  {approvalTab === 'evidencias' && (
+                    <div className="animate-fade-in" style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                      <div style={{ padding: '16px 22px', borderBottom: '1px solid #F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '1.1rem' }}>📷</span>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1F2937' }}>EVIDENCIAS FOTOGRÁFICAS</span>
+                        </div>
+                        {(() => {
+                          let evs = [];
+                          try { evs = typeof approvalModalTicket.evidencias === 'string' ? JSON.parse(approvalModalTicket.evidencias) : (approvalModalTicket.evidencias || []); } catch (e) { }
+                          return evs.length > 0 ? <span style={{ fontSize: '0.75rem', fontWeight: 700, background: '#4F46E5', color: '#fff', padding: '4px 12px', borderRadius: '12px' }}>{evs.length} foto{evs.length > 1 ? 's' : ''}</span> : null;
+                        })()}
+                      </div>
+                      <div style={{ padding: '20px 22px' }}>
+                        {(() => {
+                          let evs = [];
+                          try { evs = typeof approvalModalTicket.evidencias === 'string' ? JSON.parse(approvalModalTicket.evidencias) : (approvalModalTicket.evidencias || []); } catch (e) { }
+                          if (evs.length === 0) return (
+                            <div style={{ textAlign: 'center', padding: '50px 20px' }}>
+                              <div style={{ fontSize: '3.5rem', marginBottom: '12px', opacity: 0.3 }}>📷</div>
+                              <div style={{ color: '#9CA3AF', fontSize: '1rem', fontWeight: 600 }}>No se adjuntaron fotografías de evidencia</div>
+                              <div style={{ color: '#D1D5DB', fontSize: '0.85rem', marginTop: '6px' }}>El técnico no cargó fotos al completar este trabajo</div>
+                            </div>
+                          );
+                          return (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px' }}>
+                              {evs.map((img, i) => (
+                                <div
+                                  key={i}
+                                  onClick={() => setApprovalLightbox(img)}
+                                  style={{ position: 'relative', borderRadius: '14px', overflow: 'hidden', border: '1px solid #E5E7EB', cursor: 'pointer', aspectRatio: '4/3', background: '#F3F4F6', transition: 'transform 0.2s, box-shadow 0.2s' }}
+                                  onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.03)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)'; }}
+                                  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; }}
+                                >
+                                  <img
+                                    src={img}
+                                    alt={`Evidencia ${i + 1}`}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                    onError={e => {
+                                      e.target.onerror = null;
+                                      e.target.style.display = 'none';
+                                      e.target.parentElement.innerHTML = '<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#FEF2F2;color:#EF4444;"><span style="font-size:2.5rem;">⚠️</span><span style="font-size:0.82rem;font-weight:600;margin-top:6px;">Imagen no disponible</span></div>';
+                                    }}
+                                  />
+                                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.6))', padding: '20px 10px 8px', textAlign: 'center' }}>
+                                    <span style={{ color: '#fff', fontSize: '0.78rem', fontWeight: 700 }}>Foto {i + 1}</span>
+                                  </div>
+                                  <div style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.5)', color: '#fff', borderRadius: '8px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>🔍</div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB: FIRMAS DE CONFORMIDAD */}
+                  {approvalTab === 'firmas' && (
+                    <div className="animate-fade-in" style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                      <div style={{ padding: '16px 22px', borderBottom: '1px solid #F3F4F6', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '1.1rem' }}>✍️</span>
+                        <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1F2937' }}>FIRMAS DIGITALES DE CONFORMIDAD</span>
+                      </div>
+                      <div style={{ padding: '20px 22px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+                          {/* Firma Técnico */}
+                          <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '20px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#374151', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                              👷 Firma del Técnico Ejecutor
+                            </div>
+                            {approvalModalTicket.firma_tecnico ? (
+                              <div style={{ background: '#fff', borderRadius: '12px', padding: '16px', border: '1px solid #E5E7EB', minHeight: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <img src={approvalModalTicket.firma_tecnico} alt="Firma Técnico" style={{ maxHeight: '80px', maxWidth: '100%' }} />
+                              </div>
+                            ) : (
+                              <div style={{ background: '#FEF2F2', borderRadius: '12px', padding: '24px', border: '1px dashed #FECACA', minHeight: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '6px' }}>
+                                <span style={{ fontSize: '2rem', opacity: 0.3 }}>✍️</span>
+                                <span style={{ fontSize: '0.85rem', color: '#EF4444', fontWeight: 600 }}>No firmó</span>
+                              </div>
+                            )}
+                            <div style={{ fontSize: '0.82rem', color: '#6B7280', marginTop: '8px', fontWeight: 600 }}>{approvalModalTicket.tecnico_nombre || 'Sin asignar'}</div>
+                          </div>
+                          {/* Firma Solicitante */}
+                          <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '20px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#374151', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                              🏪 Firma de Conformidad del PDV / Solicitante
+                            </div>
+                            {approvalModalTicket.firma_solicitante ? (
+                              <div style={{ background: '#fff', borderRadius: '12px', padding: '16px', border: '1px solid #E5E7EB', minHeight: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <img src={approvalModalTicket.firma_solicitante} alt="Firma Solicitante" style={{ maxHeight: '80px', maxWidth: '100%' }} />
+                              </div>
+                            ) : (
+                              <div style={{ background: '#FEF2F2', borderRadius: '12px', padding: '24px', border: '1px dashed #FECACA', minHeight: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '6px' }}>
+                                <span style={{ fontSize: '2rem', opacity: 0.3 }}>✍️</span>
+                                <span style={{ fontSize: '0.85rem', color: '#EF4444', fontWeight: 600 }}>No firmó</span>
+                              </div>
+                            )}
+                            <div style={{ fontSize: '0.82rem', color: '#6B7280', marginTop: '8px', fontWeight: 600 }}>{approvalModalTicket.pdv_nombre || 'Punto de Venta'}</div>
+                          </div>
+                          {/* Firma Jefe */}
+                          {approvalModalTicket.firma_jefe && (
+                            <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '14px', padding: '20px', textAlign: 'center' }}>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#166534', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                👔 Firma del Jefe de Mantenimiento
+                              </div>
+                              <div style={{ background: '#fff', borderRadius: '12px', padding: '16px', border: '1px solid #BBF7D0', minHeight: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <img src={approvalModalTicket.firma_jefe} alt="Firma Jefe" style={{ maxHeight: '80px', maxWidth: '100%' }} />
+                              </div>
+                              <div style={{ fontSize: '0.82rem', color: '#166534', marginTop: '8px', fontWeight: 600 }}>Jefe de Mantenimiento</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            {/* Footer de acción (Botón Rojo Ver Reporte PDF + Botón Beige Cerrar exacto al mockup) */}
-            <div style={{ padding: '16px 20px', background: '#FAF6F0', borderTop: '1px solid #E5D8CC', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px', flexShrink: 0 }}>
-              <button
-                type="button"
-                onClick={() => handlePrintMantenimientoPDF(approvalModalTicket)}
-                style={{ background: '#991B1B', color: '#fff', borderRadius: '14px', padding: '14px', fontWeight: 700, fontSize: '0.92rem', border: 'none', cursor: 'pointer', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-              >
-                📄 Ver Reporte PDF
-              </button>
-              <button
-                type="button"
-                onClick={() => setApprovalModalTicket(null)}
-                style={{ background: '#E8DDD4', color: '#2C1810', borderRadius: '14px', padding: '14px', fontWeight: 700, fontSize: '0.92rem', border: 'none', cursor: 'pointer', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                Cerrar
-              </button>
+                {/* ═══ COLUMNA DERECHA ═══ */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                  {/* LÍNEA DE APROBACIÓN */}
+                  <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                    <div style={{ padding: '16px 20px', borderBottom: '1px solid #F3F4F6', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1rem', color: '#4F46E5' }}>⚙️</span>
+                      <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1F2937' }}>LÍNEA DE APROBACIÓN</span>
+                    </div>
+                    <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '0' }}>
+                      
+                      {/* Step 1: Técnico Ejecutor */}
+                      <div style={{ display: 'flex', gap: '14px', position: 'relative' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: approvalModalTicket.firma_tecnico ? '#22C55E' : '#E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', color: '#fff', fontWeight: 800, flexShrink: 0 }}>
+                            {approvalModalTicket.firma_tecnico ? '✔' : '1'}
+                          </div>
+                          <div style={{ width: '2px', height: '44px', background: approvalModalTicket.firma_tecnico ? '#22C55E' : '#E5E7EB' }} />
+                        </div>
+                        <div style={{ flex: 1, paddingBottom: '16px' }}>
+                          <div style={{ border: `1px solid ${approvalModalTicket.firma_tecnico ? '#BBF7D0' : '#E5E7EB'}`, borderRadius: '10px', padding: '12px', background: approvalModalTicket.firma_tecnico ? '#F0FDF4' : '#fff' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
+                              <div>
+                                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: approvalModalTicket.firma_tecnico ? '#166534' : '#374151' }}>1. Técnico Ejecutor</div>
+                                <div style={{ fontSize: '0.75rem', color: approvalModalTicket.firma_tecnico ? '#15803D' : '#6B7280' }}>{approvalModalTicket.tecnico_nombre || 'Sin asignar'}</div>
+                                {approvalModalTicket.fecha_real_finalizacion && <div style={{ fontSize: '0.72rem', color: approvalModalTicket.firma_tecnico ? '#166534' : '#9CA3AF', marginTop: '2px' }}>Fecha: {formatDate(approvalModalTicket.fecha_real_finalizacion)}</div>}
+                              </div>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '3px 8px', borderRadius: '6px', background: approvalModalTicket.firma_tecnico ? '#DCFCE7' : '#F3F4F6', color: approvalModalTicket.firma_tecnico ? '#166534' : '#6B7280' }}>
+                                {approvalModalTicket.firma_tecnico ? 'APROBADO' : 'PENDIENTE'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Step 2: Jefe de Mantenimiento */}
+                      <div style={{ display: 'flex', gap: '14px', position: 'relative' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: approvalModalTicket.firma_jefe ? '#22C55E' : approvalModalTicket.estado === 'Por Aprobar' ? '#4F46E5' : '#E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', color: '#fff', fontWeight: 800, flexShrink: 0 }}>
+                            {approvalModalTicket.firma_jefe ? '✔' : '2'}
+                          </div>
+                          <div style={{ width: '2px', height: '44px', background: approvalModalTicket.firma_jefe ? '#22C55E' : '#E5E7EB' }} />
+                        </div>
+                        <div style={{ flex: 1, paddingBottom: '16px' }}>
+                          <div style={{ border: `1px dashed ${approvalModalTicket.firma_jefe ? '#BBF7D0' : approvalModalTicket.estado === 'Por Aprobar' ? '#A5B4FC' : '#E5E7EB'}`, borderRadius: '10px', padding: '12px', background: approvalModalTicket.firma_jefe ? '#F0FDF4' : approvalModalTicket.estado === 'Por Aprobar' ? '#EEF2FF' : '#fff' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
+                              <div>
+                                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: approvalModalTicket.firma_jefe ? '#166534' : approvalModalTicket.estado === 'Por Aprobar' ? '#3730A3' : '#374151' }}>2. Jefe de Mantenimiento {approvalModalTicket.estado === 'Por Aprobar' && '(Actual)'}</div>
+                                <div style={{ fontSize: '0.75rem', color: approvalModalTicket.estado === 'Por Aprobar' ? '#4F46E5' : '#6B7280' }}>{approvalModalTicket.estado === 'Por Aprobar' ? 'Pendiente de revisión' : approvalModalTicket.estado === 'Finalizado' ? 'Aprobado' : ''}</div>
+                              </div>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '3px 8px', borderRadius: '6px', background: approvalModalTicket.firma_jefe ? '#DCFCE7' : approvalModalTicket.estado === 'Por Aprobar' ? '#E0E7FF' : '#F3F4F6', color: approvalModalTicket.firma_jefe ? '#166534' : approvalModalTicket.estado === 'Por Aprobar' ? '#4338CA' : '#6B7280' }}>
+                                {approvalModalTicket.firma_jefe ? 'APROBADO' : 'PENDIENTE'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Step 3: Área Solicitante */}
+                      <div style={{ display: 'flex', gap: '14px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: approvalModalTicket.firma_solicitante ? '#22C55E' : '#E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', color: approvalModalTicket.firma_solicitante ? '#fff' : '#9CA3AF', fontWeight: 800, flexShrink: 0 }}>
+                            {approvalModalTicket.firma_solicitante ? '✔' : '3'}
+                          </div>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ border: `1px solid ${approvalModalTicket.firma_solicitante ? '#BBF7D0' : '#E5E7EB'}`, borderRadius: '10px', padding: '12px', background: approvalModalTicket.firma_solicitante ? '#F0FDF4' : '#F9FAFB' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
+                              <div>
+                                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: approvalModalTicket.firma_solicitante ? '#166534' : '#9CA3AF' }}>3. Área Solicitante</div>
+                                <div style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>{approvalModalTicket.pdv_nombre || 'Aprobación final'}</div>
+                              </div>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '3px 8px', borderRadius: '6px', background: approvalModalTicket.firma_solicitante ? '#DCFCE7' : '#F3F4F6', color: approvalModalTicket.firma_solicitante ? '#166534' : '#9CA3AF' }}>
+                                {approvalModalTicket.firma_solicitante ? 'FIRMADO' : 'PENDIENTE'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* DESCARGAS Y EXPORTACIÓN */}
+                  <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                    <div style={{ padding: '16px 20px', borderBottom: '1px solid #F3F4F6', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1rem', color: '#4F46E5' }}>📥</span>
+                      <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1F2937' }}>DESCARGAS Y EXPORTACIÓN</span>
+                    </div>
+                    <div style={{ padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#F9FAFB', borderRadius: '10px', border: '1px solid #E5E7EB' }}>
+                        <div>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#374151' }}>📄 Reporte Completo en PDF</div>
+                          <div style={{ fontSize: '0.72rem', color: '#6B7280', marginTop: '2px' }}>Descargar reporte detallado</div>
+                        </div>
+                        <button
+                          onClick={() => handlePrintMantenimientoPDF(approvalModalTicket)}
+                          style={{ background: '#fff', color: '#EF4444', border: '1px solid #FECACA', borderRadius: '8px', padding: '6px 12px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'background 0.2s' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#FEF2F2'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                        >Descargar</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* ====== LIGHTBOX PARA AMPLIAR FOTOS DE EVIDENCIA ====== */}
+          {approvalLightbox && (
+            <div
+              onClick={() => setApprovalLightbox(null)}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 999999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', cursor: 'zoom-out' }}
+            >
+              <button
+                onClick={() => setApprovalLightbox(null)}
+                style={{ position: 'absolute', top: '16px', right: '20px', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: '1.5rem', cursor: 'pointer', borderRadius: '50%', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, transition: 'background 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+              >✕</button>
+              <img
+                src={approvalLightbox}
+                alt="Evidencia ampliada"
+                style={{ maxWidth: '92vw', maxHeight: '88vh', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
+                onClick={e => e.stopPropagation()}
+                onError={e => {
+                  e.target.onerror = null;
+                  e.target.style.display = 'none';
+                  e.target.parentElement.innerHTML = '<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1F2937;color:#EF4444;"><span style="font-size:3rem;">⚠️</span><span style="font-size:1rem;font-weight:600;margin-top:10px;">Imagen no disponible</span></div>';
+                }}
+              />
+            </div>
+          )}
         </div>
+        </>
       )}
 
       {/* ====== VISTA IMPRIMIBLE PARA PDF (@media print) ====== */}
@@ -3190,7 +3835,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
       {/* Styles */}
       <style jsx global>{`
         .desktop-only-table { display: block; }
-        .mobile-only-cards { display: none; }
+        .mobile-only-cards { display: none !important; }
         @media (max-width: 767px) {
           .desktop-only-table { display: none !important; }
           .mobile-only-cards { display: flex !important; }
