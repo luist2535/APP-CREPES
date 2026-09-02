@@ -12,7 +12,7 @@ export async function GET(request) {
     
     const db = getDb();
     const user = db.prepare(`
-      SELECT u.id, u.nombre, u.email, u.rol_id, u.ciudad_id, 
+      SELECT u.id, u.nombre, u.email, u.rol_id, u.ciudad_id, u.avatar,
              r.nombre as rol_nombre, c.nombre as ciudad_nombre
       FROM users u
       LEFT JOIN roles r ON u.rol_id = r.id

@@ -20,8 +20,70 @@ export default function DashboardLayout({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [showSessionWarning, setShowSessionWarning] = useState(false);
   const [sessionCountdown, setSessionCountdown] = useState(0);
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState('');
+  const fileInputRef = useRef(null);
   const router = useRouter();
   const pathname = usePathname();
+
+  const handleAvatarFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        setAvatarError('Por favor selecciona un archivo de imagen válido (JPG, PNG, WEBP).');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setAvatarError('La imagen no debe superar los 5 MB.');
+        return;
+      }
+      setAvatarError('');
+      setSelectedAvatarFile(file);
+      setAvatarPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleSaveAvatar = async () => {
+    if (!selectedAvatarFile) return;
+    setUploadingAvatar(true);
+    setAvatarError('');
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedAvatarFile);
+      formData.append('categoria', 'avatar_usuario');
+      formData.append('tipo_documento', 'Foto de Perfil');
+      
+      const uploadRes = await fetch('/api/uploads', {
+        method: 'POST',
+        body: formData
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploadData.error || 'Error al subir la imagen');
+
+      const avatarUrl = uploadData.url;
+      const saveRes = await fetch('/api/auth/avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar_url: avatarUrl })
+      });
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) throw new Error(saveData.error || 'Error al guardar foto en usuario');
+
+      const updatedUser = { ...user, avatar: avatarUrl };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setAvatarModalOpen(false);
+      setSelectedAvatarFile(null);
+      setAvatarPreviewUrl('');
+    } catch (err) {
+      setAvatarError(err.message || 'Ocurrió un error al guardar tu foto');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   // Refs para los timers de inactividad
   const inactivityTimerRef = useRef(null);
@@ -579,8 +641,12 @@ export default function DashboardLayout({ children }) {
 
         <div className="sidebar-footer">
           <div className="sidebar-user">
-            <div className="sidebar-user-avatar">
-              {user.nombre.substring(0, 2).toUpperCase()}
+            <div className="sidebar-user-avatar" style={{ overflow: 'hidden', padding: 0 }}>
+              {user.avatar ? (
+                <img src={user.avatar} alt={user.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                user.nombre.substring(0, 2).toUpperCase()
+              )}
             </div>
             <div className="sidebar-user-info">
               <div className="sidebar-user-name" title={user.nombre}>{user.nombre}</div>
@@ -695,8 +761,12 @@ export default function DashboardLayout({ children }) {
                 onClick={() => { setProfileMenuOpen(prev => !prev); setNotifMenuOpen(false); }}
                 title="Opciones de cuenta"
               >
-                <div className="header-admin-avatar">
-                  {user.nombre.substring(0, 2).toUpperCase()}
+                <div className="header-admin-avatar" style={{ overflow: 'hidden', padding: 0 }}>
+                  {user.avatar ? (
+                    <img src={user.avatar} alt={user.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    user.nombre.substring(0, 2).toUpperCase()
+                  )}
                 </div>
                 <div className="header-admin-info">
                   <span className="header-admin-name">{user.nombre}</span>
@@ -726,6 +796,24 @@ export default function DashboardLayout({ children }) {
                     </div>
                     {/* Options */}
                     <div style={{ padding: '6px' }}>
+                      <button
+                        onClick={() => { setProfileMenuOpen(false); setAvatarModalOpen(true); }}
+                        style={{
+                          width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+                          padding: '10px 12px', border: 'none', background: 'transparent',
+                          borderRadius: '8px', cursor: 'pointer', color: '#2C1810',
+                          fontSize: '0.82rem', fontWeight: 600, textAlign: 'left',
+                          transition: 'background 0.15s', marginBottom: '4px'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#F5ECE5'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                          <circle cx="12" cy="13" r="4"/>
+                        </svg>
+                        Cambiar foto de perfil
+                      </button>
                       <button
                         onClick={() => { setProfileMenuOpen(false); handleLogout(); }}
                         style={{
@@ -810,9 +898,13 @@ export default function DashboardLayout({ children }) {
               <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative' }} onClick={() => { setProfileMenuOpen(prev => !prev); setNotifMenuOpen(false); }}>
                 <div 
                   className="header-admin-avatar-mobile"
-                  style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#F5EBE1', color: '#3D2314', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 800 }}
+                  style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#F5EBE1', color: '#3D2314', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 800, overflow: 'hidden' }}
                 >
-                  {user?.nombre?.substring(0, 2).toUpperCase() || 'AD'}
+                  {user?.avatar ? (
+                    <img src={user.avatar} alt={user.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    user?.nombre?.substring(0, 2).toUpperCase() || 'AD'
+                  )}
                 </div>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '4px', transform: profileMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
                   <polyline points="6 9 12 15 18 9" />
@@ -833,6 +925,22 @@ export default function DashboardLayout({ children }) {
                         <div style={{ fontSize: '0.72rem', color: '#9CA3AF', marginTop: '2px' }}>{user?.rol_nombre || 'Administrador'}</div>
                       </div>
                       <div style={{ padding: '6px' }}>
+                        <button
+                          onClick={() => { setProfileMenuOpen(false); setAvatarModalOpen(true); }}
+                          style={{
+                            width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+                            padding: '10px 12px', border: 'none', background: 'transparent',
+                            borderRadius: '8px', cursor: 'pointer', color: '#2C1810',
+                            fontSize: '0.82rem', fontWeight: 600, textAlign: 'left',
+                            marginBottom: '4px'
+                          }}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                            <circle cx="12" cy="13" r="4"/>
+                          </svg>
+                          Cambiar foto
+                        </button>
                         <button
                           onClick={() => { setProfileMenuOpen(false); handleLogout(); }}
                           style={{
@@ -1204,6 +1312,92 @@ export default function DashboardLayout({ children }) {
             <div className="inactivity-modal-actions">
               <button className="btn-secondary" onClick={handleLogout}>Cerrar Sesión</button>
               <button className="btn-primary" onClick={handleExtendSession}>Continuar Trabajando</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Cambio de Foto de Perfil */}
+      {avatarModalOpen && (
+        <div className="inactivity-modal-overlay" style={{ zIndex: 10001 }} onClick={() => setAvatarModalOpen(false)}>
+          <div className="inactivity-modal" style={{ maxWidth: '420px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.15rem' }}>📷 Foto de Perfil</h3>
+              <button 
+                onClick={() => setAvatarModalOpen(false)}
+                style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#9CA3AF' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', margin: '20px 0' }}>
+              {/* Previsualización */}
+              <div style={{
+                width: '120px', height: '120px', borderRadius: '50%',
+                border: '3px solid var(--color-primary, #6B3A2A)',
+                overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: '#FDF8F5', position: 'relative', boxShadow: '0 4px 12px rgba(107,58,42,0.15)'
+              }}>
+                {avatarPreviewUrl ? (
+                  <img src={avatarPreviewUrl} alt="Vista previa" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : user?.avatar ? (
+                  <img src={user.avatar} alt={user.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#6B3A2A' }}>
+                    {user?.nombre ? user.nombre.substring(0, 2).toUpperCase() : '👤'}
+                  </span>
+                )}
+              </div>
+
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                onChange={handleAvatarFileChange}
+                accept="image/png, image/jpeg, image/jpg, image/webp"
+                style={{ display: 'none' }}
+              />
+
+              <button 
+                type="button"
+                className="btn-secondary"
+                onClick={() => fileInputRef.current?.click()}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}
+              >
+                📁 Seleccionar imagen de tu equipo
+              </button>
+
+              {avatarError && (
+                <div style={{ color: '#DC2626', fontSize: '0.8rem', marginTop: '4px' }}>
+                  {avatarError}
+                </div>
+              )}
+            </div>
+
+            <p style={{ fontSize: '0.8rem', color: '#6B7280', margin: '0 0 20px 0' }}>
+              Formatos soportados: JPG, PNG, WEBP (máx. 5MB). Tu foto será visible en el encabezado y en las visitas registradas.
+            </p>
+
+            <div className="inactivity-modal-actions">
+              <button 
+                className="btn-secondary" 
+                onClick={() => {
+                  setAvatarModalOpen(false);
+                  setSelectedAvatarFile(null);
+                  setAvatarPreviewUrl('');
+                }}
+                disabled={uploadingAvatar}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="btn-primary" 
+                onClick={handleSaveAvatar}
+                disabled={!selectedAvatarFile || uploadingAvatar}
+                style={{ opacity: !selectedAvatarFile || uploadingAvatar ? 0.6 : 1 }}
+              >
+                {uploadingAvatar ? 'Guardando...' : 'Guardar Foto'}
+              </button>
             </div>
           </div>
         </div>
