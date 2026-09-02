@@ -960,16 +960,47 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
   const openModoVisita = (ticket) => {
     setActiveExecutionTicket(ticket);
     const checkList = parseChecklist(ticket.checklist_tareas);
-    setExecutionData({
+    let initialData = {
       solucion_aplicada: ticket.solucion_aplicada || '',
       observaciones: ticket.observaciones || '',
       checklist_completado: checkList,
       firma_tecnico: ticket.firma_tecnico || '',
       firma_solicitante: ticket.firma_solicitante || '',
       evidencias_cierre_files: []
-    });
+    };
+
+    try {
+      const key = `mantenimiento_avance_${ticket.id}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.solucion_aplicada) initialData.solucion_aplicada = parsed.solucion_aplicada;
+        if (parsed.observaciones) initialData.observaciones = parsed.observaciones;
+        if (parsed.checklist_completado) initialData.checklist_completado = parsed.checklist_completado;
+        if (parsed.firma_tecnico) initialData.firma_tecnico = parsed.firma_tecnico;
+        if (parsed.firma_solicitante) initialData.firma_solicitante = parsed.firma_solicitante;
+      }
+    } catch (e) { console.error('Error cargando avance', e); }
+
+    setExecutionData(initialData);
     setActiveTab('ejecucion');
   };
+
+  useEffect(() => {
+    if (activeExecutionTicket && executionData) {
+      try {
+        const key = `mantenimiento_avance_${activeExecutionTicket.id}`;
+        const dataToSave = {
+          solucion_aplicada: executionData.solucion_aplicada,
+          observaciones: executionData.observaciones,
+          checklist_completado: executionData.checklist_completado,
+          firma_tecnico: executionData.firma_tecnico,
+          firma_solicitante: executionData.firma_solicitante
+        };
+        localStorage.setItem(key, JSON.stringify(dataToSave));
+      } catch (e) {}
+    }
+  }, [executionData, activeExecutionTicket]);
 
   const iniciarYAbriModoVisita = async (ticket) => {
     try {
@@ -1052,6 +1083,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
       if (!res.ok) throw new Error(data.error);
       showToast('📋 ¡Trabajo enviado a revisión! El Jefe de Mantenimiento debe aprobarlo para cerrar la gestión como Finalizado.', 'success');
       const ticketPorAprobar = data.mantenimiento || { ...activeExecutionTicket, estado: 'Por Aprobar', solucion_aplicada: executionData.solucion_aplicada, observaciones: executionData.observaciones, firma_tecnico: executionData.firma_tecnico, firma_solicitante: executionData.firma_solicitante };
+      try { localStorage.removeItem(`mantenimiento_avance_${activeExecutionTicket.id}`); } catch (e) {}
       setActiveExecutionTicket(null);
       setExecutionData({});
       setActiveTab('tablero');
