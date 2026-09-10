@@ -89,6 +89,36 @@ function getDb() {
       `);
     } catch (e) {}
 
+    // Tabla de Actas de Entrega de Equipos
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS actas_entrega (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          fecha TEXT NOT NULL,
+          quien_recibe TEXT NOT NULL,
+          cedula_recibe TEXT NOT NULL,
+          cargo TEXT,
+          area TEXT,
+          ciudad TEXT,
+          tipo_ubicacion TEXT DEFAULT 'pdv',
+          equipos TEXT NOT NULL,
+          observaciones TEXT,
+          estado TEXT DEFAULT 'pendiente',
+          creado_por INTEGER,
+          nombre_entrega TEXT,
+          cedula_entrega TEXT,
+          firma_entrega TEXT,
+          firma_recibe TEXT,
+          fecha_firma TEXT,
+          firmado_por INTEGER,
+          created_at TEXT DEFAULT (datetime('now', 'localtime')),
+          updated_at TEXT DEFAULT (datetime('now', 'localtime')),
+          FOREIGN KEY (creado_por) REFERENCES users(id),
+          FOREIGN KEY (firmado_por) REFERENCES users(id)
+        )
+      `);
+    } catch (e) {}
+
     // Migración para separar Techos, Paredes y Pisos en plantillas existentes
     try {
       const plantillas = db.prepare("SELECT id, campos FROM plantillas WHERE campos LIKE '%techos, paredes%'").all();

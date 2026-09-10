@@ -25,12 +25,14 @@ export default function DashboardLayout({ children }) {
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState('');
+  const [avatarSuccess, setAvatarSuccess] = useState('');
+  const [isDraggingAvatar, setIsDraggingAvatar] = useState(false);
   const fileInputRef = useRef(null);
   const router = useRouter();
   const pathname = usePathname();
 
   const handleAvatarFileChange = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files && e.target.files[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
         setAvatarError('Por favor selecciona un archivo de imagen válido (JPG, PNG, WEBP).');
@@ -41,15 +43,41 @@ export default function DashboardLayout({ children }) {
         return;
       }
       setAvatarError('');
+      setAvatarSuccess('');
+      setSelectedAvatarFile(file);
+      setAvatarPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleAvatarDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingAvatar(false);
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (!file.type.startsWith('image/')) {
+        setAvatarError('Por favor arrastra un archivo de imagen válido (JPG, PNG, WEBP).');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setAvatarError('La imagen no debe superar los 5 MB.');
+        return;
+      }
+      setAvatarError('');
+      setAvatarSuccess('');
       setSelectedAvatarFile(file);
       setAvatarPreviewUrl(URL.createObjectURL(file));
     }
   };
 
   const handleSaveAvatar = async () => {
-    if (!selectedAvatarFile) return;
+    if (!selectedAvatarFile) {
+      setAvatarError('Por favor selecciona una imagen primero.');
+      return;
+    }
     setUploadingAvatar(true);
     setAvatarError('');
+    setAvatarSuccess('');
     try {
       const formData = new FormData();
       formData.append('file', selectedAvatarFile);
@@ -61,7 +89,7 @@ export default function DashboardLayout({ children }) {
         body: formData
       });
       const uploadData = await uploadRes.json();
-      if (!uploadRes.ok) throw new Error(uploadData.error || 'Error al subir la imagen');
+      if (!uploadRes.ok) throw new Error(uploadData.error || 'Error al subir la imagen al servidor');
 
       const avatarUrl = uploadData.url;
       const saveRes = await fetch('/api/auth/avatar', {
@@ -70,16 +98,55 @@ export default function DashboardLayout({ children }) {
         body: JSON.stringify({ avatar_url: avatarUrl })
       });
       const saveData = await saveRes.json();
-      if (!saveRes.ok) throw new Error(saveData.error || 'Error al guardar foto en usuario');
+      if (!saveRes.ok) throw new Error(saveData.error || 'Error al guardar foto en tu perfil');
 
       const updatedUser = { ...user, avatar: avatarUrl };
       setUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
-      setAvatarModalOpen(false);
-      setSelectedAvatarFile(null);
-      setAvatarPreviewUrl('');
+      window.dispatchEvent(new CustomEvent('user-updated', { detail: updatedUser }));
+
+      setAvatarSuccess('¡Foto de perfil actualizada exitosamente!');
+      setTimeout(() => {
+        setAvatarModalOpen(false);
+        setSelectedAvatarFile(null);
+        setAvatarPreviewUrl('');
+        setAvatarSuccess('');
+      }, 900);
     } catch (err) {
       setAvatarError(err.message || 'Ocurrió un error al guardar tu foto');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!confirm('¿Estás seguro de que deseas eliminar tu foto de perfil actual?')) return;
+    setUploadingAvatar(true);
+    setAvatarError('');
+    setAvatarSuccess('');
+    try {
+      const saveRes = await fetch('/api/auth/avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar_url: null })
+      });
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) throw new Error(saveData.error || 'Error al eliminar foto');
+
+      const updatedUser = { ...user, avatar: null };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      window.dispatchEvent(new CustomEvent('user-updated', { detail: updatedUser }));
+
+      setAvatarSuccess('Foto de perfil eliminada.');
+      setTimeout(() => {
+        setAvatarModalOpen(false);
+        setSelectedAvatarFile(null);
+        setAvatarPreviewUrl('');
+        setAvatarSuccess('');
+      }, 700);
+    } catch (err) {
+      setAvatarError(err.message || 'Error al eliminar foto');
     } finally {
       setUploadingAvatar(false);
     }
@@ -208,6 +275,23 @@ export default function DashboardLayout({ children }) {
     }
     checkAuth();
   }, [router]);
+
+  useEffect(() => {
+    const handleUserUpdated = (e) => {
+      if (e.detail) {
+        setUser(e.detail);
+      }
+    };
+    const handleOpenAvatarModal = () => {
+      setAvatarModalOpen(true);
+    };
+    window.addEventListener('user-updated', handleUserUpdated);
+    window.addEventListener('open-avatar-modal', handleOpenAvatarModal);
+    return () => {
+      window.removeEventListener('user-updated', handleUserUpdated);
+      window.removeEventListener('open-avatar-modal', handleOpenAvatarModal);
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -382,6 +466,20 @@ export default function DashboardLayout({ children }) {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
               <circle cx="12" cy="13" r="4" />
+            </svg>
+          )
+        },
+        {
+          name: 'Acta de Entrega',
+          path: '/equipos/entrega',
+          accessPath: '/equipos',
+          icon: (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
             </svg>
           )
         },
@@ -566,6 +664,7 @@ export default function DashboardLayout({ children }) {
     if (pathname === '/calendario') return 'Calendario de Visitas';
     if (pathname === '/visitas') return 'Modo Visita Inteligente';
     if (pathname === '/solicitudes') return 'Solicitudes de Soporte Técnico';
+    if (pathname === '/equipos/entrega') return 'Acta de Entrega de Equipos';
     if (pathname === '/equipos') return 'Equipos & Escaneo QR';
     if (pathname === '/bloqueos') return 'Gestión de Bloqueos de Horario';
     if (pathname === '/archivos') return 'Repositorio Central de Archivos';
@@ -640,17 +739,26 @@ export default function DashboardLayout({ children }) {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="sidebar-user">
-            <div className="sidebar-user-avatar" style={{ overflow: 'hidden', padding: 0 }}>
+          <div 
+            className="sidebar-user"
+            onClick={() => setAvatarModalOpen(true)}
+            style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+            title="Haz clic para cambiar tu foto de perfil"
+          >
+            <div className="sidebar-user-avatar" style={{ overflow: 'hidden', padding: 0, position: 'relative' }}>
               {user.avatar ? (
                 <img src={user.avatar} alt={user.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
                 user.nombre.substring(0, 2).toUpperCase()
               )}
+              <div className="avatar-edit-badge" title="Cambiar foto">📷</div>
             </div>
             <div className="sidebar-user-info">
               <div className="sidebar-user-name" title={user.nombre}>{user.nombre}</div>
-              <div className="sidebar-user-role">{user.rol_nombre}</div>
+              <div className="sidebar-user-role">{user.rol_nombre || 'Usuario'}</div>
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', padding: '3px 6px', background: 'rgba(255,255,255,0.08)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }} title="Cambiar foto">
+              📷
             </div>
           </div>
         </div>
@@ -1320,83 +1428,184 @@ export default function DashboardLayout({ children }) {
       {/* Modal de Cambio de Foto de Perfil */}
       {avatarModalOpen && (
         <div className="inactivity-modal-overlay" style={{ zIndex: 10001 }} onClick={() => setAvatarModalOpen(false)}>
-          <div className="inactivity-modal" style={{ maxWidth: '420px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.15rem' }}>📷 Foto de Perfil</h3>
+          <div className="inactivity-modal" style={{ maxWidth: '440px', textAlign: 'center', padding: '24px 28px', borderRadius: '18px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #F0EAE1', paddingBottom: '12px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#2C1810', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                📷 Foto de Perfil
+              </h3>
               <button 
+                type="button"
                 onClick={() => setAvatarModalOpen(false)}
-                style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#9CA3AF' }}
+                style={{ background: 'transparent', border: 'none', fontSize: '1.3rem', cursor: 'pointer', color: '#9CA3AF', padding: '4px 8px', borderRadius: '6px' }}
+                title="Cerrar"
               >
                 ✕
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', margin: '20px 0' }}>
-              {/* Previsualización */}
-              <div style={{
-                width: '120px', height: '120px', borderRadius: '50%',
-                border: '3px solid var(--color-primary, #6B3A2A)',
-                overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: '#FDF8F5', position: 'relative', boxShadow: '0 4px 12px rgba(107,58,42,0.15)'
-              }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', margin: '15px 0' }}>
+              {/* Previsualización Interactiva / Zona Drop */}
+              <div 
+                onDragOver={(e) => { e.preventDefault(); setIsDraggingAvatar(true); }}
+                onDragLeave={() => setIsDraggingAvatar(false)}
+                onDrop={handleAvatarDrop}
+                onClick={() => {
+                  const input = document.getElementById('avatar-file-modal-input');
+                  if (input) input.click();
+                }}
+                style={{
+                  width: '130px', height: '130px', borderRadius: '50%',
+                  border: isDraggingAvatar ? '3px dashed #16A34A' : '3px solid #6B3A2A',
+                  overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: isDraggingAvatar ? '#F0FDF4' : '#FDF8F5', position: 'relative',
+                  boxShadow: '0 6px 18px rgba(107,58,42,0.18)', cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  transform: isDraggingAvatar ? 'scale(1.04)' : 'scale(1)'
+                }}
+                title="Haz clic o arrastra una imagen aquí para cambiar tu foto"
+              >
                 {avatarPreviewUrl ? (
                   <img src={avatarPreviewUrl} alt="Vista previa" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : user?.avatar ? (
                   <img src={user.avatar} alt={user.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
-                  <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#6B3A2A' }}>
+                  <span style={{ fontSize: '2.8rem', fontWeight: 800, color: '#6B3A2A' }}>
                     {user?.nombre ? user.nombre.substring(0, 2).toUpperCase() : '👤'}
                   </span>
                 )}
+                <div style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0,
+                  background: 'rgba(44, 24, 16, 0.75)', color: '#fff',
+                  fontSize: '0.65rem', fontWeight: 600, padding: '4px 0',
+                  backdropFilter: 'blur(2px)', transition: 'opacity 0.2s',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px'
+                }}>
+                  📷 Cambiar
+                </div>
               </div>
 
+              {selectedAvatarFile && (
+                <div style={{ fontSize: '0.78rem', color: '#059669', background: '#ECFDF5', padding: '4px 10px', borderRadius: '20px', fontWeight: 600, border: '1px solid #A7F3D0' }}>
+                  ✓ {selectedAvatarFile.name} ({(selectedAvatarFile.size / 1024).toFixed(0)} KB)
+                </div>
+              )}
+
+              {/* Inputs ocultos pero vinculados */}
               <input 
+                id="avatar-file-modal-input"
                 type="file" 
                 ref={fileInputRef}
                 onChange={handleAvatarFileChange}
                 accept="image/png, image/jpeg, image/jpg, image/webp"
-                style={{ display: 'none' }}
+                style={{ position: 'absolute', opacity: 0, width: '0.1px', height: '0.1px', pointerEvents: 'none' }}
               />
 
-              <button 
-                type="button"
-                className="btn-secondary"
-                onClick={() => fileInputRef.current?.click()}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}
-              >
-                📁 Seleccionar imagen de tu equipo
-              </button>
+              <input 
+                id="avatar-camera-modal-input"
+                type="file" 
+                onChange={handleAvatarFileChange}
+                accept="image/*"
+                capture="user"
+                style={{ position: 'absolute', opacity: 0, width: '0.1px', height: '0.1px', pointerEvents: 'none' }}
+              />
+
+              {/* Botones de acción para seleccionar archivo */}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
+                <label 
+                  htmlFor="avatar-file-modal-input"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '8px 14px', borderRadius: '8px', background: '#F3F4F6',
+                    color: '#374151', fontSize: '0.82rem', fontWeight: 600,
+                    cursor: 'pointer', border: '1px solid #E5E7EB',
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#E5E7EB'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#F3F4F6'}
+                >
+                  📁 Seleccionar archivo
+                </label>
+
+                <label 
+                  htmlFor="avatar-camera-modal-input"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '8px 14px', borderRadius: '8px', background: '#F3F4F6',
+                    color: '#374151', fontSize: '0.82rem', fontWeight: 600,
+                    cursor: 'pointer', border: '1px solid #E5E7EB',
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#E5E7EB'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#F3F4F6'}
+                >
+                  📸 Tomar foto
+                </label>
+
+                {(user?.avatar || selectedAvatarFile) && (
+                  <button
+                    type="button"
+                    onClick={selectedAvatarFile ? () => { setSelectedAvatarFile(null); setAvatarPreviewUrl(''); } : handleRemoveAvatar}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                      padding: '8px 12px', borderRadius: '8px', background: '#FEF2F2',
+                      color: '#DC2626', fontSize: '0.82rem', fontWeight: 600,
+                      cursor: 'pointer', border: '1px solid #FECACA',
+                      transition: 'all 0.15s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#FEE2E2'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#FEF2F2'}
+                    disabled={uploadingAvatar}
+                  >
+                    🗑️ {selectedAvatarFile ? 'Descartar' : 'Quitar foto'}
+                  </button>
+                )}
+              </div>
 
               {avatarError && (
-                <div style={{ color: '#DC2626', fontSize: '0.8rem', marginTop: '4px' }}>
-                  {avatarError}
+                <div style={{ color: '#DC2626', fontSize: '0.82rem', marginTop: '4px', background: '#FEF2F2', padding: '6px 12px', borderRadius: '6px', border: '1px solid #FCA5A5' }}>
+                  ⚠️ {avatarError}
+                </div>
+              )}
+
+              {avatarSuccess && (
+                <div style={{ color: '#16A34A', fontSize: '0.82rem', marginTop: '4px', background: '#F0FDF4', padding: '6px 12px', borderRadius: '6px', border: '1px solid #86EFAC', fontWeight: 600 }}>
+                  🎉 {avatarSuccess}
                 </div>
               )}
             </div>
 
-            <p style={{ fontSize: '0.8rem', color: '#6B7280', margin: '0 0 20px 0' }}>
-              Formatos soportados: JPG, PNG, WEBP (máx. 5MB). Tu foto será visible en el encabezado y en las visitas registradas.
+            <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: '0 0 18px 0', lineHeight: 1.4 }}>
+              Formatos: JPG, PNG, WEBP (máx. 5MB). Tu foto se mostrará en el encabezado, menú lateral y visitas operativas.
             </p>
 
-            <div className="inactivity-modal-actions">
+            <div className="inactivity-modal-actions" style={{ gap: '10px' }}>
               <button 
+                type="button"
                 className="btn-secondary" 
                 onClick={() => {
                   setAvatarModalOpen(false);
                   setSelectedAvatarFile(null);
                   setAvatarPreviewUrl('');
+                  setAvatarError('');
+                  setAvatarSuccess('');
                 }}
                 disabled={uploadingAvatar}
+                style={{ flex: 1 }}
               >
                 Cancelar
               </button>
               <button 
+                type="button"
                 className="btn-primary" 
                 onClick={handleSaveAvatar}
                 disabled={!selectedAvatarFile || uploadingAvatar}
-                style={{ opacity: !selectedAvatarFile || uploadingAvatar ? 0.6 : 1 }}
+                style={{
+                  flex: 1.2,
+                  opacity: !selectedAvatarFile || uploadingAvatar ? 0.6 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                }}
               >
-                {uploadingAvatar ? 'Guardando...' : 'Guardar Foto'}
+                {uploadingAvatar ? '⏳ Guardando...' : '💾 Guardar Foto'}
               </button>
             </div>
           </div>
