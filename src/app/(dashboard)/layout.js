@@ -346,7 +346,9 @@ export default function DashboardLayout({ children }) {
       '/admin': 'admin',
       '/mantenimiento': 'mantenimiento',
       '/auditoria': 'auditoria',
-      '/calidad-bpm': 'calidad-bpm'
+      '/calidad-bpm': 'calidad-bpm',
+      '/actas_entrega': 'actas_entrega',
+      '/plantillas': 'plantillas'
     };
     const modKey = moduleMap[path];
     if (modKey && user.permisos_adicionales && user.permisos_adicionales[modKey] !== undefined) {
@@ -387,6 +389,10 @@ export default function DashboardLayout({ children }) {
         return rol === 1;
       case '/calidad-bpm':
         // Módulo BPM Calidad: Admin (1), Supervisor Calidad (5), Auxiliar Calidad (13), Coordinador (2)
+        return [1, 2, 5, 13].includes(rol);
+      case '/actas_entrega':
+        return [1, 2, 4, 9, 12, 16].includes(rol);
+      case '/plantillas':
         return [1, 2, 5, 13].includes(rol);
       default:
         return false;
@@ -472,7 +478,7 @@ export default function DashboardLayout({ children }) {
         {
           name: 'Acta de Entrega',
           path: '/equipos/entrega',
-          accessPath: '/equipos',
+          accessPath: '/actas_entrega',
           icon: (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -559,7 +565,7 @@ export default function DashboardLayout({ children }) {
         {
           name: 'Modificar Ítems / Checklists',
           path: '/visitas?tab=templates',
-          accessPath: '/visitas',
+          accessPath: '/plantillas',
           icon: (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />

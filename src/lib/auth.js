@@ -84,22 +84,22 @@ function getUserAssignedCityId(user, db) {
 }
 
 const DEFAULT_ROLE_PERMISSIONS = {
-  1: ['dashboard', 'territorial', 'calendario', 'visitas', 'bloqueos', 'equipos', 'mantenimiento', 'solicitudes', 'reportes', 'archivos', 'admin'],
-  2: ['dashboard', 'territorial', 'calendario', 'visitas', 'bloqueos', 'equipos', 'mantenimiento', 'solicitudes', 'reportes', 'archivos'],
+  1: ['dashboard', 'territorial', 'calendario', 'visitas', 'bloqueos', 'equipos', 'mantenimiento', 'solicitudes', 'reportes', 'archivos', 'admin', 'actas_entrega', 'plantillas'],
+  2: ['dashboard', 'territorial', 'calendario', 'visitas', 'bloqueos', 'equipos', 'mantenimiento', 'solicitudes', 'reportes', 'archivos', 'actas_entrega', 'plantillas'],
   3: ['dashboard', 'calendario', 'visitas', 'reportes', 'archivos'],
-  4: ['dashboard', 'calendario', 'visitas', 'equipos', 'mantenimiento', 'solicitudes', 'reportes', 'archivos'],
-  5: ['dashboard', 'calendario', 'visitas', 'mantenimiento', 'reportes', 'archivos'],
+  4: ['dashboard', 'calendario', 'visitas', 'equipos', 'mantenimiento', 'solicitudes', 'reportes', 'archivos', 'actas_entrega'],
+  5: ['dashboard', 'calendario', 'visitas', 'mantenimiento', 'reportes', 'archivos', 'plantillas'],
   6: ['dashboard', 'calendario', 'visitas', 'reportes', 'archivos'],
   7: ['dashboard', 'calendario', 'visitas', 'reportes', 'archivos'],
   8: ['dashboard', 'territorial', 'calendario', 'reportes', 'archivos'],
-  9: ['dashboard', 'calendario', 'visitas', 'equipos', 'mantenimiento', 'solicitudes', 'reportes', 'archivos'],
+  9: ['dashboard', 'calendario', 'visitas', 'equipos', 'mantenimiento', 'solicitudes', 'reportes', 'archivos', 'actas_entrega'],
   10: ['dashboard', 'calendario', 'visitas', 'archivos'],
   11: ['dashboard', 'calendario', 'visitas', 'archivos'],
-  12: ['dashboard', 'calendario', 'visitas', 'equipos', 'mantenimiento', 'solicitudes', 'archivos'],
-  13: ['dashboard', 'calendario', 'visitas', 'mantenimiento', 'archivos'],
+  12: ['dashboard', 'calendario', 'visitas', 'equipos', 'mantenimiento', 'solicitudes', 'archivos', 'actas_entrega'],
+  13: ['dashboard', 'calendario', 'visitas', 'mantenimiento', 'archivos', 'plantillas'],
   14: ['dashboard', 'calendario', 'visitas', 'archivos'],
   15: ['dashboard', 'calendario', 'visitas', 'archivos'],
-  16: ['dashboard', 'calendario', 'visitas', 'equipos', 'mantenimiento', 'solicitudes', 'archivos'],
+  16: ['dashboard', 'calendario', 'visitas', 'equipos', 'mantenimiento', 'solicitudes', 'archivos', 'actas_entrega'],
   17: ['dashboard', 'calendario', 'visitas', 'solicitudes', 'archivos']
 };
 
@@ -114,6 +114,8 @@ const MODULE_DEFINITIONS = [
   { key: 'territorial', nombre: 'Gestión Territorial / Mapa', icon: '🗺️', desc: 'Mapa interactivo y distribución por zonas' },
   { key: 'bloqueos', nombre: 'Bloqueos de Horario', icon: '⏰', desc: 'Restricciones y bloqueos en el calendario de agendas' },
   { key: 'archivos', nombre: 'Repositorio Documental', icon: '📁', desc: 'Biblioteca de documentos, manuales y evidencias' },
+  { key: 'actas_entrega', nombre: 'Actas de Entrega de Equipos', icon: '📝', desc: 'Creación y gestión de actas digitales TEC-F-03' },
+  { key: 'plantillas', nombre: 'Plantillas de Visitas', icon: '⚙️', desc: 'Edición y configuración de ítems o checklists' },
   { key: 'admin', nombre: 'Configuración del Sistema', icon: '⚙️', desc: 'Administración de usuarios, PDVs y áreas funcionales' }
 ];
 
