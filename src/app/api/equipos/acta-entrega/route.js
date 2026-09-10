@@ -251,6 +251,16 @@ async function generateExcel(acta) {
   // ---- EQUIPMENT TABLE (Rows 12-25) ----
   const startRow = 12;
   const maxEquipos = 14;
+  
+  // Primero limpiamos TODAS las filas de equipos de la plantilla por si tienen datos quemados
+  for (let i = 0; i < maxEquipos; i++) {
+    const row = startRow + i;
+    const colsToClear = ['B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T'];
+    colsToClear.forEach(col => {
+      ws.getCell(`${col}${row}`).value = '';
+    });
+  }
+
   const equiposList = equipos.slice(0, maxEquipos);
 
   equiposList.forEach((eq, i) => {
@@ -285,9 +295,14 @@ async function generateExcel(acta) {
   });
 
   // ---- OBSERVATIONS (Row 33) ----
+  // Limpiar valor por defecto de la plantilla
+  ws.getCell('B33').value = '';
   if (acta.observaciones) {
     ws.getCell('B33').value = acta.observaciones;
   }
+  // Agrandar la fila de observaciones y permitir wrap text por si escriben mucho
+  ws.getRow(33).height = 45;
+  ws.getCell('B33').alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
 
   // ---- SIGNATURES ----
   // Template structure (1-indexed rows):
