@@ -158,7 +158,7 @@ crepes-app/
 │   │   │   ├── bloqueos/       # Control y programación de bloqueos de horario por PDV
 │   │   │   ├── calendario/     # Calendario general operativo inteligente (Mes/Semana/Día)
 │   │   │   ├── dashboard/      # Dashboard principal interactivo con Timeline de trazabilidad
-│   │   │   ├── equipos/        # Fichas técnicas de maquinaria, mantención y escáner QR en vivo
+│   │   │   ├── equipos/        # Fichas técnicas, inventario, escáner QR y Actas de Entrega
 │   │   │   ├── reportes/       # Analítica por área, KPIs, filtros y vista Mobile Cards
 │   │   │   ├── solicitudes/    # Gestión de tickets y solicitudes de asistencia técnica (PDV → Mantenimiento/Sistemas)
 │   │   │   ├── territorial/    # Semáforo de salud operativa y matriz territorial por ciudad
@@ -170,7 +170,7 @@ crepes-app/
 │   │   │   ├── bloqueos/       # API para suspensión y reactivación temporal de PDVs
 │   │   │   ├── calendario/     # Consulta combinada de visitas, solicitudes y cruces
 │   │   │   ├── dashboard/      # Métricas resumidas y registros del Timeline de trazabilidad
-│   │   │   ├── equipos/        # Gestión de fichas de activos y consulta por código QR
+│   │   │   ├── equipos/        # Fichas de activos y generación/firmas de Actas de Entrega
 │   │   │   ├── historial/      # Registro histórico por equipo e intervenciones
 │   │   │   ├── pdv/            # Gestión del semáforo, ubicaciones y justificaciones de cambio
 │   │   │   ├── plantillas/     # Consulta de plantillas de evaluación (Checklists y BPM)
@@ -187,6 +187,7 @@ crepes-app/
 ├── add-bpm-checklist.js        # Script instalador de la plantilla corporativa Lista de Chequeo BPM
 ├── init-db.js                  # Inicializador y generador de tablas en SQLite
 ├── migrate-db-2.js a 9.js      # Scripts del motor de migración evolutiva de base de datos
+├── migrate-db-actas-entrega.js # Migración para habilitar actas de entrega de equipos
 ├── migrate-db-audit.js         # Migración para la bitácora de auditoría
 ├── migrate-db-mantenimiento.js # Migración de base de datos para áreas de mantenimiento
 ├── reset-passwords.js          # Utilidad para restaurar contraseñas de prueba a Bcrypt
