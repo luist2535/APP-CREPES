@@ -828,7 +828,24 @@ function AdminContent() {
                           {filteredUsers.length > 0 ? (
                             filteredUsers.map((u) => (
                               <tr key={u.id} className={!u.activo ? 'row-inactive' : ''}>
-                                <td className="font-semibold">{u.nombre}</td>
+                                <td className="font-semibold">
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{
+                                      width: '32px', height: '32px', borderRadius: '50%',
+                                      background: '#F5ECE5', color: '#6B3A2A', display: 'flex',
+                                      alignItems: 'center', justifyContent: 'center', fontWeight: 700,
+                                      fontSize: '0.75rem', overflow: 'hidden', flexShrink: 0,
+                                      border: '1px solid #E8DDD4'
+                                    }}>
+                                      {u.avatar ? (
+                                        <img src={u.avatar} alt={u.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      ) : (
+                                        u.nombre.substring(0, 2).toUpperCase()
+                                      )}
+                                    </div>
+                                    <span>{u.nombre}</span>
+                                  </div>
+                                </td>
                                 <td>{u.email}</td>
                                 <td><span className="admin-role-badge">{u.rol_nombre}</span></td>
                                 <td>{u.ciudad_nombre || 'Nivel Nacional'}</td>
@@ -912,7 +929,7 @@ function AdminContent() {
                             ))
                           ) : (
                             <tr>
-                              <td colSpan="6" style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-muted)' }}>
+                              <td colSpan="6" className="text-center text-muted" style={{ padding: 'var(--spacing-xl)' }}>
                                 No se encontraron usuarios que coincidan con la búsqueda.
                               </td>
                             </tr>
@@ -927,13 +944,28 @@ function AdminContent() {
                         filteredUsers.map((u) => (
                           <div key={u.id} className={`user-mobile-card ${!u.activo ? 'row-inactive' : ''}`}>
                             <div className="user-mobile-card-header">
-                              <div>
-                                <div className="user-mobile-card-title">{u.nombre}</div>
-                                <div className="user-mobile-card-badges">
-                                  <span className="admin-role-badge">{u.rol_nombre}</span>
-                                  <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                                    {u.ciudad_nombre || 'Nivel Nacional'}
-                                  </span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{
+                                  width: '36px', height: '36px', borderRadius: '50%',
+                                  background: '#F5ECE5', color: '#6B3A2A', display: 'flex',
+                                  alignItems: 'center', justifyContent: 'center', fontWeight: 700,
+                                  fontSize: '0.8rem', overflow: 'hidden', flexShrink: 0,
+                                  border: '1px solid #E8DDD4'
+                                }}>
+                                  {u.avatar ? (
+                                    <img src={u.avatar} alt={u.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  ) : (
+                                    u.nombre.substring(0, 2).toUpperCase()
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="user-mobile-card-title">{u.nombre}</div>
+                                  <div className="user-mobile-card-badges">
+                                    <span className="admin-role-badge">{u.rol_nombre}</span>
+                                    <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                                      {u.ciudad_nombre || 'Nivel Nacional'}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                               

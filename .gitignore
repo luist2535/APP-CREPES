@@ -53,3 +53,21 @@ next-env.d.ts
 # executables
 cloudflared.exe
 startup_log.txt
+
+# Base de datos local y temporales
+*.sqlite
+*.sqlite3
+database.sqlite
+database.sqlite-shm
+database.sqlite-wal
+
+# Scripts de prueba y utilidades locales
+fix_*.js
+query_db.js
+read_excel*.js
+repair.js
+
+# Carpetas y archivos de uso estrictamente local (no subir a GitHub)
+/public/archivos/excel/
+/public/archivos/documentos/
+/FORMATO DE ENTREGA DE EQUIPO/

@@ -13,24 +13,22 @@ export async function POST(request) {
     const body = await request.json();
     const { avatar_url } = body;
 
-    if (!avatar_url) {
-      return NextResponse.json({ error: 'Se requiere la URL de la imagen' }, { status: 400 });
-    }
-
     const db = getDb();
+    const cleanAvatarUrl = (avatar_url && typeof avatar_url === 'string' && avatar_url.trim().length > 0) ? avatar_url.trim() : null;
+
     db.prepare(`
       UPDATE users 
       SET avatar = ? 
       WHERE id = ?
-    `).run(avatar_url, user.id);
+    `).run(cleanAvatarUrl, user.id);
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Foto de perfil actualizada correctamente',
-      avatar: avatar_url 
+      message: cleanAvatarUrl ? 'Foto de perfil actualizada correctamente' : 'Foto de perfil eliminada correctamente',
+      avatar: cleanAvatarUrl 
     });
   } catch (error) {
     console.error('Error updating user avatar:', error);
-    return NextResponse.json({ error: 'Error al actualizar foto de perfil' }, { status: 500 });
+    return NextResponse.json({ error: 'Error al actualizar foto de perfil: ' + (error.message || '') }, { status: 500 });
   }
 }

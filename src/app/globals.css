@@ -354,20 +354,52 @@ h4 { font-size: 1rem; font-weight: 600; line-height: 1.4; }
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+}
+
+.sidebar-user:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .sidebar-user-avatar {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: var(--radius-full);
   background: var(--color-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: var(--color-primary-dark);
   flex-shrink: 0;
+  position: relative;
+  border: 2px solid rgba(255,255,255,0.25);
+  transition: transform 0.15s ease;
+}
+
+.sidebar-user:hover .sidebar-user-avatar {
+  transform: scale(1.05);
+}
+
+.avatar-edit-badge {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+  border-radius: 50%;
+}
+
+.sidebar-user:hover .avatar-edit-badge {
+  opacity: 1;
 }
 
 .sidebar-user-info {
