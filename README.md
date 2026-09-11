@@ -104,12 +104,19 @@ El sistema cuenta con una matriz de permisos modular por cargo (configurable des
 - **Enlace Inter-módulos**: Botón **"🔗 Ir a Gestión en Módulo Operativo"** que redirige instantáneamente a la auditoría seleccionada dentro del módulo de Visitas para su edición o seguimiento.
 - **Experiencia de Usuario PWA / Mobile-First**: En pantallas móviles de campo (< 768px), las tablas de datos se convierten en **Tarjetas Operativas (*Mobile Cards*)** con carruseles de indicadores táctiles (`scroll-snap`), garantizando agilidad para el personal técnico sin necesidad de hacer zoom ni scroll horizontal en sus celulares.
 
-### 12. ⚙️ Panel de Control del Administrador (Variables Maestras)
+### 12. 📝 Actas de Entrega de Equipos (Firmas Digitales y Generación Automática)
+- Herramienta integral para la creación, registro y gestión legal de actas de entrega de herramientas y equipos tecnológicos a colaboradores.
+- Interfaz *Mobile-First* basada en "Tarjetas Operativas" (Cards) con botones de acción rápida y Floating Action Button (FAB), adaptada a la estética corporativa para facilidad de uso en campo.
+- Flujo interactivo (Wizard) paso a paso para la recolección de datos del receptor, y vinculación de múltiples equipos buscados en tiempo real desde el maestro de inventario.
+- Panel de firma digital nativo en pantalla para capturar rúbricas táctiles o por mouse de ambas partes involucradas (Quien Entrega y Quien Recibe).
+- Generación y descarga automatizada del acta en formato Excel con las firmas gráficas estampadas y listas para su archivo o impresión.
+
+### 13. ⚙️ Panel de Control del Administrador (Variables Maestras)
 - Gestión completa de usuarios (asignación de roles de 1 a 17, vinculación de ciudades y asociación de Puntos de Venta PDV).
 - Catálogo y administración de Puntos de Venta (PDV), sus direcciones, ubicaciones y semáforos iniciales.
 - Mantenimiento del maestro de Ciudades y configuración de Áreas Operativas con personalización de paletas de color en formato hexadecimal y tipología de flujo.
 
-### 13. 🛡️ Seguridad y Protección de Datos
+### 14. 🛡️ Seguridad y Protección de Datos
 - **Seguridad de Base de Datos (SQLite):**
   - **Inmunidad contra Inyección SQL:** Todas las consultas al motor de base de datos se ejecutan estrictamente utilizando sentencias preparadas (Prepared Statements) a través de `better-sqlite3`, neutralizando cualquier intento de inyección de código malicioso.
   - **Aislamiento de Datos:** El archivo físico de la base de datos (`crepes.db`) reside protegido en el servidor de backend y nunca está expuesto al directorio público o accesible vía web directamente.
@@ -120,6 +127,7 @@ El sistema cuenta con una matriz de permisos modular por cargo (configurable des
 - **Control de Acceso End-to-End (RBAC):** No solo la interfaz gráfica se adapta al rol del usuario, sino que absolutamente todos los *endpoints* (API backend) verifican la validez del token y el rol jerárquico antes de ejecutar operaciones de lectura, escritura o eliminación (Arquitectura Zero Trust interna).
 - **Protección Perimetral Avanzada (Túneles Red):** El despliegue de acceso externo se orquesta mediante **Cloudflare Tunnels** (`cloudflared`). Esto permite conectar el servidor a internet de manera inversa y cifrada sin necesidad de abrir puertos públicos (Port Forwarding) en el firewall del restaurante o data center corporativo, mitigando totalmente el riesgo de ataques DDoS directos y escaneos de puertos por bots maliciosos.
 - **Bitácora de Auditoría Inmutable:** Cada modificación de datos, eliminación de un registro operativo o cambio de estado de un Punto de Venta es sellada automáticamente con un registro de auditoría (timestamp exacto y usuario responsable), garantizando la transparencia administrativa ("Accountability").
+
 
 ---
 

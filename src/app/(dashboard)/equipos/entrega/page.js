@@ -414,19 +414,13 @@ export default function EntregaEquipoPage() {
         {view === 'list' && (
           <div className="ent-animate">
             <div className="ent-list-header">
-              <div>
-                <h2 className="ent-title">📋 Actas de Entrega de Equipos</h2>
-                <p className="ent-subtitle">Cree actas, gestione firmas y descargue documentos</p>
-              </div>
-              <button className="ent-btn-primary" onClick={() => { resetCreateForm(); setView('create'); }}>
-                ➕ Nueva Acta
-              </button>
+              <h2 className="ent-title">📋 Actas de Entrega de Equipos</h2>
             </div>
 
             {/* Filters */}
             <div className="ent-filters">
               <button className={`ent-filter-btn ${filterEstado === '' ? 'active' : ''}`} onClick={() => setFilterEstado('')}>Todas</button>
-              <button className={`ent-filter-btn ${filterEstado === 'pendiente' ? 'active' : ''}`} onClick={() => setFilterEstado('pendiente')}>⏳ Pendientes</button>
+              <button className={`ent-filter-btn ${filterEstado === 'pendiente' ? 'active' : ''}`} onClick={() => setFilterEstado('pendiente')}>🏆 Pendientes</button>
               <button className={`ent-filter-btn ${filterEstado === 'firmada' ? 'active' : ''}`} onClick={() => setFilterEstado('firmada')}>✅ Firmadas</button>
             </div>
 
@@ -439,63 +433,67 @@ export default function EntregaEquipoPage() {
               <div className="ent-empty">
                 <div className="ent-empty-icon">📄</div>
                 <h3>No hay actas creadas</h3>
-                <p>Haga clic en &quot;Nueva Acta&quot; para crear la primera</p>
+                <p>Haga clic en el botón de "Nueva Acta" para crear la primera</p>
               </div>
             ) : (
-              <div className="ent-table-wrapper">
-                <table className="ent-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Fecha</th>
-                      <th>Receptor</th>
-                      <th>Cédula</th>
-                      <th>Ciudad</th>
-                      <th>Creado por</th>
-                      <th>Estado</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {actas.map((acta) => {
-                      const est = ESTADO_LABELS[acta.estado] || ESTADO_LABELS.pendiente;
-                      return (
-                        <tr key={acta.id}>
-                          <td className="ent-td-id">{acta.id}</td>
-                          <td>{acta.fecha}</td>
-                          <td className="ent-td-name">{acta.quien_recibe}</td>
-                          <td>{acta.cedula_recibe}</td>
-                          <td>{acta.ciudad}</td>
-                          <td>{acta.creador_nombre || '—'}</td>
-                          <td>
-                            <span className="ent-badge" style={{ color: est.color, background: est.bg }}>
-                              {est.icon} {est.text}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="ent-actions">
-                              {acta.estado === 'pendiente' && (
-                                <button className="ent-btn-action sign" onClick={() => openSignView(acta.id)} title="Firmar">
-                                  ✍️ Firmar
-                                </button>
-                              )}
-                              {acta.estado === 'firmada' && (
-                                <button className="ent-btn-action download" onClick={() => handleRedownload(acta.id, acta.quien_recibe, acta.fecha)} title="Descargar">
-                                  📥 Descargar
-                                </button>
-                              )}
-                              <button className="ent-btn-action delete" onClick={() => handleDelete(acta.id)} title="Eliminar">
-                                🗑️
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="ent-cards-list">
+                {actas.map((acta) => {
+                  const est = ESTADO_LABELS[acta.estado] || ESTADO_LABELS.pendiente;
+                  return (
+                    <div key={acta.id} className="ent-acta-card">
+                      <div className="ent-acta-card-header">
+                        <span className="ent-acta-id">#</span>
+                        <span className="ent-acta-date">{acta.fecha}</span>
+                      </div>
+                      <div className="ent-acta-card-body">
+                        <div className="ent-acta-field">
+                          <label>RECEPTOR:</label>
+                          <div className="ent-acta-value">{acta.quien_recibe}</div>
+                        </div>
+                        <div className="ent-acta-field">
+                          <label>CÉDULA:</label>
+                          <div className="ent-acta-value">{acta.cedula_recibe}</div>
+                        </div>
+                        <div className="ent-acta-field">
+                          <label>CIUDAD:</label>
+                          <div className="ent-acta-value">{acta.ciudad}</div>
+                        </div>
+                        <div className="ent-acta-field">
+                          <label>CREADO POR:</label>
+                          <div className="ent-acta-value">{acta.creador_nombre || '—'}</div>
+                        </div>
+                      </div>
+                      <div className="ent-acta-card-footer">
+                        <div className="ent-acta-estado">
+                          <span className="ent-badge-estado" style={{ color: est.color, borderColor: est.color, background: est.bg }}>
+                            {est.icon} {est.text}
+                          </span>
+                        </div>
+                        <div className="ent-acta-actions">
+                          {acta.estado === 'pendiente' && (
+                            <button className="ent-btn-action sign-card" onClick={() => openSignView(acta.id)} title="Firmar">
+                              ✍️ Firmar
+                            </button>
+                          )}
+                          {acta.estado === 'firmada' && (
+                            <button className="ent-btn-action download-card" onClick={() => handleRedownload(acta.id, acta.quien_recibe, acta.fecha)} title="Descargar">
+                              📥 Descargar
+                            </button>
+                          )}
+                          <button className="ent-btn-action delete-card" onClick={() => handleDelete(acta.id)} title="Eliminar">
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
+
+            <button className="ent-fab" onClick={() => { resetCreateForm(); setView('create'); }}>
+              ➕ Nueva Acta
+            </button>
           </div>
         )}
 
@@ -773,7 +771,7 @@ export default function EntregaEquipoPage() {
       </div>
 
       <style jsx>{`
-        .ent-page { max-width: 1200px; margin: 0 auto; padding: var(--spacing-lg); }
+        .ent-page { max-width: 1200px; margin: 0 auto; padding: var(--spacing-lg); min-height: 100vh; background-color: #F9F1E7; }
 
         /* Alerts */
         .ent-alert { padding: 14px 18px; border-radius: var(--radius-lg); margin-bottom: var(--spacing-md); font-size: 0.88rem; font-weight: 500; animation: entSlide 0.3s ease; cursor: pointer; }
@@ -980,7 +978,49 @@ export default function EntregaEquipoPage() {
           .ent-radio-row { flex-direction: column; }
           .ent-equipo-top { flex-direction: column; align-items: flex-start; gap: 8px; }
           .ent-list-header { flex-direction: column; align-items: flex-start; }
+          .ent-acta-card-body { grid-template-columns: 1fr; gap: 12px; }
         }
+        @media (max-width: 480px) {
+          .ent-grid-3, .ent-grid-4 { grid-template-columns: 1fr; }
+          .ent-acta-card-footer { flex-direction: column; align-items: flex-start; gap: 12px; }
+          .ent-acta-actions { width: 100%; justify-content: space-between; }
+        }
+
+        /* UI Mockup Card Styles */
+        .ent-cards-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 80px; }
+        .ent-acta-card { background: #FFFFFF; border-radius: 12px; border: 1px solid #E5E0D8; box-shadow: 0 4px 6px rgba(0,0,0,0.03); overflow: hidden; }
+        .ent-acta-card-header { display: flex; align-items: center; gap: 16px; padding: 16px; border-bottom: 1px solid #F0ECE4; }
+        .ent-acta-id { font-weight: 800; font-size: 1.2rem; color: #4A2C21; }
+        .ent-acta-date { font-weight: 700; font-size: 1.15rem; color: #4A2C21; }
+        
+        .ent-acta-card-body { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 20px; border-bottom: 1px solid #F0ECE4; }
+        .ent-acta-field { display: flex; flex-direction: column; gap: 4px; }
+        .ent-acta-field label { font-size: 0.75rem; text-transform: uppercase; color: #333; font-weight: 600; letter-spacing: 0.5px; }
+        .ent-acta-value { font-size: 1.05rem; color: #111; font-weight: 500; }
+        
+        .ent-acta-card-footer { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #FFFFFF; }
+        .ent-badge-estado { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; border: 1px solid; }
+        .ent-acta-actions { display: flex; gap: 8px; }
+        
+        .ent-btn-action.sign-card, .ent-btn-action.download-card { padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; border: 1px solid; background-color: transparent; }
+        .ent-btn-action.sign-card { color: #B45309; border-color: #B45309; background: #FEF3C7; }
+        .ent-btn-action.sign-card:hover { background: #FDE68A; }
+        .ent-btn-action.download-card { color: #16A34A; border-color: #16A34A; background: #DCFCE7; }
+        .ent-btn-action.download-card:hover { background: #BBF7D0; }
+        
+        .ent-btn-action.delete-card { width: 38px; height: 38px; border-radius: 8px; background: #FAF5F0; border: 1px solid #E5E0D8; color: #999; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 1.1rem; }
+        .ent-btn-action.delete-card:hover { background: #FEE2E2; border-color: #EF4444; color: #EF4444; }
+        
+        /* Floating Action Button */
+        .ent-fab { position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #5E3B2E, #4A2C21); color: #FFF; border: none; border-radius: 12px; padding: 16px 24px; font-size: 1.05rem; font-weight: 600; cursor: pointer; box-shadow: 0 8px 20px rgba(94, 59, 46, 0.4); display: flex; align-items: center; gap: 8px; z-index: 100; transition: transform 0.2s; }
+        .ent-fab:hover { transform: scale(1.05); }
+        
+        /* Updated Filters for Mockup */
+        .ent-filters { gap: 12px; margin-bottom: 24px; }
+        .ent-filter-btn { padding: 10px 20px; font-size: 0.95rem; color: #666; border-color: #D6D0C4; border-radius: 20px; background: #FFF; }
+        .ent-filter-btn.active { background: #5E3B2E; color: #FFF; border-color: #5E3B2E; }
+        
+        .ent-title { font-size: 1.6rem; color: #4A2C21; font-weight: 800; margin-bottom: 20px; }
         @media (max-width: 480px) {
           .ent-grid-3, .ent-grid-4 { grid-template-columns: 1fr; }
         }
