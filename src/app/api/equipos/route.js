@@ -156,9 +156,7 @@ export async function GET(request) {
       }
     }
 
-    try {
-      db.prepare('ALTER TABLE archivos_repositorio ADD COLUMN tipo_documento TEXT').run();
-    } catch (e) { }
+
 
     const archivos = db.prepare(`
       SELECT a.*, u.nombre as usuario_nombre
@@ -179,7 +177,7 @@ export async function GET(request) {
     return NextResponse.json({ equipo, mantenimientos, archivos });
   } catch (error) {
     console.error('Equipos GET error:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
 
@@ -295,7 +293,7 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('Equipos POST error:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
 
@@ -343,6 +341,6 @@ export async function PUT(request) {
     return NextResponse.json({ message: 'Equipo actualizado exitosamente' });
   } catch (error) {
     console.error('Equipos PUT error:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }

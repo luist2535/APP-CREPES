@@ -2,6 +2,31 @@ import { NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs/promises';
 
+// Tamaño máximo de archivo: 15 MB
+const MAX_FILE_SIZE = 15 * 1024 * 1024;
+
+// Extensiones permitidas
+const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'xls', 'xlsx', 'csv', 'pdf', 'doc', 'docx', 'txt', 'ppt', 'pptx'];
+
+// Magic bytes para validar tipo real del archivo
+const MAGIC_BYTES = {
+  'ffd8ff': 'jpg',     // JPEG
+  '89504e47': 'png',   // PNG
+  '47494638': 'gif',   // GIF
+  '25504446': 'pdf',   // PDF
+  '504b0304': 'zip',   // ZIP/XLSX/DOCX/PPTX (Office Open XML)
+  'd0cf11e0': 'ole',   // OLE (XLS/DOC/PPT legacy)
+  '52494646': 'webp',  // RIFF (WebP)
+};
+
+function detectFileType(buffer) {
+  const hex = buffer.slice(0, 4).toString('hex').toLowerCase();
+  for (const [magic, type] of Object.entries(MAGIC_BYTES)) {
+    if (hex.startsWith(magic)) return type;
+  }
+  return null;
+}
+
 export async function POST(request) {
   try {
     const { getUserFromRequest } = require('@/lib/auth');
@@ -24,9 +49,52 @@ export async function POST(request) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    // ── Validación de tamaño ──
+    if (buffer.length > MAX_FILE_SIZE) {
+      return NextResponse.json({ 
+        error: `El archivo excede el tamaño máximo permitido de ${Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB` 
+      }, { status: 413 });
+    }
+
+    // ── Validación de extensión ──
+    const extension = path.extname(file.name).toLowerCase().replace('.', '');
+    if (!ALLOWED_EXTENSIONS.includes(extension)) {
+      return NextResponse.json({ 
+        error: `Tipo de archivo no permitido: .${extension}. Tipos aceptados: ${ALLOWED_EXTENSIONS.join(', ')}` 
+      }, { status: 400 });
+    }
+
+    // ── Validación de contenido real (magic bytes) ──
+    const detectedType = detectFileType(buffer);
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+    const officeExtensions = ['xlsx', 'xls', 'docx', 'doc', 'pptx', 'ppt'];
+    
+    // Verificar que el contenido coincida con la extensión declarada
+    if (imageExtensions.includes(extension)) {
+      if (detectedType && !['jpg', 'png', 'gif', 'webp'].includes(detectedType)) {
+        console.warn(`[SECURITY] Upload rejected: extension .${extension} but detected type: ${detectedType}. User: ${user.id} (${user.nombre})`);
+        return NextResponse.json({ 
+          error: 'El contenido del archivo no coincide con su extensión. El archivo podría estar dañado o no ser una imagen válida.' 
+        }, { status: 400 });
+      }
+    } else if (officeExtensions.includes(extension)) {
+      if (detectedType && !['zip', 'ole'].includes(detectedType)) {
+        console.warn(`[SECURITY] Upload rejected: extension .${extension} but detected type: ${detectedType}. User: ${user.id} (${user.nombre})`);
+        return NextResponse.json({ 
+          error: 'El contenido del archivo no coincide con su extensión. El archivo podría estar dañado.' 
+        }, { status: 400 });
+      }
+    } else if (extension === 'pdf') {
+      if (detectedType && detectedType !== 'pdf') {
+        console.warn(`[SECURITY] Upload rejected: extension .pdf but detected type: ${detectedType}. User: ${user.id} (${user.nombre})`);
+        return NextResponse.json({ 
+          error: 'El archivo no parece ser un PDF válido.' 
+        }, { status: 400 });
+      }
+    }
     
     // Determinar tipo y extensión
-    const extension = path.extname(file.name).toLowerCase().replace('.', '');
     let tipoArchivo = 'otro';
     let subcarpeta = 'general';
 
@@ -106,6 +174,7 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('Upload API error:', error);
-    return NextResponse.json({ error: 'Error al subir archivo en el servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al subir el archivo. Intente de nuevo.' }, { status: 500 });
   }
 }
+

@@ -182,7 +182,7 @@ export async function POST(request) {
     return NextResponse.json({ id: visitId, message: 'Visita registrada correctamente y evento de calendario completado' });
   } catch (error) {
     console.error('Create visita error:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
 
@@ -410,7 +410,7 @@ export async function PUT(request) {
     return NextResponse.json({ error: 'Acción no soportada' }, { status: 400 });
   } catch (error) {
     console.error('Update visita error:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
 
@@ -452,6 +452,6 @@ export async function DELETE(request) {
     return NextResponse.json({ success: true, message: 'Visita eliminada exitosamente' });
   } catch (error) {
     console.error('Error al eliminar visita:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }

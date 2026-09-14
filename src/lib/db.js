@@ -70,6 +70,40 @@ function getDb() {
     try { db.exec('ALTER TABLE mantenimientos ADD COLUMN fecha_aprobacion DATETIME'); } catch (e) {}
     try { db.exec('ALTER TABLE mantenimientos ADD COLUMN pdv_id INTEGER'); } catch (e) {}
     try { db.exec('ALTER TABLE mantenimientos ADD COLUMN categoria_id INTEGER'); } catch (e) {}
+    try { db.exec('ALTER TABLE archivos_repositorio ADD COLUMN tipo_documento TEXT'); } catch (e) {}
+
+    // ── Tablas de seguridad ──
+
+    // Rate limiting persistente para login
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS login_attempts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          ip TEXT NOT NULL,
+          email TEXT,
+          success INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT (datetime('now', 'localtime'))
+        )
+      `);
+      // Índice para consultas rápidas por IP
+      db.exec('CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip, created_at)');
+    } catch (e) {}
+
+    // Tokens revocados (para invalidar sesiones en logout)
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS revoked_tokens (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          token_hash TEXT NOT NULL UNIQUE,
+          user_id INTEGER,
+          revoked_at DATETIME DEFAULT (datetime('now', 'localtime')),
+          expires_at DATETIME NOT NULL
+        )
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_revoked_tokens_hash ON revoked_tokens(token_hash)');
+      // Limpiar tokens expirados automáticamente (no tiene sentido guardarlos después de que expiran)
+      db.exec("DELETE FROM revoked_tokens WHERE expires_at < datetime('now', 'localtime')");
+    } catch (e) {}
 
     // Tabla de calificaciones BPM (Matriz de frecuencia de verificación)
     try {

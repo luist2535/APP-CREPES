@@ -43,6 +43,6 @@ export async function GET(request) {
 
   } catch (error) {
     console.error('GET /api/bpm-calidad/exportar error:', error);
-    return NextResponse.json({ error: 'Error al exportar: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al exportar' }, { status: 500 });
   }
 }

@@ -81,9 +81,10 @@ export async function POST(request) {
       message: 'Contraseña actualizada y sesión iniciada exitosamente'
     });
     
+    const isSecure = request.url.startsWith('https://') || request.headers.get('x-forwarded-proto') === 'https';
     response.cookies.set('auth-token', token, {
       httpOnly: true,
-      secure: false, 
+      secure: isSecure, 
       sameSite: 'lax',
       maxAge: 28800, // 8 hours 
       path: '/',

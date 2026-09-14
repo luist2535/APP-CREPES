@@ -71,3 +71,6 @@ repair.js
 /public/archivos/excel/
 /public/archivos/documentos/
 /FORMATO DE ENTREGA DE EQUIPO/
+
+# Scripts peligrosos de desarrollo (no subir a producción)
+/scripts/dev-only/

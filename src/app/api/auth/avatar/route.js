@@ -29,6 +29,6 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('Error updating user avatar:', error);
-    return NextResponse.json({ error: 'Error al actualizar foto de perfil: ' + (error.message || '') }, { status: 500 });
+    return NextResponse.json({ error: 'Error al actualizar foto de perfil' }, { status: 500 });
   }
 }

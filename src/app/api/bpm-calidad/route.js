@@ -47,7 +47,7 @@ export async function GET(request) {
 
   } catch (error) {
     console.error('GET /api/bpm-calidad error:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
 
@@ -129,6 +129,6 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('POST /api/bpm-calidad error:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }

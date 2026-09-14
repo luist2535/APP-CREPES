@@ -1,28 +1,19 @@
 import { NextResponse } from 'next/server';
 const { getDb } = require('@/lib/db');
-const { generateToken, comparePassword, getUserCustomPermissions } = require('@/lib/auth');
+const { generateToken, comparePassword, getUserCustomPermissions, checkRateLimit, recordLoginAttempt } = require('@/lib/auth');
 const { logAudit } = require('@/lib/audit');
 
 export async function POST(request) {
   try {
-    // --- Rate Limiting Básico en Memoria ---
-    const ip = request.headers.get('x-forwarded-for') || 'unknown';
-    const now = Date.now();
-    const rateLimitMap = global.rateLimitMap || new Map();
-    if (!global.rateLimitMap) global.rateLimitMap = rateLimitMap;
+    // --- Rate Limiting Persistente (SQLite) ---
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() 
+      || request.headers.get('x-real-ip') 
+      || 'unknown';
     
-    // Limpiar entradas antiguas (más de 15 minutos)
-    for (const [key, timestamp] of rateLimitMap.entries()) {
-      if (now - timestamp > 15 * 60 * 1000) {
-        rateLimitMap.delete(key);
-      }
-    }
-    
-    const attempts = rateLimitMap.get(ip) || { count: 0, firstAttempt: now };
-    
-    if (attempts.count >= 5) {
+    const rateCheck = checkRateLimit(ip);
+    if (!rateCheck.allowed) {
       return NextResponse.json(
-        { error: 'Demasiados intentos fallidos. Intente de nuevo en 15 minutos.' },
+        { error: `Demasiados intentos fallidos. Intente de nuevo en ${rateCheck.retryAfter} minutos.` },
         { status: 429 }
       );
     }
@@ -56,9 +47,8 @@ export async function POST(request) {
         registro_afectado: null,
         request
       });
-      // Incrementar rate limit counter
-      attempts.count += 1;
-      rateLimitMap.set(ip, attempts);
+      // Registrar intento fallido en rate limiter persistente
+      recordLoginAttempt(ip, email, false);
       
       return NextResponse.json(
         { error: 'Credenciales incorrectas' },
@@ -66,8 +56,8 @@ export async function POST(request) {
       );
     }
     
-    // Si el login es exitoso, limpiar el contador para esa IP
-    rateLimitMap.delete(ip);
+    // Login exitoso — registrar y limpiar rate limit
+    recordLoginAttempt(ip, email, true);
     
     if (user.debe_cambiar_password === 1) {
       return NextResponse.json({
@@ -106,9 +96,11 @@ export async function POST(request) {
       }
     });
     
+    // Cookie segura: secure=true cuando se sirve sobre HTTPS (Cloudflare tunnel)
+    const isSecure = request.url.startsWith('https://') || request.headers.get('x-forwarded-proto') === 'https';
     response.cookies.set('auth-token', token, {
       httpOnly: true,
-      secure: request.url.startsWith('https://') || request.headers.get('x-forwarded-proto') === 'https',
+      secure: isSecure,
       sameSite: 'lax',
       maxAge: 28800, // 8 hours
       path: '/',
@@ -123,3 +115,4 @@ export async function POST(request) {
     );
   }
 }
+

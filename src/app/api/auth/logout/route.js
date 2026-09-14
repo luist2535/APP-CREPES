@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 const { logAudit } = require('@/lib/audit');
-const { verifyToken } = require('@/lib/auth');
+const { verifyToken, revokeToken } = require('@/lib/auth');
 
 export async function POST(request) {
   try {
@@ -19,16 +19,20 @@ export async function POST(request) {
           request
         });
       }
+      // Revocar el token para que no pueda reutilizarse
+      revokeToken(token);
     }
   } catch (e) { /* Silent - no interrumpir el logout */ }
 
+  const isSecure = request.url.startsWith('https://') || request.headers.get('x-forwarded-proto') === 'https';
   const response = NextResponse.json({ message: 'Sesión cerrada' });
   response.cookies.set('auth-token', '', {
     httpOnly: true,
-    secure: false,
+    secure: isSecure,
     sameSite: 'lax',
     maxAge: 0,
     path: '/',
   });
   return response;
 }
+

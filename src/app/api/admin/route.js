@@ -26,8 +26,19 @@ export async function POST(request) {
       if (!nombre || !email || !rol_id) {
         return NextResponse.json({ error: 'Campos obligatorios faltantes para el usuario' }, { status: 400 });
       }
+      // Si el admin proporciona una contraseña, validar su complejidad
+      if (password) {
+        const { validatePassword } = require('@/lib/security');
+        const pwValidation = validatePassword(password);
+        if (!pwValidation.valid) {
+          return NextResponse.json({ error: pwValidation.message }, { status: 400 });
+        }
+      }
       
-      const finalPassword = password || 'crepes.2026';
+      // Generar contraseña temporal segura si no se proporciona una
+      const crypto = require('crypto');
+      const tempPassword = crypto.randomBytes(4).toString('hex'); // 8 caracteres aleatorios
+      const finalPassword = password || ('Temp.' + tempPassword);
       const debeCambiar = password ? 0 : 1;
       
       // Check if email already exists
@@ -52,7 +63,11 @@ export async function POST(request) {
         registro_afectado: 'USR-' + result.lastInsertRowid,
         request: request
       });
-      return NextResponse.json({ id: result.lastInsertRowid, message: 'Usuario creado exitosamente' });
+      return NextResponse.json({ 
+        id: result.lastInsertRowid, 
+        message: 'Usuario creado exitosamente',
+        ...(debeCambiar ? { contraseña_temporal: finalPassword, nota: 'El usuario deberá cambiarla al iniciar sesión.' } : {})
+      });
     }
 
     if (entity === 'pdv') {
@@ -160,6 +175,11 @@ export async function PUT(request) {
         }
 
         if (password) {
+          const { validatePassword } = require('@/lib/security');
+          const pwValidation = validatePassword(password);
+          if (!pwValidation.valid) {
+            return NextResponse.json({ error: pwValidation.message }, { status: 400 });
+          }
           const bcrypt = require('bcryptjs');
           const passwordHash = bcrypt.hashSync(password, 10);
           db.prepare(`

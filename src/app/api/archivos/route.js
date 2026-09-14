@@ -80,7 +80,7 @@ export async function GET(request) {
     return NextResponse.json({ archivos, stats });
   } catch (error) {
     console.error('Error obteniendo archivos:', error);
-    return NextResponse.json({ error: 'Error al consultar archivos: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al consultar archivos' }, { status: 500 });
   }
 }
 
@@ -126,6 +126,6 @@ export async function DELETE(request) {
     return NextResponse.json({ success: true, message: 'Archivo eliminado correctamente' });
   } catch (error) {
     console.error('Error eliminando archivo:', error);
-    return NextResponse.json({ error: 'Error al eliminar archivo: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al eliminar archivo' }, { status: 500 });
   }
 }

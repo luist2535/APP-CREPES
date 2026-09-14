@@ -505,6 +505,6 @@ export async function GET(request) {
 
   } catch (error) {
     console.error('Error in GET /api/reportes/calidad-comportamiento:', error);
-    return NextResponse.json({ error: error.message || 'Error calculando analítica por sección de Calidad' }, { status: 500 });
+    return NextResponse.json({ error: 'Error al calcular analítica de calidad' }, { status: 500 });
   }
 }

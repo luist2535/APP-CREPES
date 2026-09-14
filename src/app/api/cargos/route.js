@@ -105,7 +105,7 @@ export async function POST(request) {
     }
   } catch (error) {
     console.error('Error in POST /api/cargos:', error);
-    return NextResponse.json({ error: error.message || 'Error al crear o duplicar el cargo' }, { status: 500 });
+    return NextResponse.json({ error: 'Error al procesar el cargo' }, { status: 500 });
   }
 }
 

@@ -7,7 +7,7 @@ if (!JWT_SECRET) {
   // Uncomment the following line in strict production:
   // throw new Error("JWT_SECRET environment variable is not set.");
 }
-const JWT_EXPIRES_IN = '24h';
+const JWT_EXPIRES_IN = '8h'; // Alineado con maxAge de la cookie (28800s = 8h)
 
 function generateToken(user) {
   return jwt.sign(
@@ -52,7 +52,110 @@ function getUserFromRequest(request) {
   const token = cookies['auth-token'];
   if (!token) return null;
   
-  return verifyToken(token);
+  const decoded = verifyToken(token);
+  if (!decoded) return null;
+
+  // Verificar si el token fue revocado (logout)
+  try {
+    const crypto = require('crypto');
+    const { getDb } = require('@/lib/db');
+    const db = getDb();
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const revoked = db.prepare('SELECT id FROM revoked_tokens WHERE token_hash = ?').get(tokenHash);
+    if (revoked) return null;
+  } catch (e) {
+    // Si falla la verificación de revocación, permitir (no bloquear por error de DB)
+  }
+
+  return decoded;
+}
+
+/**
+ * Revoca un token JWT (lo invalida antes de su expiración natural)
+ */
+function revokeToken(token) {
+  try {
+    const crypto = require('crypto');
+    const { getDb } = require('@/lib/db');
+    const db = getDb();
+    const decoded = jwt.decode(token);
+    if (!decoded) return;
+    
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(decoded.exp * 1000).toISOString();
+    
+    db.prepare(
+      'INSERT OR IGNORE INTO revoked_tokens (token_hash, user_id, expires_at) VALUES (?, ?, ?)'
+    ).run(tokenHash, decoded.id || null, expiresAt);
+
+    // Limpiar tokens expirados (mantenimiento)
+    db.prepare("DELETE FROM revoked_tokens WHERE expires_at < datetime('now', 'localtime')").run();
+  } catch (e) {
+    console.error('Error revocando token:', e);
+  }
+}
+
+/**
+ * Rate limiting persistente usando SQLite
+ * @returns {{ allowed: boolean, remaining: number, retryAfter: number }}
+ */
+function checkRateLimit(ip, email, maxAttempts = 5, windowMinutes = 15) {
+  try {
+    const { getDb } = require('@/lib/db');
+    const db = getDb();
+    
+    // Contar intentos fallidos en la ventana de tiempo
+    const count = db.prepare(`
+      SELECT COUNT(*) as c FROM login_attempts 
+      WHERE ip = ? AND success = 0 
+      AND created_at > datetime('now', 'localtime', ?)
+    `).get(ip, `-${windowMinutes} minutes`);
+    
+    const attempts = count?.c || 0;
+    
+    if (attempts >= maxAttempts) {
+      // Calcular cuándo se libera
+      const oldest = db.prepare(`
+        SELECT created_at FROM login_attempts 
+        WHERE ip = ? AND success = 0 
+        AND created_at > datetime('now', 'localtime', ?)
+        ORDER BY created_at ASC LIMIT 1
+      `).get(ip, `-${windowMinutes} minutes`);
+      
+      return { allowed: false, remaining: 0, retryAfter: windowMinutes };
+    }
+    
+    return { allowed: true, remaining: maxAttempts - attempts, retryAfter: 0 };
+  } catch (e) {
+    return { allowed: true, remaining: 5, retryAfter: 0 }; // Fail open
+  }
+}
+
+/**
+ * Registra un intento de login en la tabla persistente
+ */
+function recordLoginAttempt(ip, email, success) {
+  try {
+    const { getDb } = require('@/lib/db');
+    const db = getDb();
+    db.prepare(
+      'INSERT INTO login_attempts (ip, email, success) VALUES (?, ?, ?)'
+    ).run(ip, email || null, success ? 1 : 0);
+    
+    // Si fue exitoso, limpiar intentos fallidos previos de esa IP
+    if (success) {
+      db.prepare(
+        "DELETE FROM login_attempts WHERE ip = ? AND success = 0"
+      ).run(ip);
+    }
+    
+    // Limpiar registros antiguos (más de 1 hora)
+    db.prepare(
+      "DELETE FROM login_attempts WHERE created_at < datetime('now', 'localtime', '-1 hour')"
+    ).run();
+  } catch (e) {
+    console.error('Error registrando intento de login:', e);
+  }
 }
 
 function getUserAssignedCityId(user, db) {
@@ -267,5 +370,8 @@ module.exports = {
   GRANULAR_MODULE_ACTIONS,
   getUserCustomPermissions,
   hasPermission,
-  hasActionPermission
+  hasActionPermission,
+  revokeToken,
+  checkRateLimit,
+  recordLoginAttempt
 };

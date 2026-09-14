@@ -21,7 +21,7 @@ export async function GET(request) {
     return NextResponse.json({ plantillas });
   } catch (error) {
     console.error('Error fetching plantillas:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
 
@@ -141,6 +141,6 @@ export async function PUT(request) {
     return NextResponse.json({ message: `Checklist guardado exitosamente (Versión v${newVer})`, version: newVer });
   } catch (error) {
     console.error('Error updating template:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }

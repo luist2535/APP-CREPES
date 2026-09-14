@@ -157,6 +157,6 @@ export async function DELETE(request) {
     return NextResponse.json({ success: true, message: 'Solicitudes eliminadas correctamente.' });
   } catch (error) {
     console.error('Error en DELETE api/solicitudes:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }

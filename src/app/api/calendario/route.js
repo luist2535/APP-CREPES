@@ -253,7 +253,7 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('Calendar POST error:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
 
@@ -292,6 +292,6 @@ export async function DELETE(request) {
     return NextResponse.json({ success: true, message: 'Evento eliminado exitosamente' });
   } catch (error) {
     console.error('Error al eliminar evento de calendario:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }

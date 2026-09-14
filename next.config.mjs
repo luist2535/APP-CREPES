@@ -27,6 +27,14 @@ const nextConfig = {
           {
             key: 'Permissions-Policy',
             value: 'camera=self, microphone=(), geolocation=self', // camera and location might be needed for the app (qr scanner, territorial)
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
+          },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains',
           }
         ],
       },

@@ -78,7 +78,7 @@ export async function GET(request) {
     return NextResponse.json({ actas });
   } catch (error) {
     console.error('Acta Entrega GET error:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
 
@@ -137,7 +137,7 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('Acta Entrega POST error:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
 
@@ -185,7 +185,7 @@ export async function PUT(request) {
     return NextResponse.json({ message: 'Acta firmada exitosamente' });
   } catch (error) {
     console.error('Acta Entrega PUT error:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
 
@@ -209,7 +209,7 @@ export async function DELETE(request) {
     return NextResponse.json({ message: 'Acta eliminada' });
   } catch (error) {
     console.error('Acta Entrega DELETE error:', error);
-    return NextResponse.json({ error: 'Error del servidor: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
 
