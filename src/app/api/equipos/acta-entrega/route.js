@@ -300,8 +300,16 @@ async function generateExcel(acta) {
   if (acta.observaciones) {
     ws.getCell('B33').value = acta.observaciones;
   }
+  
+  // Combinar celdas de la B a la T para que el texto tenga todo el ancho de la hoja
+  try {
+    ws.mergeCells('B33:T33');
+  } catch (e) {
+    console.log("Celdas de observaciones ya estaban combinadas o hubo un error menor.");
+  }
+  
   // Agrandar la fila de observaciones y permitir wrap text por si escriben mucho
-  ws.getRow(33).height = 45;
+  ws.getRow(33).height = 50;
   ws.getCell('B33').alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
 
   // ---- SIGNATURES ----
@@ -341,9 +349,8 @@ async function generateExcel(acta) {
         extension: 'png',
       });
       ws.addImage(imageId, {
-        tl: { col: 3.0, row: 36.5 },
-        br: { col: 6.5, row: 40.0 },
-        editAs: 'oneCell',
+        tl: { col: 3.5, row: 36.5 },
+        ext: { width: 180, height: 90 }
       });
     } catch (e) {
       console.error('Error inserting entrega signature:', e);
@@ -361,9 +368,8 @@ async function generateExcel(acta) {
         extension: 'png',
       });
       ws.addImage(imageId, {
-        tl: { col: 9.0, row: 36.5 },
-        br: { col: 14.0, row: 40.0 },
-        editAs: 'oneCell',
+        tl: { col: 9.5, row: 36.5 },
+        ext: { width: 180, height: 90 }
       });
     } catch (e) {
       console.error('Error inserting recibe signature:', e);
