@@ -1341,8 +1341,6 @@ export default function DashboardLayout({ children }) {
           }
         }
 
-        }
-
         /* --- Estilos para el Modal de Inactividad --- */
         .inactivity-modal-overlay {
           position: fixed;
