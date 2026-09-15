@@ -90,7 +90,7 @@ export default function EquiposPage() {
     }
     
     const script = document.createElement('script');
-    script.src = 'https://unpkg.com/html5-qrcode';
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';
     script.async = true;
     script.onload = () => {
       setScannerLoaded(true);
