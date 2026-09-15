@@ -114,7 +114,8 @@ function SignaturePad({ label, onSignatureChange, signatureData }) {
         </div>
       ) : (
         <button type="button" className="ent-btn-open-sig" onClick={() => setIsOpen(true)}>
-          ✍️ Abrir panel de firma
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          Abrir Panel de Firma
         </button>
       )}
 
@@ -931,16 +932,17 @@ export default function EntregaEquipoPage() {
 
         /* Signature Pad Modal & Preview */
         .ent-sig-container { display: flex; flex-direction: column; gap: 8px; margin-top: var(--spacing-md); }
-        .ent-btn-open-sig { padding: 12px; background: #fff; border: 2px dashed var(--color-primary-light); border-radius: var(--radius-md); color: var(--color-primary); font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        .ent-btn-open-sig:hover { border-color: var(--color-primary); background: rgba(107,58,42,0.05); }
+        .ent-btn-open-sig { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 14px; background: #FFF4E5; border: 2px dashed #F5B041; border-radius: var(--radius-md); color: #B9770E; font-weight: 700; font-size: 1rem; cursor: pointer; transition: all 0.2s; }
+        .ent-btn-open-sig:hover { border-color: #D68910; background: #FDEBD0; color: #9C640C; transform: translateY(-1px); }
         .ent-sig-preview { display: flex; flex-direction: column; gap: 8px; align-items: center; background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--spacing-sm); }
         .ent-sig-img { max-height: 80px; object-fit: contain; }
         
-        .ent-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(2px); }
-        .ent-modal-content { background: var(--color-bg-primary); padding: var(--spacing-xl); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); width: 90%; max-width: 600px; }
-        .ent-modal-content h3 { font-size: 1.2rem; color: var(--color-primary); margin-bottom: 4px; }
-        .ent-modal-desc { font-size: 0.85rem; color: var(--color-text-secondary); margin-bottom: var(--spacing-lg); }
-        .ent-modal-canvas-wrap { width: 100%; height: 250px; background: #fff; border: 2px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; touch-action: none; margin-bottom: var(--spacing-lg); }
+        .ent-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; z-index: 10000; backdrop-filter: blur(3px); padding: 20px; }
+        .ent-modal-content { background: var(--color-bg-primary); padding: var(--spacing-xl); border-radius: var(--radius-xl); box-shadow: 0 10px 40px rgba(0,0,0,0.2); width: 100%; max-width: 800px; display: flex; flex-direction: column; }
+        .ent-modal-content h3 { font-size: 1.4rem; color: var(--color-primary); margin-bottom: 8px; text-align: center; font-weight: 800; }
+        .ent-modal-desc { font-size: 0.95rem; color: var(--color-text-secondary); margin-bottom: var(--spacing-lg); text-align: center; }
+        .ent-modal-canvas-wrap { width: 100%; height: 400px; background: #fff; border: 2px dashed #D6D0C4; border-radius: var(--radius-lg); overflow: hidden; touch-action: none; margin-bottom: var(--spacing-xl); transition: border-color 0.2s; }
+        .ent-modal-canvas-wrap:hover { border-color: var(--color-primary); }
         .ent-modal-canvas { width: 100%; height: 100%; cursor: crosshair; display: block; }
         .ent-modal-actions { display: flex; justify-content: space-between; gap: 12px; }
         .ent-btn-modal { padding: 12px 20px; border-radius: var(--radius-md); font-weight: 600; font-size: 0.9rem; cursor: pointer; flex: 1; border: none; }
