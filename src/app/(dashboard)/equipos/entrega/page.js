@@ -770,8 +770,7 @@ export default function EntregaEquipoPage() {
           </div>
         )}
       </div>
-
-      <style jsx>{`
+      <style jsx global>{`
         .ent-page { max-width: 1200px; margin: 0 auto; padding: var(--spacing-lg); min-height: 100vh; background-color: #F9F1E7; }
 
         /* Alerts */
