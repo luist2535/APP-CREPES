@@ -26,7 +26,7 @@ const PUBLIC_PAGE_ROUTES = [
   '/favicon.ico',
 ];
 
-export function middleware(request) {
+export function proxy(request) {
   const { pathname } = request.nextUrl;
 
   // No interceptar archivos estáticos de Next.js o recursos públicos
