@@ -1503,7 +1503,7 @@ export default function DashboardLayout({ children }) {
                 ref={fileInputRef}
                 onChange={handleAvatarFileChange}
                 accept="image/png, image/jpeg, image/jpg, image/webp"
-                style={{ position: 'absolute', opacity: 0, width: '0.1px', height: '0.1px', pointerEvents: 'none' }}
+                style={{ display: 'none' }}
               />
 
               <input 
@@ -1512,7 +1512,7 @@ export default function DashboardLayout({ children }) {
                 onChange={handleAvatarFileChange}
                 accept="image/*"
                 capture="user"
-                style={{ position: 'absolute', opacity: 0, width: '0.1px', height: '0.1px', pointerEvents: 'none' }}
+                style={{ display: 'none' }}
               />
 
               {/* Botones de acción para seleccionar archivo */}

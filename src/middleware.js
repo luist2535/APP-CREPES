@@ -20,6 +20,7 @@ const PUBLIC_API_ROUTES = [
 
 // Rutas de página que NO requieren autenticación
 const PUBLIC_PAGE_ROUTES = [
+  '/',
   '/login',
   '/_next',
   '/favicon.ico',
@@ -33,12 +34,26 @@ export function middleware(request) {
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
     pathname.startsWith('/archivos/') || // archivos públicos existentes (compatibilidad)
+    pathname.startsWith('/images/') || // carpeta de imágenes públicas
+    pathname.startsWith('/templates/') || // plantillas estáticas Excel/PDF
+    pathname.startsWith('/uploads/') || // archivos subidos localmente
+    pathname.startsWith('/fonts/') ||
     pathname.endsWith('.ico') ||
     pathname.endsWith('.png') ||
     pathname.endsWith('.jpg') ||
+    pathname.endsWith('.jpeg') ||
+    pathname.endsWith('.webp') ||
     pathname.endsWith('.svg') ||
     pathname.endsWith('.css') ||
-    pathname.endsWith('.js')
+    pathname.endsWith('.js') ||
+    pathname.endsWith('.pdf') ||
+    pathname.endsWith('.xlsx') ||
+    pathname.endsWith('.csv') ||
+    pathname.endsWith('.doc') ||
+    pathname.endsWith('.docx') ||
+    pathname.endsWith('.mp4') ||
+    pathname.endsWith('.woff') ||
+    pathname.endsWith('.woff2')
   ) {
     return NextResponse.next();
   }
@@ -65,14 +80,21 @@ export function middleware(request) {
   }
 
   // Verificar rutas de páginas (redirigir a login si no autenticado)
-  if (PUBLIC_PAGE_ROUTES.some(route => pathname.startsWith(route))) {
+  // Redirigir explícitamente /login a / ya que la página de login está en la raíz
+  if (pathname === '/login') {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  // Nota: PUBLIC_PAGE_ROUTES.some() con '/' coincidiría con todo si no tenemos cuidado,
+  // por lo que mejor comprobamos si pathname es exactamente '/' o si empieza con el resto.
+  if (pathname === '/' || PUBLIC_PAGE_ROUTES.some(route => route !== '/' && route !== '/login' && pathname.startsWith(route))) {
     return NextResponse.next();
   }
 
   // Para páginas del dashboard, verificar que tenga cookie de sesión
   const token = request.cookies.get('auth-token')?.value;
-  if (!token && pathname !== '/login' && !pathname.startsWith('/_next')) {
-    const loginUrl = new URL('/login', request.url);
+  if (!token && pathname !== '/' && pathname !== '/login' && !pathname.startsWith('/_next')) {
+    const loginUrl = new URL('/', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
   }

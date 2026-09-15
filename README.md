@@ -247,3 +247,10 @@ npm run start
 > [!TIP]
 > **Acceso exterior y Servicio de Windows:** Consulta el documento interno `guia_despliegue_windows_service.md` para configurar la aplicación para que se inicie automáticamente como Servicio en segundo plano en Windows Server y para activar el túnel de internet seguro con **`compartir_en_internet.bat`** (vía Cloudflare Tunnel).
 
+---
+
+## Historial de Cambios (Changelog)
+
+### Mejoras Recientes
+- **Seguridad / Middleware:** Se actualizó el `middleware.js` para evitar el bucle de redirección (`/login` a `/`) e incluir de manera explícita recursos estáticos públicos críticos como plantillas descargables (`/templates/`), archivos subidos localmente (`/uploads/`), imágenes (`/images/`) y extensiones multimedia y de documentos (`.pdf`, `.xlsx`, `.jpeg`, `.webp`, `.docx`, etc.).
+- **Interfaz de Usuario / Perfil:** Se corrigió un error en el modal de cambio de foto de perfil en el dashboard que impedía abrir el explorador de archivos al presionar los botones "Seleccionar archivo" o "Tomar foto" mediante la modificación de las propiedades CSS.
