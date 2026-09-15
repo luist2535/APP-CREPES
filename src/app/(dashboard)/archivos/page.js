@@ -125,18 +125,86 @@ export default function RepositorioArchivosPage() {
     return `${(kb / 1024).toFixed(2)} MB`;
   };
 
+  // SVG icon components for each file type (matching mockup's visual style)
+  const FileIconExcel = () => (
+    <svg width="52" height="52" viewBox="0 0 64 64" fill="none">
+      <rect x="8" y="4" width="48" height="56" rx="4" fill="#fff" stroke="#C8E6C9" strokeWidth="2"/>
+      <rect x="14" y="14" width="36" height="6" rx="1" fill="#4CAF50"/>
+      <rect x="14" y="24" width="16" height="4" rx="1" fill="#81C784"/>
+      <rect x="34" y="24" width="16" height="4" rx="1" fill="#A5D6A7"/>
+      <rect x="14" y="31" width="16" height="4" rx="1" fill="#C8E6C9"/>
+      <rect x="34" y="31" width="16" height="4" rx="1" fill="#81C784"/>
+      <rect x="14" y="38" width="16" height="4" rx="1" fill="#81C784"/>
+      <rect x="34" y="38" width="16" height="4" rx="1" fill="#C8E6C9"/>
+      <rect x="14" y="45" width="16" height="4" rx="1" fill="#C8E6C9"/>
+      <rect x="34" y="45" width="16" height="4" rx="1" fill="#81C784"/>
+    </svg>
+  );
+
+  const FileIconPdf = () => (
+    <svg width="52" height="52" viewBox="0 0 64 64" fill="none">
+      <rect x="8" y="4" width="48" height="56" rx="4" fill="#fff" stroke="#FFCDD2" strokeWidth="2"/>
+      <rect x="14" y="12" width="36" height="8" rx="2" fill="#EF5350"/>
+      <text x="32" y="19" textAnchor="middle" fill="#fff" fontSize="7" fontWeight="bold" fontFamily="Arial">PDF</text>
+      <rect x="14" y="26" width="28" height="3" rx="1" fill="#FFCDD2"/>
+      <rect x="14" y="32" width="36" height="3" rx="1" fill="#FFCDD2"/>
+      <rect x="14" y="38" width="22" height="3" rx="1" fill="#FFCDD2"/>
+      <rect x="14" y="44" width="36" height="3" rx="1" fill="#FFCDD2"/>
+      <rect x="14" y="50" width="16" height="3" rx="1" fill="#FFCDD2"/>
+    </svg>
+  );
+
+  const FileIconDoc = () => (
+    <svg width="52" height="52" viewBox="0 0 64 64" fill="none">
+      <path d="M12 8C12 5.79 13.79 4 16 4H40L52 16V52C52 54.21 50.21 56 48 56H16C13.79 56 12 54.21 12 52V8Z" fill="#FFF8E1" stroke="#FFD54F" strokeWidth="2"/>
+      <path d="M40 4V12C40 14.21 41.79 16 44 16H52" fill="#FFE082" stroke="#FFD54F" strokeWidth="2" strokeLinejoin="round"/>
+      <rect x="20" y="24" width="24" height="3" rx="1" fill="#FFD54F"/>
+      <rect x="20" y="30" width="20" height="3" rx="1" fill="#FFE082"/>
+      <rect x="20" y="36" width="24" height="3" rx="1" fill="#FFD54F"/>
+      <rect x="20" y="42" width="16" height="3" rx="1" fill="#FFE082"/>
+    </svg>
+  );
+
+  const FileIconFolder = () => (
+    <svg width="52" height="52" viewBox="0 0 64 64" fill="none">
+      <path d="M6 16C6 13.79 7.79 12 10 12H24L30 18H54C56.21 18 58 19.79 58 22V48C58 50.21 56.21 52 54 52H10C7.79 52 6 50.21 6 48V16Z" fill="#FFD54F"/>
+      <path d="M6 22H58V48C58 50.21 56.21 52 54 52H10C7.79 52 6 50.21 6 48V22Z" fill="#FFCA28"/>
+      <path d="M10 26H54V46C54 47.1 53.1 48 52 48H12C10.9 48 10 47.1 10 46V26Z" fill="#FFF8E1" fillOpacity="0.5"/>
+    </svg>
+  );
+
+  const FileIconGeneric = () => (
+    <svg width="52" height="52" viewBox="0 0 64 64" fill="none">
+      <path d="M12 8C12 5.79 13.79 4 16 4H40L52 16V52C52 54.21 50.21 56 48 56H16C13.79 56 12 54.21 12 52V8Z" fill="#F5F5F5" stroke="#BDBDBD" strokeWidth="2"/>
+      <path d="M40 4V12C40 14.21 41.79 16 44 16H52" fill="#E0E0E0" stroke="#BDBDBD" strokeWidth="2" strokeLinejoin="round"/>
+      <rect x="20" y="24" width="24" height="3" rx="1" fill="#BDBDBD"/>
+      <rect x="20" y="30" width="20" height="3" rx="1" fill="#E0E0E0"/>
+      <rect x="20" y="36" width="24" height="3" rx="1" fill="#BDBDBD"/>
+    </svg>
+  );
+
+  const getFileIcon = (tipo) => {
+    switch (tipo) {
+      case 'excel': return <FileIconExcel />;
+      case 'pdf': return <FileIconPdf />;
+      case 'documento': return <FileIconDoc />;
+      case 'foto': return <FileIconFolder />;
+      default: return <FileIconGeneric />;
+    }
+  };
+
   const getTipoInfo = (tipo, extension) => {
     switch (tipo) {
       case 'excel':
-        return { icon: '📊', bg: '#E8F5E9', color: '#2E7D32', label: 'EXCEL', badgeBg: '#C8E6C9' };
+        return { bg: '#F1F8E9', color: '#2E7D32', label: 'EXCEL', badgeBg: '#C8E6C9' };
       case 'foto':
-        return { icon: '📷', bg: '#FFF3E0', color: '#E65100', label: 'FOTO', badgeBg: '#FFE0B2' };
+        return { bg: '#FFF8E1', color: '#E65100', label: 'FOTO', badgeBg: '#FFE0B2' };
       case 'pdf':
-        return { icon: '📄', bg: '#FFEBEE', color: '#C62828', label: 'PDF', badgeBg: '#FFCDD2' };
+        return { bg: '#FFF5F5', color: '#C62828', label: 'PDF', badgeBg: '#FFCDD2' };
       case 'documento':
-        return { icon: '📁', bg: '#E3F2FD', color: '#1565C0', label: 'DOC', badgeBg: '#BBDEFB' };
+        return { bg: '#FFFDE7', color: '#F57F17', label: 'DOC', badgeBg: '#FFF9C4' };
       default:
-        return { icon: '📎', bg: '#F5F5F5', color: '#616161', label: extension?.toUpperCase() || 'FILE', badgeBg: '#E0E0E0' };
+        return { bg: '#F5F5F5', color: '#616161', label: extension?.toUpperCase() || 'FILE', badgeBg: '#E0E0E0' };
     }
   };
 
@@ -211,11 +279,21 @@ export default function RepositorioArchivosPage() {
       {/* ═══════════════════ STATS CARDS ═══════════════════ */}
       <div className="repo-stats-row">
         {[
-          { key: 'todos', label: 'Total de Archivos', icon: '🗂️', iconBg: '#F5F0E8', iconColor: '#5D4037' },
-          { key: 'excel', label: 'Excel / Hojas', icon: '📊', iconBg: '#E8F5E9', iconColor: '#2E7D32' },
-          { key: 'foto', label: 'Fotos / Evidencias', icon: '📷', iconBg: '#FFF3E0', iconColor: '#E65100' },
-          { key: 'pdf', label: 'PDFs / Reportes', icon: '📄', iconBg: '#FFEBEE', iconColor: '#C62828' },
-          { key: 'documento', label: 'Documentos', icon: '📁', iconBg: '#E3F2FD', iconColor: '#1565C0' },
+          { key: 'todos', label: 'Total de Archivos', iconBg: '#F5F0E8',
+            iconSvg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M2 6C2 4.9 2.9 4 4 4H9L11 6H20C21.1 6 22 6.9 22 8V18C22 19.1 21.1 20 20 20H4C2.9 20 2 19.1 2 18V6Z" fill="#FFCA28"/><path d="M2 8H22V18C22 19.1 21.1 20 20 20H4C2.9 20 2 19.1 2 18V8Z" fill="#FFA000"/></svg>
+          },
+          { key: 'excel', label: 'Excel / Hojas', iconBg: '#E8F5E9',
+            iconSvg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="2" width="18" height="20" rx="2" fill="#fff" stroke="#4CAF50" strokeWidth="1.5"/><rect x="6" y="6" width="12" height="3" rx="1" fill="#4CAF50"/><rect x="6" y="11" width="5" height="2" rx="0.5" fill="#81C784"/><rect x="13" y="11" width="5" height="2" rx="0.5" fill="#C8E6C9"/><rect x="6" y="15" width="5" height="2" rx="0.5" fill="#C8E6C9"/><rect x="13" y="15" width="5" height="2" rx="0.5" fill="#81C784"/></svg>
+          },
+          { key: 'foto', label: 'Fotos / Evidencias', iconBg: '#FFF3E0',
+            iconSvg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="20" height="16" rx="2" fill="#FFE0B2" stroke="#F57C00" strokeWidth="1.5"/><circle cx="8" cy="10" r="2" fill="#F57C00"/><path d="M2 16L7 12L10 14L15 9L22 16V18C22 19.1 21.1 20 20 20H4C2.9 20 2 19.1 2 18V16Z" fill="#F57C00" opacity="0.6"/></svg>
+          },
+          { key: 'pdf', label: 'PDFs / Reportes', iconBg: '#FFEBEE',
+            iconSvg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="4" y="2" width="16" height="20" rx="2" fill="#fff" stroke="#EF5350" strokeWidth="1.5"/><rect x="7" y="5" width="10" height="3" rx="1" fill="#EF5350"/><rect x="7" y="10" width="8" height="1.5" rx="0.5" fill="#FFCDD2"/><rect x="7" y="13" width="10" height="1.5" rx="0.5" fill="#FFCDD2"/><rect x="7" y="16" width="6" height="1.5" rx="0.5" fill="#FFCDD2"/></svg>
+          },
+          { key: 'documento', label: 'Documentos', iconBg: '#E3F2FD',
+            iconSvg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 4C6 2.9 6.9 2 8 2H14L20 8V20C20 21.1 19.1 22 18 22H8C6.9 22 6 21.1 6 20V4Z" fill="#fff" stroke="#42A5F5" strokeWidth="1.5"/><path d="M14 2V6C14 7.1 14.9 8 16 8H20" fill="#BBDEFB" stroke="#42A5F5" strokeWidth="1.5"/><rect x="9" y="11" width="8" height="1.5" rx="0.5" fill="#90CAF9"/><rect x="9" y="14" width="6" height="1.5" rx="0.5" fill="#BBDEFB"/><rect x="9" y="17" width="8" height="1.5" rx="0.5" fill="#90CAF9"/></svg>
+          },
         ].map(s => {
           const pct = getPercentChange(s.key);
           const isActive = filtroTipo === s.key;
@@ -226,7 +304,7 @@ export default function RepositorioArchivosPage() {
               onClick={() => setFiltroTipo(s.key === 'todos' ? 'todos' : s.key)}
             >
               <div className="repo-stat-icon" style={{ backgroundColor: s.iconBg }}>
-                <span>{s.icon}</span>
+                {s.iconSvg}
               </div>
               <div className="repo-stat-body">
                 <span className="repo-stat-label">{s.label}</span>
@@ -319,8 +397,8 @@ export default function RepositorioArchivosPage() {
                           onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
                         />
                       ) : null}
-                      <div className="rfc-thumb-fallback" style={{ display: showRealImage ? 'none' : 'flex', color: tipoInfo.color }}>
-                        <span className="rfc-thumb-emoji">{tipoInfo.icon}</span>
+                      <div className="rfc-thumb-fallback" style={{ display: showRealImage ? 'none' : 'flex' }}>
+                        {getFileIcon(arch.tipo_archivo)}
                       </div>
                       <span className="rfc-type-badge" style={{ backgroundColor: tipoInfo.badgeBg, color: tipoInfo.color }}>
                         {tipoInfo.label}
@@ -385,8 +463,8 @@ export default function RepositorioArchivosPage() {
                       {showRealImage ? (
                         <img src={arch.ruta_archivo} alt="" className="rmi-thumb-img" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
                       ) : null}
-                      <div className="rmi-thumb-fallback" style={{ display: showRealImage ? 'none' : 'flex', color: tipoInfo.color }}>
-                        <span>{tipoInfo.icon}</span>
+                      <div className="rmi-thumb-fallback" style={{ display: showRealImage ? 'none' : 'flex' }}>
+                        {getFileIcon(arch.tipo_archivo)}
                       </div>
                     </div>
                     <div className="rmi-info">
@@ -993,8 +1071,8 @@ export default function RepositorioArchivosPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 1.5rem;
         }
+        .rmi-thumb-fallback svg { width: 36px; height: 36px; }
         .rmi-info { flex: 1; min-width: 0; }
         .rmi-name {
           font-size: 0.82rem;
