@@ -723,11 +723,10 @@ export default function RepositorioArchivosPage() {
           min-width: 0;
         }
         .repo-stat-label {
-          font-size: 0.78rem;
+          font-size: 0.82rem;
           color: #8D7B6E;
           font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.3px;
+          letter-spacing: 0.2px;
           margin-bottom: 2px;
         }
         .repo-stat-number {
