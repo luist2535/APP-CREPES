@@ -23,6 +23,9 @@ export default function RepositorioArchivosPage() {
   // Previsualizador modal
   const [previewFile, setPreviewFile] = useState(null);
 
+  // Mobile: show more filters
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
+
   const fetchArchivos = async () => {
     setLoading(true);
     try {
@@ -122,285 +125,325 @@ export default function RepositorioArchivosPage() {
     return `${(kb / 1024).toFixed(2)} MB`;
   };
 
-  const getTipoIcon = (tipo, extension) => {
+  const getTipoInfo = (tipo, extension) => {
     switch (tipo) {
       case 'excel':
-        return { icon: '📊', bg: '#e6f4ea', color: '#137333', label: 'Excel' };
+        return { icon: '📊', bg: '#E8F5E9', color: '#2E7D32', label: 'EXCEL', badgeBg: '#C8E6C9' };
       case 'foto':
-        return { icon: '🖼️', bg: '#fef7e0', color: '#b06000', label: 'Foto/Imagen' };
+        return { icon: '📷', bg: '#FFF3E0', color: '#E65100', label: 'FOTO', badgeBg: '#FFE0B2' };
       case 'pdf':
-        return { icon: '📄', bg: '#fce8e6', color: '#c5221f', label: 'PDF' };
+        return { icon: '📄', bg: '#FFEBEE', color: '#C62828', label: 'PDF', badgeBg: '#FFCDD2' };
       case 'documento':
-        return { icon: '📁', bg: '#e8f0fe', color: '#1a73e8', label: 'Documento' };
+        return { icon: '📁', bg: '#E3F2FD', color: '#1565C0', label: 'DOC', badgeBg: '#BBDEFB' };
       default:
-        return { icon: '📎', bg: '#f1f3f4', color: '#5f6368', label: extension?.toUpperCase() || 'Archivo' };
+        return { icon: '📎', bg: '#F5F5F5', color: '#616161', label: extension?.toUpperCase() || 'FILE', badgeBg: '#E0E0E0' };
     }
   };
 
   const getCategoriaLabel = (cat) => {
     const mapas = {
-      'evidencia_visita': '🔍 Evidencia Visita',
-      'reporte_excel': '📊 Reporte Excel',
-      'manual_equipo': '🛠️ Manual Equipo',
-      'documento_pdv': '📍 Documento PDV',
-      'general': '📂 General'
+      'evidencia_visita': 'evidencia_mantenimiento',
+      'reporte_excel': 'reporte_visitas',
+      'manual_equipo': 'manual_equipo',
+      'documento_pdv': 'documento_pdv',
+      'general': 'general',
+      'evidencia_mantenimiento': 'evidencia_mantenimiento',
+      'reporte_pdf': 'reporte_pdf'
     };
     return mapas[cat] || cat;
   };
 
+  const getCategoriaDisplayLabel = (cat) => {
+    const mapas = {
+      'evidencia_visita': '🔍 Evidencia Visita',
+      'reporte_excel': '📊 Reporte Excel',
+      'manual_equipo': '🛠️ Manual Equipo',
+      'documento_pdv': '📍 Documento PDV',
+      'general': '📂 General',
+      'evidencia_mantenimiento': '🔧 Evidencia Mantenimiento',
+      'reporte_pdf': '📄 Reporte PDF'
+    };
+    return mapas[cat] || cat;
+  };
+
+  const getUserInitials = (name) => {
+    if (!name) return 'S';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return parts[0][0]?.toUpperCase() || 'U';
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Simulated percentage changes (decoration) based on stats
+  const getPercentChange = (type) => {
+    const map = { todos: { val: 12, up: true }, excel: { val: 8, up: true }, foto: { val: 15, up: true }, pdf: { val: 0, up: null }, documento: { val: 33, up: true } };
+    return map[type] || { val: 0, up: null };
+  };
+
+  const isImageFile = (arch) => {
+    if (arch.tipo_archivo === 'foto') return true;
+    const ext = (arch.extension || '').toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'].includes(ext);
+  };
+
   return (
-    <div className="repositorio-container animate-fade-in">
-      {/* Banner Superior */}
-      <div className="repo-header">
-        <div className="repo-title-box">
-          <h2>📂 Repositorio Central de Archivos & Evidencias</h2>
-          <p>
-            Almacenamiento estructurado en carpetas del proyecto (<code>/public/archivos/</code>) con trazabilidad y registro en base de datos SQLite.
+    <div className="repo-page animate-fade-in">
+
+      {/* ═══════════════════ HEADER ═══════════════════ */}
+      <div className="repo-hero">
+        <div className="repo-hero-content">
+          <h1 className="repo-hero-title">Repositorio Central de Archivos & Evidencias</h1>
+          <p className="repo-hero-sub">
+            Almacenamiento estructurado en carpetas del proyecto / <code>/public/archivos/</code> con trazabilidad y registro en base de datos SQLite.
           </p>
         </div>
-        <button className="btn-upload-new" onClick={() => setShowModal(true)}>
-          <span>➕</span>
+        <button className="repo-btn-upload" onClick={() => setShowModal(true)}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <span>Subir Nuevo Archivo</span>
         </button>
       </div>
 
-      {/* Tarjetas de Estadísticas por Tipo de Archivo */}
-      <div className="stats-grid">
-        <div 
-          className={`stat-card ${filtroTipo === 'todos' ? 'active' : ''}`}
-          onClick={() => setFiltroTipo('todos')}
-        >
-          <div className="stat-icon" style={{ backgroundColor: '#f1f3f4', color: '#202124' }}>🗂️</div>
-          <div className="stat-info">
-            <span className="stat-label">Todos los Archivos</span>
-            <span className="stat-value">{stats.todos || 0}</span>
-          </div>
-        </div>
+      {/* ═══════════════════ STATS CARDS ═══════════════════ */}
+      <div className="repo-stats-row">
+        {[
+          { key: 'todos', label: 'Total de Archivos', icon: '🗂️', iconBg: '#F5F0E8', iconColor: '#5D4037' },
+          { key: 'excel', label: 'Excel / Hojas', icon: '📊', iconBg: '#E8F5E9', iconColor: '#2E7D32' },
+          { key: 'foto', label: 'Fotos / Evidencias', icon: '📷', iconBg: '#FFF3E0', iconColor: '#E65100' },
+          { key: 'pdf', label: 'PDFs / Reportes', icon: '📄', iconBg: '#FFEBEE', iconColor: '#C62828' },
+          { key: 'documento', label: 'Documentos', icon: '📁', iconBg: '#E3F2FD', iconColor: '#1565C0' },
+        ].map(s => {
+          const pct = getPercentChange(s.key);
+          const isActive = filtroTipo === s.key;
+          return (
+            <div
+              key={s.key}
+              className={`repo-stat-card ${isActive ? 'active' : ''}`}
+              onClick={() => setFiltroTipo(s.key === 'todos' ? 'todos' : s.key)}
+            >
+              <div className="repo-stat-icon" style={{ backgroundColor: s.iconBg }}>
+                <span>{s.icon}</span>
+              </div>
+              <div className="repo-stat-body">
+                <span className="repo-stat-label">{s.label}</span>
+                <span className="repo-stat-number">{stats[s.key] || 0}</span>
+                {pct.up !== null && (
+                  <span className={`repo-stat-pct ${pct.up ? 'up' : 'down'}`}>
+                    {pct.up ? '↑' : '↓'} {pct.val}%
+                  </span>
+                )}
+                {pct.up === null && (
+                  <span className="repo-stat-pct neutral">= {pct.val}%</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-        <div 
-          className={`stat-card ${filtroTipo === 'excel' ? 'active' : ''}`}
-          onClick={() => setFiltroTipo('excel')}
-        >
-          <div className="stat-icon" style={{ backgroundColor: '#e6f4ea', color: '#137333' }}>📊</div>
-          <div className="stat-info">
-            <span className="stat-label">Excel / Hojas</span>
-            <span className="stat-value">{stats.excel || 0}</span>
+      {/* ═══════════════════ FILTERS + SEARCH ═══════════════════ */}
+      <div className="repo-toolbar">
+        <div className="repo-filters-row">
+          <div className="repo-filter-pills">
+            {[
+              { key: 'todos', label: 'Todas las Categorías', icon: '📋' },
+              { key: 'evidencia_visita', label: 'Evidencias de Auditoría', icon: '🔍' },
+              { key: 'reporte_excel', label: 'Reportes Excel', icon: '📊' },
+              { key: 'manual_equipo', label: 'Manuales y Fichas', icon: '📘' },
+              { key: 'documento_pdv', label: 'Documentos PDF', icon: '📄' },
+            ].map(f => (
+              <button
+                key={f.key}
+                className={`repo-pill ${filtroCategoria === f.key ? 'active' : ''}`}
+                onClick={() => setFiltroCategoria(f.key)}
+              >
+                <span className="pill-icon">{f.icon}</span>
+                <span className="pill-label">{f.label}</span>
+              </button>
+            ))}
           </div>
-        </div>
 
-        <div 
-          className={`stat-card ${filtroTipo === 'foto' ? 'active' : ''}`}
-          onClick={() => setFiltroTipo('foto')}
-        >
-          <div className="stat-icon" style={{ backgroundColor: '#fef7e0', color: '#b06000' }}>🖼️</div>
-          <div className="stat-info">
-            <span className="stat-label">Fotos / Evidencias</span>
-            <span className="stat-value">{stats.foto || 0}</span>
-          </div>
-        </div>
-
-        <div 
-          className={`stat-card ${filtroTipo === 'pdf' ? 'active' : ''}`}
-          onClick={() => setFiltroTipo('pdf')}
-        >
-          <div className="stat-icon" style={{ backgroundColor: '#fce8e6', color: '#c5221f' }}>📄</div>
-          <div className="stat-info">
-            <span className="stat-label">PDFs / Reportes</span>
-            <span className="stat-value">{stats.pdf || 0}</span>
-          </div>
-        </div>
-
-        <div 
-          className={`stat-card ${filtroTipo === 'documento' ? 'active' : ''}`}
-          onClick={() => setFiltroTipo('documento')}
-        >
-          <div className="stat-icon" style={{ backgroundColor: '#e8f0fe', color: '#1a73e8' }}>📁</div>
-          <div className="stat-info">
-            <span className="stat-label">Documentos</span>
-            <span className="stat-value">{stats.documento || 0}</span>
-          </div>
+          <form onSubmit={handleSearchSubmit} className="repo-search-box">
+            <svg className="repo-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input
+              type="text"
+              placeholder="Buscar por nombre, usuario..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="repo-search-input"
+            />
+            {busqueda && (
+              <button type="button" className="repo-search-clear" onClick={() => { setBusqueda(''); fetchArchivos(); }}>✕</button>
+            )}
+            <button type="submit" className="repo-search-submit">Buscar</button>
+          </form>
         </div>
       </div>
 
-      {/* Barra de Filtros y Búsqueda */}
-      <div className="toolbar-section">
-        <div className="tabs-filter">
-          <button 
-            className={`tab-btn ${filtroCategoria === 'todos' ? 'active' : ''}`}
-            onClick={() => setFiltroCategoria('todos')}
-          >
-            Todas las Categorías
-          </button>
-          <button 
-            className={`tab-btn ${filtroCategoria === 'evidencia_visita' ? 'active' : ''}`}
-            onClick={() => setFiltroCategoria('evidencia_visita')}
-          >
-            🔍 Evidencias de Auditoría
-          </button>
-          <button 
-            className={`tab-btn ${filtroCategoria === 'reporte_excel' ? 'active' : ''}`}
-            onClick={() => setFiltroCategoria('reporte_excel')}
-          >
-            📊 Reportes Excel
-          </button>
-          <button 
-            className={`tab-btn ${filtroCategoria === 'manual_equipo' ? 'active' : ''}`}
-            onClick={() => setFiltroCategoria('manual_equipo')}
-          >
-            🛠️ Manuales y Fichas
-          </button>
-          <button 
-            className={`tab-btn ${filtroCategoria === 'documento_pdv' ? 'active' : ''}`}
-            onClick={() => setFiltroCategoria('documento_pdv')}
-          >
-            📍 Documentos PDV
-          </button>
-        </div>
-
-        <form onSubmit={handleSearchSubmit} className="search-form">
-          <input 
-            type="text" 
-            placeholder="Buscar por nombre, usuario u observación..." 
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            className="search-input"
-          />
-          <button type="submit" className="search-btn">🔍 Buscar</button>
-          {busqueda && (
-            <button type="button" className="clear-btn" onClick={() => { setBusqueda(''); fetchArchivos(); }}>✖</button>
-          )}
-        </form>
-      </div>
-
-      {/* Listado de Archivos en Grilla / Tabla Moderna */}
-      <div className="archivos-section">
+      {/* ═══════════════════ FILES GRID ═══════════════════ */}
+      <div className="repo-files-section">
         {loading ? (
-          <div className="loading-state">
+          <div className="repo-loading">
             <div className="spinner"></div>
             <p>Consultando base de datos y sistema de archivos...</p>
           </div>
         ) : archivos.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">📂</div>
+          <div className="repo-empty">
+            <div className="repo-empty-icon">📂</div>
             <h3>No se encontraron archivos</h3>
             <p>No hay documentos o evidencias que coincidan con los filtros aplicados en este momento.</p>
-            <button className="btn-upload-empty" onClick={() => setShowModal(true)}>
+            <button className="repo-btn-upload-empty" onClick={() => setShowModal(true)}>
               Subir el primer archivo
             </button>
           </div>
         ) : (
-          <div className="archivos-grid">
-            {archivos.map((arch) => {
-              const tipoInfo = getTipoIcon(arch.tipo_archivo, arch.extension);
-              return (
-                <div key={arch.id} className="archivo-card">
-                  <div className="card-header-icon" style={{ backgroundColor: tipoInfo.bg, color: tipoInfo.color }}>
-                    <span className="icon-emoji">{tipoInfo.icon}</span>
-                    <span className="tipo-badge" style={{ color: tipoInfo.color }}>{tipoInfo.label}</span>
-                  </div>
-
-                  <div className="card-body">
-                    <h4 className="archivo-nombre" title={arch.nombre_original}>
-                      {arch.nombre_original}
-                    </h4>
-                    
-                    <div className="archivo-meta">
-                      <span className="cat-badge">{getCategoriaLabel(arch.categoria)}</span>
-                      <span className="size-badge">{formatSize(arch.tamano_bytes)}</span>
+          <>
+            {/* Desktop grid */}
+            <div className="repo-grid-desktop">
+              {archivos.map((arch) => {
+                const tipoInfo = getTipoInfo(arch.tipo_archivo, arch.extension);
+                const showRealImage = isImageFile(arch);
+                return (
+                  <div key={arch.id} className="repo-file-card">
+                    {/* Thumbnail */}
+                    <div className="rfc-thumb" style={{ backgroundColor: tipoInfo.bg }}>
+                      {showRealImage ? (
+                        <img
+                          src={arch.ruta_archivo}
+                          alt={arch.nombre_original}
+                          className="rfc-thumb-img"
+                          onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                        />
+                      ) : null}
+                      <div className="rfc-thumb-fallback" style={{ display: showRealImage ? 'none' : 'flex', color: tipoInfo.color }}>
+                        <span className="rfc-thumb-emoji">{tipoInfo.icon}</span>
+                      </div>
+                      <span className="rfc-type-badge" style={{ backgroundColor: tipoInfo.badgeBg, color: tipoInfo.color }}>
+                        {tipoInfo.label}
+                      </span>
                     </div>
 
-                    {arch.referencia_id && (
-                      <div className="referencia-tag">
-                        📌 Ref: <strong>{arch.referencia_id}</strong>
+                    {/* Body */}
+                    <div className="rfc-body">
+                      <h4 className="rfc-name" title={arch.nombre_original}>{arch.nombre_original}</h4>
+                      <div className="rfc-meta-row">
+                        <span className="rfc-cat-tag">{getCategoriaLabel(arch.categoria)}</span>
+                        <span className="rfc-size">{formatSize(arch.tamano_bytes)}</span>
                       </div>
-                    )}
+                      {arch.observaciones && (
+                        <p className="rfc-desc">{arch.observaciones}</p>
+                      )}
+                    </div>
 
-                    {arch.observaciones && (
-                      <p className="archivo-obs">{arch.observaciones}</p>
-                    )}
-
-                    <div className="archivo-footer">
-                      <div className="user-info">
-                        <span className="user-icon">👤</span>
-                        <div>
-                          <div className="user-name">{arch.usuario_nombre || 'Sistema'}</div>
-                          <div className="date-str">
-                            {new Date(arch.created_at).toLocaleDateString('es-ES', { 
-                              day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' 
-                            })}
-                          </div>
+                    {/* Footer */}
+                    <div className="rfc-footer">
+                      <div className="rfc-user">
+                        <div className="rfc-avatar">{getUserInitials(arch.usuario_nombre)}</div>
+                        <div className="rfc-user-info">
+                          <span className="rfc-user-name">{arch.usuario_nombre || 'Sistema'}</span>
+                          <span className="rfc-user-date">{formatDate(arch.created_at)}</span>
                         </div>
                       </div>
-
-                      <div className="actions-group">
-                        {arch.tipo_archivo === 'foto' || arch.tipo_archivo === 'pdf' ? (
-                          <button 
-                            className="btn-action btn-preview" 
-                            onClick={() => setPreviewFile(arch)}
-                            title="Previsualizar"
-                          >
-                            👁️
-                          </button>
-                        ) : null}
-                        
-                        <a 
-                          href={`${arch.ruta_archivo}${arch.ruta_archivo?.includes('?') ? '&' : '?'}download=1`} 
+                      <div className="rfc-actions">
+                        <a
+                          href={`${arch.ruta_archivo}${arch.ruta_archivo?.includes('?') ? '&' : '?'}download=1`}
                           download={arch.nombre_original}
-                          target="_blank" 
+                          target="_blank"
                           rel="noopener noreferrer"
-                          className="btn-action btn-download"
-                          title="Descargar archivo"
+                          className="rfc-act-btn"
+                          title="Descargar"
                         >
-                          ⬇️
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         </a>
-
-                        <button 
-                          className="btn-action btn-delete" 
-                          onClick={() => handleDelete(arch.id, arch.nombre_original)}
-                          title="Eliminar archivo"
-                        >
-                          🗑️
+                        {(arch.tipo_archivo === 'foto' || arch.tipo_archivo === 'pdf') && (
+                          <button className="rfc-act-btn" onClick={() => setPreviewFile(arch)} title="Previsualizar">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                          </button>
+                        )}
+                        <button className="rfc-act-btn rfc-act-delete" onClick={() => handleDelete(arch.id, arch.nombre_original)} title="Eliminar">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         </button>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+
+            {/* Mobile list */}
+            <div className="repo-list-mobile">
+              {archivos.map((arch) => {
+                const tipoInfo = getTipoInfo(arch.tipo_archivo, arch.extension);
+                const showRealImage = isImageFile(arch);
+                return (
+                  <div key={arch.id} className="repo-mobile-item">
+                    <div className="rmi-thumb" style={{ backgroundColor: tipoInfo.bg }}>
+                      {showRealImage ? (
+                        <img src={arch.ruta_archivo} alt="" className="rmi-thumb-img" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                      ) : null}
+                      <div className="rmi-thumb-fallback" style={{ display: showRealImage ? 'none' : 'flex', color: tipoInfo.color }}>
+                        <span>{tipoInfo.icon}</span>
+                      </div>
+                    </div>
+                    <div className="rmi-info">
+                      <h4 className="rmi-name">{arch.nombre_original}</h4>
+                      <div className="rmi-meta">
+                        <span className="rmi-cat">{getCategoriaLabel(arch.categoria)}</span>
+                        <span className="rmi-size">{formatSize(arch.tamano_bytes)}</span>
+                      </div>
+                      <div className="rmi-user-row">
+                        <div className="rmi-avatar">{getUserInitials(arch.usuario_nombre)}</div>
+                        <span className="rmi-user-name">{arch.usuario_nombre || 'Sistema'}</span>
+                        <span className="rmi-date">{formatDate(arch.created_at)}</span>
+                      </div>
+                    </div>
+                    <span className="rmi-type-badge" style={{ backgroundColor: tipoInfo.badgeBg, color: tipoInfo.color }}>
+                      {tipoInfo.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
-      {/* Modal de Subida */}
+      {/* ═══════════════════ UPLOAD MODAL ═══════════════════ */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => !uploading && setShowModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
+        <div className="repo-modal-overlay" onClick={() => !uploading && setShowModal(false)}>
+          <div className="repo-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="repo-modal-header">
               <h3>➕ Subir Archivo al Repositorio</h3>
-              <button className="modal-close" onClick={() => !uploading && setShowModal(false)}>✖</button>
+              <button className="repo-modal-close" onClick={() => !uploading && setShowModal(false)}>✕</button>
             </div>
 
-            <form onSubmit={handleUpload} className="upload-form">
-              <div className="file-drop-area">
-                <input 
-                  type="file" 
+            <form onSubmit={handleUpload} className="repo-modal-body">
+              <div className="repo-drop-zone">
+                <input
+                  type="file"
                   id="fileInput"
                   onChange={(e) => setFile(e.target.files[0])}
-                  className="file-input-hidden"
+                  className="repo-file-hidden"
                   disabled={uploading}
                 />
-                <label htmlFor="fileInput" className="file-drop-label">
-                  <span className="drop-icon">📁</span>
-                  <span className="drop-title">
-                    {file ? file.name : 'Haz clic para seleccionar un archivo (Excel, Foto, PDF, Word)'}
+                <label htmlFor="fileInput" className="repo-drop-label">
+                  <span className="repo-drop-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#8B6914" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                   </span>
-                  <span className="drop-subtitle">
-                    {file ? `Tamaño: ${formatSize(file.size)}` : 'El sistema creará o asignará la subcarpeta automáticamente según la extensión'}
+                  <span className="repo-drop-title">
+                    {file ? file.name : 'Haz clic para seleccionar un archivo'}
+                  </span>
+                  <span className="repo-drop-sub">
+                    {file ? `Tamaño: ${formatSize(file.size)}` : 'Excel, Foto, PDF, Word — El sistema organizará automáticamente'}
                   </span>
                 </label>
               </div>
 
-              <div className="form-group">
+              <div className="repo-form-group">
                 <label>Categoría / Tipo de Registro:</label>
                 <select value={categoria} onChange={(e) => setCategoria(e.target.value)} disabled={uploading}>
                   <option value="general">📂 Documento General</option>
@@ -411,42 +454,37 @@ export default function RepositorioArchivosPage() {
                 </select>
               </div>
 
-              <div className="form-group">
+              <div className="repo-form-group">
                 <label>Referencia (Opcional):</label>
-                <input 
-                  type="text" 
-                  placeholder="Ej: ID de Equipo (EQ-1001), Nombre de PDV o ID de Auditoría" 
+                <input
+                  type="text"
+                  placeholder="Ej: ID de Equipo (EQ-1001), Nombre de PDV..."
                   value={referenciaId}
                   onChange={(e) => setReferenciaId(e.target.value)}
                   disabled={uploading}
                 />
               </div>
 
-              <div className="form-group">
+              <div className="repo-form-group">
                 <label>Observaciones o Descripción:</label>
-                <textarea 
-                  rows="3" 
-                  placeholder="Detalles sobre el contenido del documento, mes, justificación..." 
+                <textarea
+                  rows="3"
+                  placeholder="Detalles sobre el contenido del documento..."
                   value={observaciones}
                   onChange={(e) => setObservaciones(e.target.value)}
                   disabled={uploading}
                 />
               </div>
 
-              {errorMsg && <div className="alert-msg alert-error">{errorMsg}</div>}
-              {successMsg && <div className="alert-msg alert-success">{successMsg}</div>}
+              {errorMsg && <div className="repo-alert repo-alert-error">⚠️ {errorMsg}</div>}
+              {successMsg && <div className="repo-alert repo-alert-success">{successMsg}</div>}
 
-              <div className="modal-actions">
-                <button 
-                  type="button" 
-                  className="btn-cancel" 
-                  onClick={() => setShowModal(false)}
-                  disabled={uploading}
-                >
+              <div className="repo-modal-actions">
+                <button type="button" className="repo-btn-cancel" onClick={() => setShowModal(false)} disabled={uploading}>
                   Cancelar
                 </button>
-                <button type="submit" className="btn-submit" disabled={uploading || !file}>
-                  {uploading ? 'Organizando y Guardando...' : 'Guardar en Repositorio'}
+                <button type="submit" className="repo-btn-submit" disabled={uploading || !file}>
+                  {uploading ? '⏳ Organizando...' : '💾 Guardar en Repositorio'}
                 </button>
               </div>
             </form>
@@ -454,674 +492,830 @@ export default function RepositorioArchivosPage() {
         </div>
       )}
 
-      {/* Modal de Previsualización */}
+      {/* ═══════════════════ PREVIEW MODAL ═══════════════════ */}
       {previewFile && (
-        <div className="modal-overlay" onClick={() => setPreviewFile(null)}>
-          <div className="modal-preview-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>👁️ Previsualizando: {previewFile.nombre_original}</h3>
-              <button className="modal-close" onClick={() => setPreviewFile(null)}>✖</button>
+        <div className="repo-modal-overlay" onClick={() => setPreviewFile(null)}>
+          <div className="repo-modal repo-modal-preview" onClick={(e) => e.stopPropagation()}>
+            <div className="repo-modal-header">
+              <h3>👁️ {previewFile.nombre_original}</h3>
+              <button className="repo-modal-close" onClick={() => setPreviewFile(null)}>✕</button>
             </div>
-            <div className="preview-body">
+            <div className="repo-preview-body">
               {previewFile.tipo_archivo === 'foto' ? (
-                <img src={previewFile.ruta_archivo} alt={previewFile.nombre_original} className="preview-img" />
+                <img src={previewFile.ruta_archivo} alt={previewFile.nombre_original} className="repo-preview-img" />
               ) : previewFile.tipo_archivo === 'pdf' ? (
-                <iframe src={previewFile.ruta_archivo} className="preview-iframe" title="Visor PDF" />
+                <iframe src={previewFile.ruta_archivo} className="repo-preview-iframe" title="Visor PDF" />
               ) : (
                 <p>Este formato no soporta previsualización directa en el navegador.</p>
               )}
             </div>
-            <div className="preview-footer">
-              <a href={`${previewFile.ruta_archivo}${previewFile.ruta_archivo?.includes('?') ? '&' : '?'}download=1`} download={previewFile.nombre_original} target="_blank" rel="noopener noreferrer" className="btn-download-large">
-                ⬇️ Descargar Archivo Original
+            <div className="repo-preview-footer">
+              <a href={`${previewFile.ruta_archivo}${previewFile.ruta_archivo?.includes('?') ? '&' : '?'}download=1`} download={previewFile.nombre_original} target="_blank" rel="noopener noreferrer" className="repo-btn-download-lg">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Descargar Archivo Original
               </a>
             </div>
           </div>
         </div>
       )}
 
+      {/* ═══════════════════ STYLES ═══════════════════ */}
       <style jsx>{`
-        .repositorio-container {
-          padding: var(--spacing-lg);
+        /* ── Page Container ── */
+        .repo-page {
+          padding: 20px;
           display: flex;
           flex-direction: column;
-          gap: var(--spacing-lg);
+          gap: 20px;
+          max-width: 1400px;
+          margin: 0 auto;
+          width: 100%;
         }
 
-        .repo-header {
+        /* ── Hero Header ── */
+        .repo-hero {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          background: linear-gradient(135deg, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%);
-          padding: var(--spacing-lg);
-          border-radius: var(--radius-lg);
-          border: 1px solid var(--color-border);
-          box-shadow: var(--shadow-sm);
+          background: linear-gradient(135deg, #FAF6F0 0%, #F5EDE3 50%, #EDE4D6 100%);
+          padding: 28px 32px;
+          border-radius: 16px;
+          border: 1px solid #E8DFD3;
+          gap: 20px;
           flex-wrap: wrap;
-          gap: var(--spacing-md);
         }
-
-        .repo-title-box h2 {
-          font-family: 'Playfair Display', serif;
-          color: var(--color-primary-dark);
-          margin-bottom: 6px;
-          font-size: 1.8rem;
+        .repo-hero-title {
+          font-family: 'Playfair Display', 'Georgia', serif;
+          font-size: 1.65rem;
+          font-weight: 800;
+          color: #2C1810;
+          margin: 0 0 6px 0;
+          line-height: 1.2;
         }
-
-        .repo-title-box p {
-          color: var(--color-text-secondary);
-          font-size: 0.95rem;
-          max-width: 700px;
+        .repo-hero-sub {
+          color: #6B5B52;
+          font-size: 0.9rem;
+          margin: 0;
+          max-width: 600px;
+          line-height: 1.5;
         }
-
-        .repo-title-box code {
-          background-color: rgba(139, 105, 20, 0.1);
-          color: var(--color-primary);
-          padding: 2px 6px;
+        .repo-hero-sub code {
+          background: rgba(139,105,20,0.12);
+          color: #6B3A2A;
+          padding: 2px 8px;
           border-radius: 4px;
           font-weight: 600;
+          font-size: 0.82rem;
+          font-family: 'SF Mono', 'Consolas', monospace;
         }
-
-        .btn-upload-new {
+        .repo-btn-upload {
           display: flex;
           align-items: center;
           gap: 10px;
-          background-color: var(--color-primary);
-          color: var(--color-text-on-dark);
-          padding: 12px 24px;
-          border-radius: var(--radius-md);
-          font-weight: 600;
+          background: #5D4037;
+          color: #fff;
+          padding: 13px 26px;
+          border-radius: 12px;
+          font-weight: 700;
           border: none;
           cursor: pointer;
           transition: all 0.2s ease;
-          box-shadow: var(--shadow-md);
-          font-size: 1rem;
+          font-size: 0.95rem;
+          box-shadow: 0 4px 14px rgba(93,64,55,0.25);
+          white-space: nowrap;
         }
-
-        .btn-upload-new:hover {
-          background-color: var(--color-primary-dark);
+        .repo-btn-upload:hover {
+          background: #3E2723;
           transform: translateY(-2px);
-          box-shadow: var(--shadow-lg);
+          box-shadow: 0 6px 20px rgba(93,64,55,0.35);
         }
 
-        /* Stats Grid */
-        .stats-grid {
+        /* ── Stats Row ── */
+        .repo-stats-row {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: var(--spacing-md);
+          grid-template-columns: repeat(5, 1fr);
+          gap: 14px;
         }
-
-        .stat-card {
-          background: var(--color-bg-primary);
-          border: 1px solid var(--color-border);
-          border-radius: var(--radius-md);
-          padding: var(--spacing-md);
+        .repo-stat-card {
+          background: #fff;
+          border: 1.5px solid #E8E0D8;
+          border-radius: 14px;
+          padding: 18px 16px;
           display: flex;
-          align-items: center;
-          gap: var(--spacing-md);
+          align-items: flex-start;
+          gap: 14px;
           cursor: pointer;
           transition: all 0.2s ease;
-          box-shadow: var(--shadow-sm);
+          position: relative;
+          overflow: hidden;
         }
-
-        .stat-card:hover {
+        .repo-stat-card::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 3px;
+          background: transparent;
+          transition: background 0.2s;
+        }
+        .repo-stat-card:hover {
           transform: translateY(-3px);
-          border-color: var(--color-primary);
-          box-shadow: var(--shadow-md);
+          box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+          border-color: #D4C5B5;
         }
-
-        .stat-card.active {
-          border: 2px solid var(--color-primary);
-          background-color: rgba(139, 105, 20, 0.04);
+        .repo-stat-card.active {
+          border-color: #6B3A2A;
+          background: #FDFBF9;
         }
-
-        .stat-icon {
-          width: 50px;
-          height: 50px;
-          border-radius: var(--radius-md);
+        .repo-stat-card.active::before {
+          background: linear-gradient(90deg, #6B3A2A, #8B5E3C);
+        }
+        .repo-stat-icon {
+          width: 46px;
+          height: 46px;
+          border-radius: 12px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 1.5rem;
+          font-size: 1.3rem;
+          flex-shrink: 0;
         }
-
-        .stat-info {
+        .repo-stat-body {
           display: flex;
           flex-direction: column;
+          min-width: 0;
         }
-
-        .stat-label {
-          font-size: 0.85rem;
-          color: var(--color-text-secondary);
-          font-weight: 500;
+        .repo-stat-label {
+          font-size: 0.78rem;
+          color: #8D7B6E;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+          margin-bottom: 2px;
         }
-
-        .stat-value {
-          font-size: 1.6rem;
+        .repo-stat-number {
+          font-size: 1.7rem;
+          font-weight: 800;
+          color: #2C1810;
+          font-family: 'Outfit', 'Inter', sans-serif;
+          line-height: 1.1;
+        }
+        .repo-stat-pct {
+          font-size: 0.72rem;
           font-weight: 700;
-          color: var(--color-primary-dark);
-          font-family: 'Playfair Display', serif;
+          margin-top: 3px;
         }
+        .repo-stat-pct.up { color: #2E7D32; }
+        .repo-stat-pct.down { color: #C62828; }
+        .repo-stat-pct.neutral { color: #8D7B6E; }
 
-        /* Toolbar Section */
-        .toolbar-section {
+        /* ── Toolbar (Filters + Search) ── */
+        .repo-toolbar {
+          background: #fff;
+          border: 1.5px solid #E8E0D8;
+          border-radius: 14px;
+          padding: 14px 18px;
+        }
+        .repo-filters-row {
           display: flex;
-          justify-content: space-between;
           align-items: center;
-          gap: var(--spacing-md);
+          gap: 14px;
           flex-wrap: wrap;
-          background: var(--color-bg-primary);
-          padding: var(--spacing-md);
-          border-radius: var(--radius-md);
-          border: 1px solid var(--color-border);
         }
-
-        .tabs-filter {
+        .repo-filter-pills {
           display: flex;
           gap: 8px;
           flex-wrap: wrap;
+          flex: 1;
         }
-
-        .tab-btn {
-          background: var(--color-bg-secondary);
-          border: 1px solid transparent;
+        .repo-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
           padding: 8px 16px;
-          border-radius: var(--radius-full);
-          font-size: 0.85rem;
+          border-radius: 24px;
+          border: 1.5px solid #E8E0D8;
+          background: #FAFAF8;
+          font-size: 0.82rem;
           font-weight: 600;
-          color: var(--color-text-secondary);
+          color: #6B5B52;
           cursor: pointer;
           transition: all 0.2s;
+          white-space: nowrap;
         }
-
-        .tab-btn:hover {
-          background: rgba(139, 105, 20, 0.1);
-          color: var(--color-primary);
+        .repo-pill:hover {
+          background: #F5EDE3;
+          border-color: #D4C5B5;
         }
-
-        .tab-btn.active {
-          background: var(--color-primary);
-          color: var(--color-text-on-dark);
+        .repo-pill.active {
+          background: #5D4037;
+          color: #fff;
+          border-color: #5D4037;
         }
+        .repo-pill.active .pill-icon { filter: brightness(10); }
+        .pill-icon { font-size: 0.9rem; }
 
-        .search-form {
+        .repo-search-box {
           display: flex;
           align-items: center;
-          gap: 8px;
+          border: 1.5px solid #E8E0D8;
+          border-radius: 10px;
+          overflow: hidden;
+          background: #FAFAF8;
+          min-width: 260px;
+          transition: border-color 0.2s;
+        }
+        .repo-search-box:focus-within {
+          border-color: #6B3A2A;
+          box-shadow: 0 0 0 3px rgba(107,58,42,0.1);
+        }
+        .repo-search-icon {
+          margin-left: 12px;
+          color: #9E8E82;
+          flex-shrink: 0;
+        }
+        .repo-search-input {
           flex: 1;
-          max-width: 400px;
-        }
-
-        .search-input {
-          flex: 1;
-          padding: 8px 14px;
-          border: 1px solid var(--color-border);
-          border-radius: var(--radius-md);
-          font-size: 0.9rem;
-          outline: none;
-        }
-
-        .search-input:focus {
-          border-color: var(--color-primary);
-          box-shadow: 0 0 0 2px rgba(139, 105, 20, 0.2);
-        }
-
-        .search-btn {
-          background: var(--color-secondary);
-          color: var(--color-text-on-dark);
           border: none;
-          padding: 8px 14px;
-          border-radius: var(--radius-md);
-          font-weight: 600;
+          background: transparent;
+          padding: 9px 10px;
+          font-size: 0.88rem;
+          outline: none;
+          color: #2C1810;
+          min-width: 0;
+        }
+        .repo-search-input::placeholder { color: #B5A599; }
+        .repo-search-clear {
+          background: none;
+          border: none;
+          color: #9E8E82;
+          padding: 0 8px;
+          cursor: pointer;
+          font-size: 0.9rem;
+        }
+        .repo-search-submit {
+          background: #6B3A2A;
+          color: #fff;
+          border: none;
+          padding: 9px 16px;
+          font-weight: 700;
+          font-size: 0.82rem;
           cursor: pointer;
           transition: background 0.2s;
         }
+        .repo-search-submit:hover { background: #3E2723; }
 
-        .search-btn:hover {
-          background: var(--color-secondary-dark);
+        /* ── Files Section ── */
+        .repo-files-section { min-height: 200px; }
+        .repo-loading, .repo-empty {
+          text-align: center;
+          padding: 60px 20px;
+          background: #fff;
+          border-radius: 16px;
+          border: 2px dashed #E8E0D8;
+        }
+        .repo-empty-icon { font-size: 3.5rem; margin-bottom: 12px; }
+        .repo-empty h3 { color: #2C1810; margin: 0 0 6px; }
+        .repo-empty p { color: #8D7B6E; font-size: 0.9rem; margin: 0 0 20px; }
+        .repo-btn-upload-empty {
+          background: #5D4037; color: #fff; border: none;
+          padding: 11px 24px; border-radius: 10px;
+          font-weight: 700; cursor: pointer;
         }
 
-        .clear-btn {
-          background: transparent;
-          border: none;
-          color: var(--color-text-secondary);
-          font-size: 1.1rem;
-          cursor: pointer;
-        }
-
-        /* Archivos Grid */
-        .archivos-grid {
+        /* ── Desktop Grid ── */
+        .repo-grid-desktop {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
-          gap: var(--spacing-lg);
+          grid-template-columns: repeat(3, 1fr);
+          gap: 18px;
         }
+        .repo-list-mobile { display: none; }
 
-        .archivo-card {
-          background: var(--color-bg-primary);
-          border: 1px solid var(--color-border);
-          border-radius: var(--radius-lg);
+        .repo-file-card {
+          background: #fff;
+          border: 1.5px solid #E8E0D8;
+          border-radius: 14px;
           overflow: hidden;
           display: flex;
           flex-direction: column;
-          box-shadow: var(--shadow-sm);
-          transition: all 0.2s ease;
+          transition: all 0.25s ease;
         }
-
-        .archivo-card:hover {
+        .repo-file-card:hover {
           transform: translateY(-4px);
-          box-shadow: var(--shadow-lg);
-          border-color: var(--color-secondary);
+          box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+          border-color: #C8B9A9;
         }
 
-        .card-header-icon {
-          height: 110px;
+        /* Thumbnail */
+        .rfc-thumb {
+          height: 160px;
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+        }
+        .rfc-thumb-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .rfc-thumb-fallback {
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          position: relative;
+          width: 100%;
+          height: 100%;
         }
-
-        .icon-emoji {
-          font-size: 3rem;
-        }
-
-        .tipo-badge {
+        .rfc-thumb-emoji { font-size: 3rem; }
+        .rfc-type-badge {
           position: absolute;
-          bottom: 8px;
-          right: 12px;
-          font-size: 0.75rem;
-          font-weight: 700;
+          top: 10px;
+          right: 10px;
+          font-size: 0.68rem;
+          font-weight: 800;
           text-transform: uppercase;
-          background: rgba(255, 255, 255, 0.9);
-          padding: 2px 8px;
-          border-radius: 12px;
-          box-shadow: var(--shadow-sm);
+          padding: 4px 10px;
+          border-radius: 6px;
+          letter-spacing: 0.5px;
         }
 
-        .card-body {
-          padding: var(--spacing-md);
+        /* Card Body */
+        .rfc-body {
+          padding: 14px 16px 10px;
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 6px;
           flex: 1;
         }
-
-        .archivo-nombre {
-          font-size: 1.05rem;
+        .rfc-name {
+          font-size: 0.92rem;
           font-weight: 700;
-          color: var(--color-primary-dark);
-          word-break: break-all;
+          color: #2C1810;
           margin: 0;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          word-break: break-all;
+          line-height: 1.35;
+        }
+        .rfc-meta-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 6px;
+        }
+        .rfc-cat-tag {
+          font-size: 0.72rem;
+          font-weight: 600;
+          color: #8D7B6E;
+          background: #F5F0E8;
+          padding: 3px 8px;
+          border-radius: 4px;
+        }
+        .rfc-size {
+          font-size: 0.78rem;
+          color: #9E8E82;
+          font-weight: 600;
+        }
+        .rfc-desc {
+          font-size: 0.8rem;
+          color: #8D7B6E;
+          margin: 0;
+          line-height: 1.35;
           display: -webkit-box;
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
           overflow: hidden;
         }
 
-        .archivo-meta {
+        /* Card Footer */
+        .rfc-footer {
+          padding: 10px 16px 14px;
+          border-top: 1px solid #F0EAE1;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          gap: 8px;
-        }
-
-        .cat-badge {
-          background: var(--color-bg-secondary);
-          color: var(--color-primary-dark);
-          font-size: 0.75rem;
-          font-weight: 600;
-          padding: 4px 8px;
-          border-radius: 4px;
-        }
-
-        .size-badge {
-          font-size: 0.8rem;
-          color: var(--color-text-secondary);
-          font-weight: 600;
-        }
-
-        .referencia-tag {
-          font-size: 0.82rem;
-          color: var(--color-secondary-dark);
-          background: rgba(200, 150, 62, 0.1);
-          padding: 4px 8px;
-          border-radius: 4px;
-          display: inline-block;
-        }
-
-        .archivo-obs {
-          font-size: 0.85rem;
-          color: var(--color-text-secondary);
-          margin: 0;
-          font-style: italic;
-          line-height: 1.3;
-        }
-
-        .archivo-footer {
           margin-top: auto;
-          padding-top: 12px;
-          border-top: 1px solid var(--color-border);
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
         }
-
-        .user-info {
+        .rfc-user {
           display: flex;
           align-items: center;
           gap: 8px;
+          min-width: 0;
         }
-
-        .user-icon {
-          font-size: 1.2rem;
-        }
-
-        .user-name {
-          font-size: 0.82rem;
-          font-weight: 600;
-          color: var(--color-primary-dark);
-        }
-
-        .date-str {
-          font-size: 0.72rem;
-          color: var(--color-text-secondary);
-        }
-
-        .actions-group {
-          display: flex;
-          gap: 6px;
-        }
-
-        .btn-action {
-          width: 32px;
-          height: 32px;
-          border-radius: 6px;
-          border: 1px solid var(--color-border);
-          background: var(--color-bg-secondary);
+        .rfc-avatar {
+          width: 30px;
+          height: 30px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #6B3A2A, #8B5E3C);
+          color: #fff;
           display: flex;
           align-items: center;
           justify-content: center;
-          cursor: pointer;
-          text-decoration: none;
-          font-size: 1rem;
-          transition: all 0.2s;
+          font-size: 0.62rem;
+          font-weight: 800;
+          flex-shrink: 0;
         }
-
-        .btn-action:hover {
-          background: var(--color-primary);
-          color: #fff;
-          border-color: var(--color-primary);
-          transform: scale(1.05);
-        }
-
-        .btn-delete:hover {
-          background: #c5221f;
-          border-color: #c5221f;
-        }
-
-        /* Loading & Empty States */
-        .loading-state, .empty-state {
-          text-align: center;
-          padding: 60px 20px;
-          background: var(--color-bg-primary);
-          border-radius: var(--radius-lg);
-          border: 1px dashed var(--color-border);
-        }
-
-        .empty-icon {
-          font-size: 4rem;
-          margin-bottom: 15px;
-        }
-
-        .btn-upload-empty {
-          margin-top: 15px;
-          background: var(--color-primary);
-          color: #fff;
-          border: none;
-          padding: 10px 20px;
-          border-radius: var(--radius-md);
-          font-weight: 600;
-          cursor: pointer;
-        }
-
-        /* Modals */
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.6);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-          padding: 20px;
-          backdrop-filter: blur(3px);
-        }
-
-        .modal-content {
-          background: var(--color-bg-primary);
-          width: 100%;
-          max-width: 550px;
-          border-radius: var(--radius-lg);
-          overflow: hidden;
-          box-shadow: var(--shadow-lg);
-        }
-
-        .modal-preview-content {
-          background: var(--color-bg-primary);
-          width: 100%;
-          max-width: 900px;
-          height: 85vh;
-          border-radius: var(--radius-lg);
+        .rfc-user-info {
           display: flex;
           flex-direction: column;
+          min-width: 0;
+        }
+        .rfc-user-name {
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: #3E2723;
+          white-space: nowrap;
           overflow: hidden;
-          box-shadow: var(--shadow-lg);
+          text-overflow: ellipsis;
+        }
+        .rfc-user-date {
+          font-size: 0.65rem;
+          color: #9E8E82;
+        }
+        .rfc-actions {
+          display: flex;
+          gap: 5px;
+        }
+        .rfc-act-btn {
+          width: 30px;
+          height: 30px;
+          border-radius: 8px;
+          border: 1px solid #E8E0D8;
+          background: #FAFAF8;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.15s;
+          text-decoration: none;
+          color: #6B5B52;
+        }
+        .rfc-act-btn:hover {
+          background: #5D4037;
+          color: #fff;
+          border-color: #5D4037;
+        }
+        .rfc-act-btn:hover svg { stroke: #fff; }
+        .rfc-act-delete:hover {
+          background: #C62828;
+          border-color: #C62828;
         }
 
-        .modal-header {
-          background: var(--color-primary-dark);
-          color: var(--color-text-on-dark);
-          padding: 16px 20px;
+        /* ── Mobile List ── */
+        .repo-mobile-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          background: #fff;
+          border: 1.5px solid #E8E0D8;
+          border-radius: 12px;
+          padding: 12px;
+          transition: all 0.15s;
+          position: relative;
+        }
+        .repo-mobile-item:not(:last-child) { margin-bottom: 10px; }
+        .rmi-thumb {
+          width: 56px;
+          height: 56px;
+          border-radius: 10px;
+          overflow: hidden;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .rmi-thumb-img { width: 100%; height: 100%; object-fit: cover; }
+        .rmi-thumb-fallback {
+          width: 100%; height: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.5rem;
+        }
+        .rmi-info { flex: 1; min-width: 0; }
+        .rmi-name {
+          font-size: 0.82rem;
+          font-weight: 700;
+          color: #2C1810;
+          margin: 0 0 3px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          padding-right: 50px;
+        }
+        .rmi-meta {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          margin-bottom: 4px;
+        }
+        .rmi-cat {
+          font-size: 0.68rem;
+          font-weight: 600;
+          color: #8D7B6E;
+        }
+        .rmi-size {
+          font-size: 0.68rem;
+          color: #9E8E82;
+        }
+        .rmi-user-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .rmi-avatar {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #6B3A2A, #8B5E3C);
+          color: #fff;
+          font-size: 0.45rem;
+          font-weight: 800;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .rmi-user-name {
+          font-size: 0.68rem;
+          font-weight: 600;
+          color: #3E2723;
+        }
+        .rmi-date {
+          font-size: 0.62rem;
+          color: #9E8E82;
+        }
+        .rmi-type-badge {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          font-size: 0.6rem;
+          font-weight: 800;
+          text-transform: uppercase;
+          padding: 3px 8px;
+          border-radius: 4px;
+          letter-spacing: 0.3px;
+        }
+
+        /* ── Modal ── */
+        .repo-modal-overlay {
+          position: fixed;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(0,0,0,0.55);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10000;
+          padding: 16px;
+          backdrop-filter: blur(4px);
+        }
+        .repo-modal {
+          background: #fff;
+          width: 100%;
+          max-width: 560px;
+          border-radius: 18px;
+          overflow: hidden;
+          box-shadow: 0 25px 60px rgba(0,0,0,0.2);
+          animation: repoSlideUp 0.25s ease-out;
+        }
+        @keyframes repoSlideUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .repo-modal-preview {
+          max-width: 900px;
+          max-height: 88vh;
+          display: flex;
+          flex-direction: column;
+        }
+        .repo-modal-header {
+          background: linear-gradient(135deg, #3E2723, #5D4037);
+          color: #fff;
+          padding: 16px 22px;
           display: flex;
           justify-content: space-between;
           align-items: center;
         }
-
-        .modal-header h3 {
+        .repo-modal-header h3 {
           margin: 0;
-          font-size: 1.2rem;
-          font-family: 'Playfair Display', serif;
+          font-size: 1.1rem;
+          font-family: 'Outfit', sans-serif;
+          font-weight: 700;
         }
-
-        .modal-close {
-          background: transparent;
+        .repo-modal-close {
+          background: rgba(255,255,255,0.15);
           border: none;
           color: #fff;
-          font-size: 1.2rem;
+          width: 30px;
+          height: 30px;
+          border-radius: 8px;
           cursor: pointer;
+          font-size: 1rem;
+          transition: background 0.15s;
         }
-
-        .upload-form {
-          padding: 20px;
+        .repo-modal-close:hover { background: rgba(255,255,255,0.3); }
+        .repo-modal-body {
+          padding: 22px;
           display: flex;
           flex-direction: column;
           gap: 16px;
         }
 
-        .file-drop-area {
-          border: 2px dashed var(--color-secondary);
-          border-radius: var(--radius-md);
-          padding: 25px;
-          text-align: center;
-          background: rgba(139, 105, 20, 0.03);
-          cursor: pointer;
-          transition: background 0.2s;
+        /* Drop zone */
+        .repo-drop-zone {
+          border: 2px dashed #D4C5B5;
+          border-radius: 14px;
+          background: #FDFBF9;
+          transition: all 0.2s;
         }
-
-        .file-drop-area:hover {
-          background: rgba(139, 105, 20, 0.08);
+        .repo-drop-zone:hover {
+          border-color: #8B6914;
+          background: #FAF6F0;
         }
-
-        .file-input-hidden {
-          display: none;
-        }
-
-        .file-drop-label {
+        .repo-file-hidden { display: none; }
+        .repo-drop-label {
           display: flex;
           flex-direction: column;
           align-items: center;
           gap: 8px;
+          padding: 28px 20px;
           cursor: pointer;
+          text-align: center;
         }
-
-        .drop-icon {
-          font-size: 2.5rem;
-        }
-
-        .drop-title {
+        .repo-drop-title {
           font-weight: 700;
-          color: var(--color-primary-dark);
-          font-size: 1rem;
+          color: #2C1810;
+          font-size: 0.95rem;
+        }
+        .repo-drop-sub {
+          font-size: 0.8rem;
+          color: #9E8E82;
         }
 
-        .drop-subtitle {
-          font-size: 0.82rem;
-          color: var(--color-text-secondary);
-        }
-
-        .form-group {
+        /* Form groups */
+        .repo-form-group {
           display: flex;
           flex-direction: column;
           gap: 6px;
         }
-
-        .form-group label {
-          font-size: 0.88rem;
-          font-weight: 600;
-          color: var(--color-primary-dark);
+        .repo-form-group label {
+          font-size: 0.85rem;
+          font-weight: 700;
+          color: #3E2723;
         }
-
-        .form-group select, .form-group input, .form-group textarea {
-          padding: 10px 12px;
-          border: 1px solid var(--color-border);
-          border-radius: var(--radius-md);
-          font-size: 0.95rem;
+        .repo-form-group select,
+        .repo-form-group input,
+        .repo-form-group textarea {
+          padding: 10px 14px;
+          border: 1.5px solid #E8E0D8;
+          border-radius: 10px;
+          font-size: 0.9rem;
           font-family: inherit;
           outline: none;
+          transition: border-color 0.2s;
+          background: #FDFBF9;
+        }
+        .repo-form-group select:focus,
+        .repo-form-group input:focus,
+        .repo-form-group textarea:focus {
+          border-color: #6B3A2A;
+          box-shadow: 0 0 0 3px rgba(107,58,42,0.08);
         }
 
-        .form-group select:focus, .form-group input:focus, .form-group textarea:focus {
-          border-color: var(--color-primary);
-        }
-
-        .alert-msg {
+        /* Alerts */
+        .repo-alert {
           padding: 10px 14px;
-          border-radius: var(--radius-md);
-          font-size: 0.9rem;
+          border-radius: 10px;
+          font-size: 0.88rem;
           font-weight: 600;
         }
+        .repo-alert-error { background: #FFEBEE; color: #C62828; }
+        .repo-alert-success { background: #E8F5E9; color: #2E7D32; }
 
-        .alert-error {
-          background: #fce8e6;
-          color: #c5221f;
-        }
-
-        .alert-success {
-          background: #e6f4ea;
-          color: #137333;
-        }
-
-        .modal-actions {
+        /* Modal actions */
+        .repo-modal-actions {
           display: flex;
           justify-content: flex-end;
-          gap: 12px;
-          margin-top: 10px;
+          gap: 10px;
+          padding-top: 4px;
         }
-
-        .btn-cancel {
-          padding: 10px 18px;
-          border: 1px solid var(--color-border);
-          background: var(--color-bg-secondary);
-          border-radius: var(--radius-md);
-          font-weight: 600;
+        .repo-btn-cancel {
+          padding: 10px 20px;
+          border: 1.5px solid #E8E0D8;
+          background: #FAFAF8;
+          border-radius: 10px;
+          font-weight: 700;
           cursor: pointer;
+          color: #6B5B52;
+          transition: all 0.15s;
         }
-
-        .btn-submit {
+        .repo-btn-cancel:hover { background: #F0EAE1; }
+        .repo-btn-submit {
           padding: 10px 22px;
-          background: var(--color-primary);
+          background: #5D4037;
           color: #fff;
           border: none;
-          border-radius: var(--radius-md);
-          font-weight: 600;
+          border-radius: 10px;
+          font-weight: 700;
           cursor: pointer;
+          transition: all 0.15s;
         }
+        .repo-btn-submit:hover { background: #3E2723; }
+        .repo-btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .btn-submit:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        /* Preview body */
-        .preview-body {
+        /* Preview */
+        .repo-preview-body {
           flex: 1;
+          background: #1A1A1A;
           display: flex;
           align-items: center;
           justify-content: center;
-          background: #333;
           overflow: hidden;
-          padding: 10px;
+          padding: 12px;
+          min-height: 300px;
         }
-
-        .preview-img {
-          max-width: 100%;
-          max-height: 100%;
-          object-fit: contain;
-        }
-
-        .preview-iframe {
-          width: 100%;
-          height: 100%;
-          border: none;
-          background: #fff;
-        }
-
-        .preview-footer {
-          padding: 14px 20px;
-          background: var(--color-bg-secondary);
+        .repo-preview-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .repo-preview-iframe { width: 100%; height: 100%; border: none; background: #fff; min-height: 400px; }
+        .repo-preview-footer {
+          padding: 14px 22px;
+          background: #F5F0E8;
           display: flex;
           justify-content: center;
         }
-
-        .btn-download-large {
-          background: var(--color-primary);
+        .repo-btn-download-lg {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: #5D4037;
           color: #fff;
           padding: 10px 24px;
-          border-radius: var(--radius-md);
+          border-radius: 10px;
           text-decoration: none;
-          font-weight: 600;
-          box-shadow: var(--shadow-sm);
+          font-weight: 700;
+          font-size: 0.9rem;
+          transition: all 0.15s;
+        }
+        .repo-btn-download-lg:hover { background: #3E2723; }
+
+        /* ── Responsive ── */
+        @media (max-width: 1100px) {
+          .repo-grid-desktop {
+            grid-template-columns: repeat(2, 1fr);
+          }
         }
 
         @media (max-width: 768px) {
-          .repo-header {
-            flex-direction: column;
-            align-items: flex-start;
-          }
-          .btn-upload-new {
-            width: 100%;
-            justify-content: center;
-          }
-          .toolbar-section {
+          .repo-page { padding: 14px; gap: 14px; }
+
+          .repo-hero {
             flex-direction: column;
             align-items: stretch;
+            padding: 20px;
+            text-align: center;
           }
-          .search-form {
-            max-width: 100%;
+          .repo-hero-title { font-size: 1.3rem; }
+          .repo-hero-sub { max-width: 100%; font-size: 0.82rem; }
+          .repo-btn-upload {
+            width: 100%;
+            justify-content: center;
+            padding: 14px;
+          }
+
+          .repo-stats-row {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+          }
+          .repo-stat-card { padding: 14px 12px; gap: 10px; }
+          .repo-stat-icon { width: 38px; height: 38px; font-size: 1.1rem; }
+          .repo-stat-number { font-size: 1.4rem; }
+          .repo-stat-label { font-size: 0.68rem; }
+
+          .repo-toolbar { padding: 10px 12px; }
+          .repo-filters-row { flex-direction: column; gap: 10px; }
+          .repo-filter-pills {
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            padding-bottom: 4px;
+          }
+          .repo-filter-pills::-webkit-scrollbar { display: none; }
+          .repo-pill { padding: 7px 12px; font-size: 0.75rem; }
+          .repo-search-box { min-width: 100%; }
+
+          .repo-grid-desktop { display: none; }
+          .repo-list-mobile { display: block; }
+
+          .repo-modal { max-width: 100%; }
+          .repo-modal-preview { max-height: 92vh; }
+        }
+
+        @media (max-width: 400px) {
+          .repo-stats-row { grid-template-columns: 1fr 1fr; }
+          .repo-stats-row > .repo-stat-card:last-child {
+            grid-column: span 2;
           }
         }
       `}</style>
