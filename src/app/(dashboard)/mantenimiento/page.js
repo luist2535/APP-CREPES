@@ -139,14 +139,50 @@ function SignaturePad({ onSave, onClear, label, value }) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
-  const saveSignature = () => {
+  const [savedSignature, setSavedSignature] = useState(null);
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.user?.firma) {
+          setSavedSignature(data.user.firma);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  const saveSignature = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const dataUrl = canvas.toDataURL();
+    
+    if (saveAsDefault) {
+      try {
+        await fetch('/api/auth/firma', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firma: dataUrl })
+        });
+        setSavedSignature(dataUrl);
+      } catch (err) {
+        console.error('Error saving default signature:', err);
+      }
+    }
+
     setSignatureData(dataUrl);
     onSave(dataUrl);
     setIsOpen(false);
+  };
+
+  const loadSavedSignature = () => {
+    if (savedSignature) {
+      setSignatureData(savedSignature);
+      onSave(savedSignature);
+      setIsOpen(false);
+    }
   };
 
   const handleClear = () => {
@@ -171,9 +207,16 @@ function SignaturePad({ onSave, onClear, label, value }) {
           </div>
         </div>
       ) : (
-        <button type="button" onClick={() => setIsOpen(true)} style={{ padding: '10px 14px', fontSize: '0.82rem', borderRadius: '8px', border: '1.5px dashed #6B3A2A', background: '#FFF', color: '#6B3A2A', fontWeight: 600, cursor: 'pointer', textAlign: 'center' }}>
-          ✍️ Pulsar para Dibujar Firma
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button type="button" onClick={() => setIsOpen(true)} style={{ flex: 1, padding: '10px 14px', fontSize: '0.82rem', borderRadius: '8px', border: '1.5px dashed #6B3A2A', background: '#FFF', color: '#6B3A2A', fontWeight: 600, cursor: 'pointer', textAlign: 'center' }}>
+            ✍️ Dibujar Firma
+          </button>
+          {savedSignature && (
+            <button type="button" onClick={loadSavedSignature} style={{ flex: 1, padding: '10px 14px', fontSize: '0.82rem', borderRadius: '8px', border: '1.5px solid #6B3A2A', background: '#6B3A2A', color: '#FFF', fontWeight: 600, cursor: 'pointer', textAlign: 'center' }}>
+              ✒️ Cargar mi firma
+            </button>
+          )}
+        </div>
       )}
 
       {isOpen && (
@@ -194,6 +237,17 @@ function SignaturePad({ onSave, onClear, label, value }) {
                   onMouseLeave={stopDrawing}
                   style={{ width: '100%', height: '100%', cursor: 'crosshair', touchAction: 'none' }}
                 />
+              </div>
+              <div style={{ marginTop: '15px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: '#4b5563' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={saveAsDefault} 
+                    onChange={(e) => setSaveAsDefault(e.target.checked)} 
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  Guardar como mi firma predeterminada
+                </label>
               </div>
             </div>
             <div style={{ padding: '12px 20px', background: '#f9f9f9', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

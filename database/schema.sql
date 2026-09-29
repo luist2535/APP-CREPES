@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS users (
   rol_id INTEGER NOT NULL,
   ciudad_id INTEGER,
   avatar TEXT,
+  firma TEXT,
   activo INTEGER DEFAULT 1,
   ultimo_login DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

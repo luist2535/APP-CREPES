@@ -121,10 +121,45 @@ function SignaturePad({ label, onSignatureChange, signatureData }) {
     return trimmed.toDataURL('image/png');
   };
 
-  const handleSave = () => {
+  const [savedSignature, setSavedSignature] = useState(null);
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.user?.firma) {
+          setSavedSignature(data.user.firma);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  const handleSave = async () => {
     const dataUrl = trimCanvas(canvasRef.current);
+    
+    if (saveAsDefault) {
+      try {
+        await fetch('/api/auth/firma', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firma: dataUrl })
+        });
+        setSavedSignature(dataUrl);
+      } catch (err) {
+        console.error('Error saving default signature:', err);
+      }
+    }
+    
     onSignatureChange(dataUrl);
     setIsOpen(false);
+  };
+
+  const loadSavedSignature = () => {
+    if (savedSignature) {
+      onSignatureChange(savedSignature);
+      setIsOpen(false);
+    }
   };
 
   const handleClear = () => {
@@ -146,10 +181,17 @@ function SignaturePad({ label, onSignatureChange, signatureData }) {
           </button>
         </div>
       ) : (
-        <button type="button" className="ent-btn-open-sig" onClick={() => setIsOpen(true)}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-          Abrir Panel de Firma
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button type="button" className="ent-btn-open-sig" onClick={() => setIsOpen(true)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            Abrir Panel de Firma
+          </button>
+          {savedSignature && (
+            <button type="button" className="ent-btn-modal save" onClick={loadSavedSignature} style={{ margin: 0, padding: '8px 16px' }}>
+              ✒️ Cargar mi firma
+            </button>
+          )}
+        </div>
       )}
 
       {isOpen && (
@@ -172,10 +214,22 @@ function SignaturePad({ label, onSignatureChange, signatureData }) {
               />
             </div>
             
-            <div className="ent-modal-actions">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: '#4b5563' }}>
+                <input 
+                  type="checkbox" 
+                  checked={saveAsDefault} 
+                  onChange={(e) => setSaveAsDefault(e.target.checked)} 
+                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                />
+                Guardar como mi firma predeterminada
+              </label>
+            </div>
+
+            <div className="ent-modal-actions" style={{ marginTop: '15px' }}>
               <button type="button" className="ent-btn-modal cancel" onClick={() => setIsOpen(false)}>Cancelar</button>
               <button type="button" className="ent-btn-modal clear" onClick={handleClear}>Limpiar</button>
-              <button type="button" className="ent-btn-modal save" onClick={handleSave}>Guardar Firma</button>
+              <button type="button" className="ent-btn-modal save" onClick={handleSave}>Aceptar Firma</button>
             </div>
           </div>
         </div>

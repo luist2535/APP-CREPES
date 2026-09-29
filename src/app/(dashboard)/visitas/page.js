@@ -145,14 +145,50 @@ function SignaturePad({ onSave, onClear, label, value }) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
-  const saveSignature = () => {
+  const [savedSignature, setSavedSignature] = useState(null);
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.user?.firma) {
+          setSavedSignature(data.user.firma);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  const saveSignature = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const dataUrl = canvas.toDataURL();
+
+    if (saveAsDefault) {
+      try {
+        await fetch('/api/auth/firma', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firma: dataUrl })
+        });
+        setSavedSignature(dataUrl);
+      } catch (err) {
+        console.error('Error saving default signature:', err);
+      }
+    }
+
     setSignatureData(dataUrl);
     onSave(dataUrl);
     setIsOpen(false);
+  };
+
+  const loadSavedSignature = () => {
+    if (savedSignature) {
+      setSignatureData(savedSignature);
+      onSave(savedSignature);
+      setIsOpen(false);
+    }
   };
 
   const handleClear = () => {
@@ -179,9 +215,16 @@ function SignaturePad({ onSave, onClear, label, value }) {
           </div>
         </div>
       ) : (
-        <button type="button" className="btn btn-primary btn-block btn-lg drawing-trigger-btn" onClick={() => setIsOpen(true)}>
-          ✍️ Pulsar para Dibujar Firma
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button type="button" className="btn btn-primary btn-block btn-lg drawing-trigger-btn" onClick={() => setIsOpen(true)} style={{ flex: 1, margin: 0 }}>
+            ✍️ Dibujar Firma
+          </button>
+          {savedSignature && (
+            <button type="button" className="btn btn-block btn-lg drawing-trigger-btn" onClick={loadSavedSignature} style={{ flex: 1, margin: 0, background: 'var(--color-primary-dark)' }}>
+              ✒️ Cargar mi firma
+            </button>
+          )}
+        </div>
       )}
 
       {/* Modal Overlay for drawing */}
@@ -204,6 +247,18 @@ function SignaturePad({ onSave, onClear, label, value }) {
                   onMouseUp={stopDrawing}
                   onMouseLeave={stopDrawing}
                 />
+              </div>
+
+              <div style={{ marginTop: '15px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: '#4b5563' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={saveAsDefault} 
+                    onChange={(e) => setSaveAsDefault(e.target.checked)} 
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  Guardar como mi firma predeterminada
+                </label>
               </div>
             </div>
 
