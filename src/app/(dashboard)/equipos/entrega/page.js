@@ -28,11 +28,10 @@ function SignaturePad({ label, onSignatureChange, signatureData }) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
-  // Initialize canvas only when modal opens
+  // Initialize canvas only when modal opens — transparent background
   useEffect(() => {
     if (!isOpen) return;
     
-    // Give modal animation time to finish before setting size
     const timer = setTimeout(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -50,8 +49,8 @@ function SignaturePad({ label, onSignatureChange, signatureData }) {
       ctx.lineWidth = 3;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, rect.width, rect.height);
+      // Transparent background — no fillRect
+      ctx.clearRect(0, 0, rect.width, rect.height);
     }, 150);
     
     return () => clearTimeout(timer);
@@ -87,8 +86,43 @@ function SignaturePad({ label, onSignatureChange, signatureData }) {
     setIsDrawing(false);
   };
 
+  // Trim transparent pixels around the signature and export cropped PNG
+  const trimCanvas = (canvas) => {
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+    let top = h, bottom = 0, left = w, right = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const alpha = data[(y * w + x) * 4 + 3];
+        if (alpha > 0) {
+          if (y < top) top = y;
+          if (y > bottom) bottom = y;
+          if (x < left) left = x;
+          if (x > right) right = x;
+        }
+      }
+    }
+    if (top > bottom || left > right) return canvas.toDataURL('image/png');
+    const pad = 10;
+    top = Math.max(0, top - pad);
+    left = Math.max(0, left - pad);
+    bottom = Math.min(h - 1, bottom + pad);
+    right = Math.min(w - 1, right + pad);
+    const trimW = right - left + 1;
+    const trimH = bottom - top + 1;
+    const trimmed = document.createElement('canvas');
+    trimmed.width = trimW;
+    trimmed.height = trimH;
+    const tCtx = trimmed.getContext('2d');
+    tCtx.drawImage(canvas, left, top, trimW, trimH, 0, 0, trimW, trimH);
+    return trimmed.toDataURL('image/png');
+  };
+
   const handleSave = () => {
-    const dataUrl = canvasRef.current.toDataURL('image/png');
+    const dataUrl = trimCanvas(canvasRef.current);
     onSignatureChange(dataUrl);
     setIsOpen(false);
   };
@@ -97,8 +131,7 @@ function SignaturePad({ label, onSignatureChange, signatureData }) {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const rect = canvas.getBoundingClientRect();
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, rect.width, rect.height);
+    ctx.clearRect(0, 0, rect.width * (window.devicePixelRatio || 2), rect.height * (window.devicePixelRatio || 2));
   };
 
   return (
@@ -713,7 +746,15 @@ export default function EntregaEquipoPage() {
                     </thead>
                     <tbody>
                       {(selectedActa.equipos_lista || []).map((eq, i) => (
-                        <tr key={i}><td>{i + 1}</td><td>{eq.descripcion}</td><td>{eq.tipo}</td><td>{eq.placa}</td><td>{eq.marca}</td><td>{eq.modelo}</td><td>{eq.serie}</td></tr>
+                        <tr key={i}>
+                          <td data-label="#">{i + 1}</td>
+                          <td data-label="Descripción">{eq.descripcion}</td>
+                          <td data-label="Tipo">{eq.tipo}</td>
+                          <td data-label="Placa">{eq.placa}</td>
+                          <td data-label="Marca">{eq.marca}</td>
+                          <td data-label="Modelo">{eq.modelo}</td>
+                          <td data-label="Serie">{eq.serie}</td>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -790,7 +831,7 @@ export default function EntregaEquipoPage() {
         .ent-filter-btn.active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
 
         /* Table */
-        .ent-table-wrapper { overflow-x: auto; border-radius: var(--radius-lg); border: 1px solid var(--color-border-light); }
+        .ent-table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border-radius: var(--radius-lg); border: 1px solid var(--color-border-light); }
         .ent-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         .ent-table th { background: var(--color-primary); color: #fff; padding: 12px 14px; text-align: left; font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
         .ent-table td { padding: 12px 14px; border-bottom: 1px solid var(--color-border-light); color: var(--color-text-primary); }
@@ -913,7 +954,7 @@ export default function EntregaEquipoPage() {
         .ent-hint { font-size: 0.8rem; color: var(--color-text-muted); text-align: center; margin-top: var(--spacing-sm); font-style: italic; }
 
         /* Sign View */
-        .ent-readonly-section { background: var(--color-bg-primary); border: 1px solid var(--color-border-light); border-radius: var(--radius-lg); padding: var(--spacing-lg); margin-bottom: var(--spacing-md); }
+        .ent-readonly-section { background: var(--color-bg-primary); border: 1px solid var(--color-border-light); border-radius: var(--radius-lg); padding: var(--spacing-lg); margin-bottom: var(--spacing-md); overflow: hidden; width: 100%; box-sizing: border-box; }
         .ent-readonly-section h3 { font-size: 0.95rem; color: var(--color-primary); margin-bottom: var(--spacing-md); padding-bottom: 8px; border-bottom: 1px solid var(--color-border); }
         .ent-ro-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
         .ent-ro-item { display: flex; flex-direction: column; gap: 4px; padding: 12px; background: #fff; border: 1px solid var(--color-border-light); border-radius: var(--radius-md); }
@@ -933,8 +974,7 @@ export default function EntregaEquipoPage() {
         .ent-sig-container { display: flex; flex-direction: column; gap: 8px; margin-top: var(--spacing-md); }
         .ent-btn-open-sig { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 14px; background: #FFF4E5; border: 2px dashed #F5B041; border-radius: var(--radius-md); color: #B9770E; font-weight: 700; font-size: 1rem; cursor: pointer; transition: all 0.2s; }
         .ent-btn-open-sig:hover { border-color: #D68910; background: #FDEBD0; color: #9C640C; transform: translateY(-1px); }
-        .ent-sig-preview { display: flex; flex-direction: column; gap: 8px; align-items: center; background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--spacing-sm); }
-        .ent-sig-img { max-height: 80px; object-fit: contain; }
+        .ent-sig-preview { display: flex; flex-direction: column; gap: 8px; align-items: center; background: repeating-conic-gradient(#f0f0f0 0% 25%, #fff 0% 50%) 50% / 16px 16px; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--spacing-sm); }\r\n        .ent-sig-img { max-height: 80px; object-fit: contain; }
         
         .ent-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; z-index: 10000; backdrop-filter: blur(3px); padding: 20px; }
         .ent-modal-content { background: var(--color-bg-primary); padding: var(--spacing-xl); border-radius: var(--radius-xl); box-shadow: 0 10px 40px rgba(0,0,0,0.2); width: 100%; max-width: 800px; display: flex; flex-direction: column; }
@@ -973,6 +1013,8 @@ export default function EntregaEquipoPage() {
         /* Responsive */
         @media (max-width: 768px) {
           .ent-page { padding: var(--spacing-md); }
+          .ent-card { padding: var(--spacing-md); }
+          .ent-readonly-section { padding: var(--spacing-sm); }
           .ent-grid-2, .ent-summary-grid, .ent-ro-grid { grid-template-columns: 1fr; }
           .ent-grid-3, .ent-grid-4 { grid-template-columns: 1fr 1fr; }
           .ent-sign-grid { grid-template-columns: 1fr; }
@@ -980,6 +1022,15 @@ export default function EntregaEquipoPage() {
           .ent-equipo-top { flex-direction: column; align-items: flex-start; gap: 8px; }
           .ent-list-header { flex-direction: column; align-items: flex-start; }
           .ent-acta-card-body { grid-template-columns: 1fr; gap: 12px; }
+
+          /* Tabla Responsive tipo tarjeta */
+          .ent-table-wrapper { border: none; background: transparent; }
+          .ent-table, .ent-table tbody, .ent-table tr, .ent-table td { display: block; width: 100%; }
+          .ent-table thead { display: none; }
+          .ent-table tr { margin-bottom: 12px; border: 1px solid var(--color-border-light); border-radius: var(--radius-md); background: #fff; padding: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+          .ent-table td { display: flex; justify-content: space-between; align-items: center; text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--color-border-light); }
+          .ent-table td:last-child { border-bottom: none; }
+          .ent-table td::before { content: attr(data-label); font-weight: 700; color: var(--color-primary); text-transform: uppercase; font-size: 0.75rem; text-align: left; margin-right: 12px; }
         }
         @media (max-width: 480px) {
           .ent-grid-3, .ent-grid-4 { grid-template-columns: 1fr; }
