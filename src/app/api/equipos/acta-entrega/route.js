@@ -313,33 +313,41 @@ async function generateExcel(acta) {
   ws.getCell('B33').alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
 
   // ---- SIGNATURES ----
-  // Template structure (1-indexed rows):
-  //   Row 41: "FIRMA QUIEN ENTREGA:" (B) / line (D) / "FIRMA QUIEN RECIBE:" (H) / line (J)
-  //   Row 42: "NOMBRE QUIEN ENTREGA:" / name / "NOMBRE QUIEN RECIBE:" / name
-  //   Row 43: "NUMERO DE CEDULA:" / number / "NUMERO DE CEDULA:" / number
-  //
-  // Signatures go ABOVE the "FIRMA" label, in the empty rows 38-40
-  // ExcelJS uses 0-indexed rows: row 38 in Excel = index 37
-
-  // Quien Entrega: Name & Cedula
-  if (acta.nombre_entrega) {
-    ws.getCell('D42').value = acta.nombre_entrega;
-    ws.getCell('D42').font = { name: 'Arial', size: 10 };
-  }
-  if (acta.cedula_entrega) {
-    ws.getCell('D43').value = acta.cedula_entrega;
-    ws.getCell('D43').font = { name: 'Arial', size: 10 };
+  // Limpiar valores previos en la plantilla para estas filas
+  for (let r = 41; r <= 43; r++) {
+    for (let c = 2; c <= 12; c++) {
+      ws.getCell(r, c).value = '';
+    }
   }
 
-  // Quien Recibe: Name & Cedula
-  ws.getCell('J42').value = acta.quien_recibe || '';
-  ws.getCell('J42').font = { name: 'Arial', size: 10 };
-  ws.getCell('J43').value = acta.cedula_recibe || '';
-  ws.getCell('J43').font = { name: 'Arial', size: 10 };
+  // Combinar celdas para el texto
+  try { ws.mergeCells('C41:E41'); } catch(e){}
+  try { ws.mergeCells('C42:E42'); } catch(e){}
+  try { ws.mergeCells('C43:E43'); } catch(e){}
+  try { ws.mergeCells('H41:J41'); } catch(e){}
+  try { ws.mergeCells('H42:J42'); } catch(e){}
+  try { ws.mergeCells('H43:J43'); } catch(e){}
+
+  // Textos y valores
+  ws.getCell('C41').value = 'FIRMA QUIEN ENTREGA:';
+  ws.getCell('C42').value = 'NOMBRE QUIEN ENTREGA: ' + (acta.nombre_entrega || '');
+  ws.getCell('C43').value = 'NÚMERO DE CEDULA: ' + (acta.cedula_entrega || '');
+
+  ws.getCell('H41').value = 'FIRMA QUIEN RECIBE:';
+  ws.getCell('H42').value = 'NOMBRE QUIEN RECIBE: ' + (acta.quien_recibe || '');
+  ws.getCell('H43').value = 'NÚMERO DE CEDULA: ' + (acta.cedula_recibe || '');
+
+  // Aplicar estilos a las celdas combinadas
+  [41, 42, 43].forEach(r => {
+    ['C', 'H'].forEach(col => {
+      const cell = ws.getCell(`${col}${r}`);
+      cell.font = { name: 'Arial', size: 10, bold: r === 41 };
+      cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: false };
+    });
+  });
 
   // Insert signature IMAGES
-  // For "Quien Entrega" - place above D41 line, spanning D38:F40 area
-  // ExcelJS 0-indexed: col D=3, row 38=37, row 40=39
+  // Quien Entrega: Colocada a la derecha de sus datos (Col E/F, índice 4.5)
   if (acta.firma_entrega) {
     try {
       const base64Data = acta.firma_entrega.replace(/^data:image\/\w+;base64,/, '');
@@ -349,16 +357,15 @@ async function generateExcel(acta) {
         extension: 'png',
       });
       ws.addImage(imageId, {
-        tl: { col: 3.5, row: 36.5 },
-        ext: { width: 180, height: 90 }
+        tl: { col: 4.5, row: 39.2 },
+        ext: { width: 170, height: 85 }
       });
     } catch (e) {
       console.error('Error inserting entrega signature:', e);
     }
   }
 
-  // For "Quien Recibe" - place above J41 line, spanning J38:N40 area
-  // ExcelJS 0-indexed: col J=9, row 38=37, row 40=39
+  // Quien Recibe: Colocada a la derecha de sus datos (Col J/K, índice 9.5)
   if (acta.firma_recibe) {
     try {
       const base64Data = acta.firma_recibe.replace(/^data:image\/\w+;base64,/, '');
@@ -368,8 +375,8 @@ async function generateExcel(acta) {
         extension: 'png',
       });
       ws.addImage(imageId, {
-        tl: { col: 9.5, row: 36.5 },
-        ext: { width: 180, height: 90 }
+        tl: { col: 9.5, row: 39.2 },
+        ext: { width: 170, height: 85 }
       });
     } catch (e) {
       console.error('Error inserting recibe signature:', e);
