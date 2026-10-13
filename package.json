@@ -1,6 +1,7 @@
 {
   "name": "crepes-app",
   "version": "0.1.0",
+  "author": "Luis Ahumada",
   "private": true,
   "scripts": {
     "dev": "next dev",

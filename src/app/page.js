@@ -256,6 +256,10 @@ function LoginForm() {
 
       </div>
 
+      <div className="author-signature">
+        Desarrollado por Luis Ahumada
+      </div>
+
       <style jsx global>{`
         .login-background {
           min-height: 100vh;
@@ -566,6 +570,16 @@ function LoginForm() {
 
         .animate-fade-in {
           animation: fadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        
+        .author-signature {
+          position: absolute;
+          bottom: 20px;
+          text-align: center;
+          color: rgba(255, 255, 255, 0.6);
+          font-size: 0.85rem;
+          font-weight: 500;
+          letter-spacing: 0.8px;
         }
       `}</style>
     </div>

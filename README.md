@@ -256,3 +256,9 @@ npm run start
 - **Interfaz de Usuario / Perfil:** Se corrigió un error en el modal de cambio de foto de perfil en el dashboard que impedía abrir el explorador de archivos al presionar los botones "Seleccionar archivo" o "Tomar foto" mediante la modificación de las propiedades CSS.
 - **Interfaz de Usuario / Perfil (Diseño):** Se eliminó un error de sintaxis CSS (una llave de cierre extra) en `layout.js` que impedía renderizar correctamente el fondo y posición flotante del modal, asegurando que ahora aparezca perfectamente centrado sobre la pantalla.
 - **Equipos / Lector QR:** Se actualizaron las políticas de seguridad de Next.js (CSP) en `next.config.mjs` para permitir la carga segura de la librería del escáner de códigos QR (`Html5Qrcode`) desde repositorios externos (`cdnjs` y `unpkg`), solucionando un error crítico en pantalla roja que bloqueaba el lector de cámara.
+
+---
+
+## Créditos y Autoría
+**Arquitectura y Desarrollo:** Luis Ahumada
+© 2024 Todos los derechos reservados.

@@ -9,6 +9,14 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [trendRange, setTrendRange] = useState('7 días');
+  const [hoveredTrendIndex, setHoveredTrendIndex] = useState(null);
+  const [hoveredSeries, setHoveredSeries] = useState(null);
+  const [hiddenSeries, setHiddenSeries] = useState({
+    operando: false,
+    alertas: false,
+    fuera: false,
+    visitas: false,
+  });
   const [indicatorPeriod, setIndicatorPeriod] = useState('Hoy');
   const [hoveredCity, setHoveredCity] = useState(null);
 
@@ -95,23 +103,100 @@ export default function DashboardPage() {
     return found ? { ...found, cx: fallback.cx, cy: fallback.cy, ciudad: fallback.ciudad } : fallback;
   });
 
-  // 7-day Trend Data
-  const trendDays   = ['Jue', 'Vie', 'Sáb', 'Dom', 'Lun', 'Mar', 'Hoy'];
-  const operandoVals = [25, 29, 26, 31, 26, 29, greenCount || 27];
-  const alertasVals  = [10, 15, 15, 18, 14, 17, yellowCount || 14];
-  const fueraVals    = [5,  8,  8,  8,  8,  7,  redCount || 7];
-  const visitasVals  = [0,  0,  1,  0,  0,  0,  data?.visitasPendientes || 0];
+  // ── Dynamic Trend Data (7, 14, 30 days) ──
+  const getFallbackTrend = (range, green, yellow, red, visitas) => {
+    const DIAS_MAP = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const MESES_MAP = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const count = range === '30 días' ? 30 : range === '14 días' ? 14 : 7;
+    const now = new Date();
+    const arr = [];
+    for (let i = count - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const isHoy = i === 0;
+      const seed = (d.getFullYear() * 372 + (d.getMonth() + 1) * 31 + d.getDate());
+      arr.push({
+        fecha: d.toLocaleDateString('sv-SE'),
+        dia: isHoy ? 'Hoy' : DIAS_MAP[d.getDay()],
+        diaCompleto: `${isHoy ? 'Hoy' : DIAS_MAP[d.getDay()]}, ${d.getDate()} de ${MESES_MAP[d.getMonth()]}`,
+        fechaCorta: `${d.getDate()} ${MESES_MAP[d.getMonth()]}`,
+        operando: isHoy ? (green || 19) : Math.max(1, (green || 19) + (((seed * 7) % 5) - 2)),
+        alertas: isHoy ? (yellow || 1) : Math.max(0, (yellow || 1) + Math.abs((seed * 3) % 4)),
+        fuera: isHoy ? (red || 0) : Math.max(0, Math.min(2, (seed * 5) % 3)),
+        visitas: isHoy ? (visitas || 0) : Math.abs((seed * 11) % 4),
+      });
+    }
+    return arr;
+  };
 
-  const W = 360, H = 140, maxVal = 35;
-  const getPoint = (v, i) => {
-    const x = (i / (trendDays.length - 1)) * W;
-    const y = H - 15 - ((Math.min(v, maxVal) / maxVal) * (H - 30));
+  const activeTrendList = (data?.tendencias && data.tendencias[trendRange])
+    ? data.tendencias[trendRange]
+    : getFallbackTrend(trendRange, greenCount, yellowCount, redCount, data?.visitasPendientes);
+
+  const seriesConfig = [
+    { key: 'operando', label: 'POI Operando', color: '#22C55E', symbolClass: 'green-line' },
+    { key: 'alertas', label: 'Alertas', color: '#EAB308', symbolClass: 'yellow-line' },
+    { key: 'fuera', label: 'Fuera de servicio', color: '#EF4444', symbolClass: 'red-line' },
+    { key: 'visitas', label: 'Visitas realizadas', color: '#6B3A2A', symbolClass: 'brown-line' },
+  ];
+
+  const chartW = 460;
+  const chartH = 150;
+  const padLeft = 14;
+  const padRight = 14;
+  const padTop = 15;
+  const padBottom = 20;
+  const plotWidth = chartW - padLeft - padRight;
+  const plotHeight = chartH - padTop - padBottom;
+  const totalPoints = activeTrendList.length;
+
+  // Escala Y dinámica según las series visibles
+  const visibleMax = Math.max(
+    ...activeTrendList.map(d => Math.max(
+      !hiddenSeries.operando ? d.operando : 0,
+      !hiddenSeries.alertas ? d.alertas : 0,
+      !hiddenSeries.fuera ? d.fuera : 0,
+      !hiddenSeries.visitas ? d.visitas : 0,
+    )),
+    10
+  );
+  const chartMaxY = Math.max(30, Math.ceil((visibleMax + 4) / 10) * 10);
+  const yAxisTicks = [chartMaxY, Math.round(chartMaxY * 2 / 3), Math.round(chartMaxY / 3), 0];
+
+  const getChartPoint = (v, i) => {
+    const x = padLeft + (totalPoints <= 1 ? 0 : (i / (totalPoints - 1)) * plotWidth);
+    const clamped = Math.max(0, Math.min(v, chartMaxY));
+    const y = padTop + (1 - clamped / chartMaxY) * plotHeight;
     return { x, y };
   };
-  const getPath = (vals) => vals.map((v, i) => {
-    const pt = getPoint(v, i);
-    return `${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;
-  }).join(' ');
+
+  const getLinePath = (key) => {
+    if (hiddenSeries[key] || totalPoints === 0) return '';
+    return activeTrendList.map((item, i) => {
+      const pt = getChartPoint(item[key], i);
+      return `${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;
+    }).join(' ');
+  };
+
+  const handleSvgMouseMove = (e) => {
+    const svg = e.currentTarget;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const relX = e.clientX - rect.left;
+    const svgX = (relX / rect.width) * chartW;
+
+    let closest = 0;
+    let minD = Infinity;
+    for (let i = 0; i < totalPoints; i++) {
+      const pt = getChartPoint(0, i);
+      const diff = Math.abs(svgX - pt.x);
+      if (diff < minD) {
+        minD = diff;
+        closest = i;
+      }
+    }
+    setHoveredTrendIndex(closest);
+  };
 
   return (
     <div className="dashboard-root">
@@ -554,11 +639,14 @@ export default function DashboardPage() {
           <div className="card-head">
             <div className="card-title">
               <span className="card-icon">📈</span>
-              <h3>Tendencia de operación (últimos 7 días)</h3>
+              <h3>Tendencia de operación ({trendRange === '7 días' ? 'últimos 7 días' : trendRange === '14 días' ? 'últimos 14 días' : 'últimos 30 días'})</h3>
             </div>
             <select
               value={trendRange}
-              onChange={e => setTrendRange(e.target.value)}
+              onChange={e => {
+                setTrendRange(e.target.value);
+                setHoveredTrendIndex(null);
+              }}
               className="card-select"
             >
               <option value="7 días">7 días ▾</option>
@@ -566,79 +654,271 @@ export default function DashboardPage() {
               <option value="30 días">30 días ▾</option>
             </select>
           </div>
+
+          {/* Mini Resumen del periodo seleccionado */}
+          <div className="trend-period-summary">
+            <div className="trend-pill" title="Promedio de PDVs en operación en este período">
+              <span className="trend-pill-dot" style={{ background: '#22C55E' }}></span>
+              <span className="trend-pill-label">Promedio operando:</span>
+              <strong className="trend-pill-value">
+                {Math.round(activeTrendList.reduce((acc, c) => acc + c.operando, 0) / (totalPoints || 1))} PDV
+              </strong>
+            </div>
+            <div className="trend-pill" title="Total de visitas registradas en el período">
+              <span className="trend-pill-dot" style={{ background: '#6B3A2A' }}></span>
+              <span className="trend-pill-label">Total visitas:</span>
+              <strong className="trend-pill-value">
+                {activeTrendList.reduce((acc, c) => acc + c.visitas, 0)}
+              </strong>
+            </div>
+            <div className="trend-pill" title="Total de alertas durante el período">
+              <span className="trend-pill-dot" style={{ background: '#EAB308' }}></span>
+              <span className="trend-pill-label">Alertas:</span>
+              <strong className="trend-pill-value">
+                {activeTrendList.reduce((acc, c) => acc + c.alertas, 0)}
+              </strong>
+            </div>
+          </div>
+
           <div className="card-content trend-content-row">
 
             {/* SVG Chart */}
             <div className="trend-svg-box">
               <div className="trend-y-axis">
-                <span>30</span>
-                <span>20</span>
-                <span>10</span>
-                <span>0</span>
+                {yAxisTicks.map((tick, idx) => (
+                  <span key={idx}>{tick}</span>
+                ))}
               </div>
               <div className="trend-chart-area">
-                <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
+                <svg
+                  viewBox={`0 0 ${chartW} ${chartH}`}
+                  width="100%"
+                  height={chartH}
+                  preserveAspectRatio="none"
+                  onMouseMove={handleSvgMouseMove}
+                  onMouseLeave={() => setHoveredTrendIndex(null)}
+                  onTouchMove={(e) => {
+                    if (e.touches && e.touches[0]) {
+                      const touch = e.touches[0];
+                      const svg = e.currentTarget;
+                      const rect = svg.getBoundingClientRect();
+                      const relX = touch.clientX - rect.left;
+                      const svgX = (relX / rect.width) * chartW;
+                      let closest = 0; let minD = Infinity;
+                      for (let i = 0; i < totalPoints; i++) {
+                        const pt = getChartPoint(0, i);
+                        const diff = Math.abs(svgX - pt.x);
+                        if (diff < minD) { minD = diff; closest = i; }
+                      }
+                      setHoveredTrendIndex(closest);
+                    }
+                  }}
+                  onTouchEnd={() => setHoveredTrendIndex(null)}
+                >
                   {/* Grid Lines */}
-                  {[0, 1, 2, 3].map(i => (
-                    <line key={i} x1="0" y1={15 + i * (H - 30) / 3} x2={W} y2={15 + i * (H - 30) / 3} stroke="#F4EBE1" strokeWidth="1" />
-                  ))}
-
-                  {/* 1. POI Operando (Green Line) */}
-                  <path d={getPath(operandoVals)} fill="none" stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  {operandoVals.map((v, i) => {
-                    const pt = getPoint(v, i);
-                    return <circle key={i} cx={pt.x} cy={pt.y} r="3.5" fill="#22C55E" />;
+                  {yAxisTicks.map((_, i) => {
+                    const y = padTop + (i / 3) * plotHeight;
+                    return (
+                      <line
+                        key={i}
+                        x1="0"
+                        y1={y}
+                        x2={chartW}
+                        y2={y}
+                        stroke="#F4EBE1"
+                        strokeWidth="1"
+                        strokeDasharray={i === 3 ? "none" : "2 2"}
+                      />
+                    );
                   })}
 
-                  {/* 2. Alertas (Yellow Line) */}
-                  <path d={getPath(alertasVals)} fill="none" stroke="#EAB308" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  {alertasVals.map((v, i) => {
-                    const pt = getPoint(v, i);
-                    return <circle key={i} cx={pt.x} cy={pt.y} r="3.5" fill="#EAB308" />;
-                  })}
+                  {/* Hover Guideline & Background Strip */}
+                  {hoveredTrendIndex !== null && (() => {
+                    const hx = getChartPoint(0, hoveredTrendIndex).x;
+                    const colW = Math.max(14, plotWidth / (totalPoints - 1 || 1));
+                    return (
+                      <g>
+                        <rect
+                          x={hx - colW / 2}
+                          y={padTop}
+                          width={colW}
+                          height={plotHeight}
+                          fill="#6B3A2A"
+                          opacity="0.05"
+                          rx="4"
+                        />
+                        <line
+                          x1={hx}
+                          y1={padTop}
+                          x2={hx}
+                          y2={padTop + plotHeight}
+                          stroke="#6B3A2A"
+                          strokeWidth="1.5"
+                          strokeDasharray="3 3"
+                          opacity="0.5"
+                        />
+                      </g>
+                    );
+                  })()}
 
-                  {/* 3. Fuera de servicio (Red Line) */}
-                  <path d={getPath(fueraVals)} fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  {fueraVals.map((v, i) => {
-                    const pt = getPoint(v, i);
-                    return <circle key={i} cx={pt.x} cy={pt.y} r="3.5" fill="#EF4444" />;
-                  })}
+                  {/* Series Paths & Circles */}
+                  {seriesConfig.map(({ key, color }) => {
+                    if (hiddenSeries[key]) return null;
+                    const isHovered = hoveredSeries === key;
+                    const isDimmed = hoveredSeries && hoveredSeries !== key;
+                    const pathD = getLinePath(key);
 
-                  {/* 4. Visitas realizadas (Brown Line) */}
-                  <path d={getPath(visitasVals)} fill="none" stroke="#6B3A2A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  {visitasVals.map((v, i) => {
-                    const pt = getPoint(v, i);
-                    return <circle key={i} cx={pt.x} cy={pt.y} r="3.5" fill="#6B3A2A" />;
+                    return (
+                      <g key={key} style={{ transition: 'opacity 0.25s ease' }}>
+                        <path
+                          d={pathD}
+                          fill="none"
+                          stroke={color}
+                          strokeWidth={isHovered ? 3.5 : 2.5}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          opacity={isDimmed ? 0.25 : 1}
+                        />
+                        {activeTrendList.map((item, i) => {
+                          const pt = getChartPoint(item[key], i);
+                          const isPointHovered = hoveredTrendIndex === i;
+                          return (
+                            <g key={i}>
+                              {isPointHovered && (
+                                <circle
+                                  cx={pt.x}
+                                  cy={pt.y}
+                                  r="7"
+                                  fill={color}
+                                  opacity="0.3"
+                                  className="pulse-halo"
+                                />
+                              )}
+                              <circle
+                                cx={pt.x}
+                                cy={pt.y}
+                                r={isPointHovered ? 5 : isHovered ? 4.2 : 3.5}
+                                fill={isPointHovered ? '#FFFFFF' : color}
+                                stroke={isPointHovered ? color : 'none'}
+                                strokeWidth={isPointHovered ? 2.5 : 0}
+                                opacity={isDimmed ? 0.25 : 1}
+                                style={{ transition: 'all 0.15s ease' }}
+                              />
+                            </g>
+                          );
+                        })}
+                      </g>
+                    );
                   })}
                 </svg>
 
+                {/* Floating Interactive Tooltip */}
+                {hoveredTrendIndex !== null && activeTrendList[hoveredTrendIndex] && (() => {
+                  const cur = activeTrendList[hoveredTrendIndex];
+                  const totalP = (cur.operando + cur.alertas + cur.fuera) || 1;
+                  const pctOp = Math.round((cur.operando / totalP) * 100);
+                  const isRightHalf = hoveredTrendIndex > totalPoints / 2;
+                  const xPct = (hoveredTrendIndex / (totalPoints - 1 || 1)) * 100;
+                  return (
+                    <div
+                      className="trend-interactive-tooltip"
+                      style={{
+                        left: `${xPct}%`,
+                        transform: isRightHalf ? 'translateX(-100%)' : 'translateX(0%)',
+                      }}
+                    >
+                      <div className="tip-header">
+                        <span className="tip-calendar">📅</span>
+                        <strong>{cur.diaCompleto}</strong>
+                      </div>
+                      <div className="tip-divider" />
+                      <div className="tip-metrics">
+                        {!hiddenSeries.operando && (
+                          <div className="tip-row">
+                            <span className="tip-dot" style={{ background: '#22C55E' }} />
+                            <span className="tip-label">POI Operando:</span>
+                            <span className="tip-val" style={{ color: '#16A34A' }}>{cur.operando}</span>
+                            <span className="tip-sub">({pctOp}%)</span>
+                          </div>
+                        )}
+                        {!hiddenSeries.alertas && (
+                          <div className="tip-row">
+                            <span className="tip-dot" style={{ background: '#EAB308' }} />
+                            <span className="tip-label">Alertas:</span>
+                            <span className="tip-val" style={{ color: '#CA8A04' }}>{cur.alertas}</span>
+                          </div>
+                        )}
+                        {!hiddenSeries.fuera && (
+                          <div className="tip-row">
+                            <span className="tip-dot" style={{ background: '#EF4444' }} />
+                            <span className="tip-label">Fuera de servicio:</span>
+                            <span className="tip-val" style={{ color: '#DC2626' }}>{cur.fuera}</span>
+                          </div>
+                        )}
+                        {!hiddenSeries.visitas && (
+                          <div className="tip-row">
+                            <span className="tip-dot" style={{ background: '#6B3A2A' }} />
+                            <span className="tip-label">Visitas realizadas:</span>
+                            <span className="tip-val" style={{ color: '#6B3A2A' }}>{cur.visitas}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* X Axis Labels */}
                 <div className="trend-x-axis">
-                  {trendDays.map((d, i) => (
-                    <span key={i}>{d}</span>
-                  ))}
+                  {activeTrendList.map((item, i) => {
+                    let show = false;
+                    if (totalPoints <= 7) show = true;
+                    else if (totalPoints <= 14) show = (i % 2 === 0 || i === totalPoints - 1);
+                    else show = (i % 5 === 0 || i === totalPoints - 1);
+
+                    return (
+                      <span
+                        key={i}
+                        className={`trend-x-label ${hoveredTrendIndex === i ? 'active' : ''}`}
+                        style={{
+                          visibility: show ? 'visible' : 'hidden',
+                          fontWeight: hoveredTrendIndex === i ? 800 : 600,
+                          color: hoveredTrendIndex === i ? '#6B3A2A' : '#9CA3AF'
+                        }}
+                      >
+                        {totalPoints > 7 ? item.fechaCorta : item.dia}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
-            {/* Right Legend matching reference mockup */}
+            {/* Right Legend matching reference mockup - interactive click to toggle & hover to highlight */}
             <div className="trend-legend">
-              <div className="trend-legend-item">
-                <span className="line-symbol green-line"></span>
-                <span>POI Operando</span>
-              </div>
-              <div className="trend-legend-item">
-                <span className="line-symbol yellow-line"></span>
-                <span>Alertas</span>
-              </div>
-              <div className="trend-legend-item">
-                <span className="line-symbol red-line"></span>
-                <span>Fuera de servicio</span>
-              </div>
-              <div className="trend-legend-item">
-                <span className="line-symbol brown-line"></span>
-                <span>Visitas realizadas</span>
-              </div>
+              <div className="trend-legend-title">Filtros (clic para activar/ocultar)</div>
+              {seriesConfig.map(({ key, label, symbolClass }) => {
+                const isHidden = hiddenSeries[key];
+                const isHovered = hoveredSeries === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`trend-legend-item ${isHidden ? 'is-hidden' : ''} ${isHovered ? 'is-hovered' : ''}`}
+                    onClick={() => setHiddenSeries(prev => ({ ...prev, [key]: !prev[key] }))}
+                    onMouseEnter={() => setHoveredSeries(key)}
+                    onMouseLeave={() => setHoveredSeries(null)}
+                    title={isHidden ? `Mostrar ${label}` : `Ocultar ${label}`}
+                  >
+                    <span className={`line-symbol ${symbolClass}`} style={{ opacity: isHidden ? 0.35 : 1 }}></span>
+                    <span className="legend-label" style={{ textDecoration: isHidden ? 'line-through' : 'none', opacity: isHidden ? 0.45 : 1 }}>
+                      {label}
+                    </span>
+                    <span className="legend-status-dot" style={{ opacity: isHidden ? 0.25 : 1 }}>
+                      {isHidden ? '✕' : '●'}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
           </div>
@@ -1287,6 +1567,43 @@ export default function DashboardPage() {
         }
 
         /* Trend Content */
+        .trend-period-summary {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 12px;
+          flex-wrap: wrap;
+        }
+
+        .trend-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: #FAF5EE;
+          border: 1px solid #EFE4D6;
+          border-radius: 20px;
+          padding: 4px 10px;
+          font-size: 0.68rem;
+          color: #6B5B52;
+          transition: all 0.2s ease;
+        }
+
+        .trend-pill:hover {
+          background: #F5EAE0;
+          border-color: #E2D2BF;
+        }
+
+        .trend-pill-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+        }
+
+        .trend-pill-value {
+          color: #2C1810;
+          font-weight: 700;
+        }
+
         .trend-content-row {
           display: flex;
           align-items: center;
@@ -1308,10 +1625,13 @@ export default function DashboardPage() {
           color: #9CA3AF;
           font-weight: 600;
           padding-bottom: 20px;
+          text-align: right;
+          min-width: 20px;
         }
 
         .trend-chart-area {
           flex: 1;
+          position: relative;
         }
 
         .trend-x-axis {
@@ -1323,12 +1643,95 @@ export default function DashboardPage() {
           font-weight: 600;
         }
 
+        .trend-x-label {
+          transition: color 0.2s ease, font-weight 0.2s ease;
+        }
+
+        .trend-interactive-tooltip {
+          position: absolute;
+          top: 0;
+          z-index: 15;
+          background: rgba(255, 255, 255, 0.96);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border: 1.5px solid #EAD8C7;
+          border-radius: 12px;
+          padding: 8px 12px;
+          box-shadow: 0 10px 25px -4px rgba(44, 21, 11, 0.2);
+          pointer-events: none;
+          min-width: 175px;
+          transition: left 0.08s ease-out, transform 0.08s ease-out;
+        }
+
+        .tip-header {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.72rem;
+          color: #2C1810;
+          font-weight: 700;
+        }
+
+        .tip-calendar {
+          font-size: 0.8rem;
+        }
+
+        .tip-divider {
+          height: 1px;
+          background: #F3EAE1;
+          margin: 5px 0 6px 0;
+        }
+
+        .tip-metrics {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .tip-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.68rem;
+          color: #4A3B32;
+        }
+
+        .tip-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          flex-shrink: 0;
+        }
+
+        .tip-label {
+          flex: 1;
+        }
+
+        .tip-val {
+          font-weight: 800;
+          font-size: 0.72rem;
+        }
+
+        .tip-sub {
+          font-size: 0.62rem;
+          color: #9CA3AF;
+        }
+
         /* Trend Legend */
         .trend-legend {
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 6px;
           flex-shrink: 0;
+        }
+
+        .trend-legend-title {
+          font-size: 0.62rem;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          font-weight: 700;
+          color: #9CA3AF;
+          margin-bottom: 2px;
         }
 
         .trend-legend-item {
@@ -1338,6 +1741,44 @@ export default function DashboardPage() {
           font-size: 0.7rem;
           font-weight: 600;
           color: #6B5B52;
+          background: #FAF7F4;
+          border: 1px solid transparent;
+          border-radius: 8px;
+          padding: 6px 10px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          width: 100%;
+          text-align: left;
+        }
+
+        .trend-legend-item:hover {
+          background: #F5EAE0;
+          border-color: #E2D2BF;
+          color: #2C1810;
+          transform: translateX(2px);
+        }
+
+        .trend-legend-item.is-hovered {
+          background: #F1DFCD;
+          border-color: #C89F7D;
+          color: #2C1810;
+          box-shadow: 0 2px 6px rgba(44, 21, 11, 0.08);
+        }
+
+        .trend-legend-item.is-hidden {
+          background: #F9F9F9;
+          border-color: #EFEFEF;
+        }
+
+        .legend-label {
+          flex: 1;
+          transition: all 0.2s ease;
+        }
+
+        .legend-status-dot {
+          font-size: 0.65rem;
+          color: #8C7B70;
+          margin-left: 4px;
         }
 
         .line-symbol {
@@ -1345,6 +1786,7 @@ export default function DashboardPage() {
           height: 3px;
           border-radius: 2px;
           position: relative;
+          transition: opacity 0.2s ease;
         }
         .line-symbol::after {
           content: '';
@@ -1367,6 +1809,15 @@ export default function DashboardPage() {
 
         .brown-line { background: #6B3A2A; }
         .brown-line::after { background: #6B3A2A; }
+
+        @keyframes haloPulse {
+          0% { r: 5px; opacity: 0.45; }
+          50% { r: 8.5px; opacity: 0.15; }
+          100% { r: 5px; opacity: 0.45; }
+        }
+        .pulse-halo {
+          animation: haloPulse 1.4s infinite ease-in-out;
+        }
 
         /* Tooltip Styles */
         .map-tooltip {
