@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><title>Vectorizador fiel</title>
+<script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.js"></script>
+<style>body{font-family:Segoe UI,sans-serif;max-width:900px;margin:30px auto;text-align:center}
+#out{border:1px solid #ccc;margin-top:20px;padding:10px}button{padding:10px 20px;font-size:16px;margin:8px}</style></head>
+<body>
+<h2>Imagen → SVG (fiel, con degradados por capas de color)</h2>
+<input type="file" id="f" accept="image/*"><br>
+Colores: <input type="range" id="c" min="8" max="64" value="40"><span id="cv">40</span>
+<button id="go">Vectorizar</button><button id="dl" disabled>Descargar SVG</button>
+<div id="out"></div>
+<script>
+let svg="";
+c.oninput=()=>cv.textContent=c.value;
+go.onclick=()=>{
+  const file=f.files[0]; if(!file) return alert("Elige la imagen primero");
+  const url=URL.createObjectURL(file);
+  const opts={numberofcolors:+c.value,colorsampling:2,colorquantcycles:6,pathomit:4,ltres:0.5,qtres:0.5,
+    scale:1,strokewidth:0,blurradius:1,blurdelta:20,roundcoords:1,viewbox:true,desc:false,mincolorratio:0};
+  ImageTracer.imageToSVG(url,s=>{svg=s;out.innerHTML=s;dl.disabled=false;},opts);
+};
+dl.onclick=()=>{const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml"}));a.download="ibupli_logo.svg";a.click();};
+</script></body></html>

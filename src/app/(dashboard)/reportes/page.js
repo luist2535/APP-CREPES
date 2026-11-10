@@ -59,7 +59,7 @@ export default function ReportesPage() {
   const [calidadSeccion, setCalidadSeccion] = useState('all'); // Área (Nivel 0)
   const [calidadSubArea, setCalidadSubArea] = useState('all'); // Sub-Área (Nivel 1)
   const [calidadItem, setCalidadItem] = useState('all'); // Ítem (Nivel 2)
-  const [calidadSubTab, setCalidadSubTab] = useState('evolucion'); // 'evolucion' | 'ranking' | 'historial' | 'comparador' | 'longitudinal'
+  const [calidadSubTab, setCalidadSubTab] = useState('evolucion'); // 'evolucion' | 'ranking' | 'historial' | 'comparador' | 'longitudinal' | 'temporal'
   const [compPeriodoA, setCompPeriodoA] = useState('');
   const [compPeriodoB, setCompPeriodoB] = useState('');
   const [longitudinalSeccionSelected, setLongitudinalSeccionSelected] = useState('Almacén');
@@ -276,79 +276,46 @@ export default function ReportesPage() {
     if (!calidadData) return;
     setExportLoading(true);
     try {
-      const XLSX = await import('xlsx');
-      const wb = XLSX.utils.book_new();
+      // Construir los mismos parámetros de filtro que se usan para obtener los datos
+      const params = new URLSearchParams();
+      params.set('pdv_id', calidadPdv);
+      params.set('ciudad_id', calidadCiudad);
+      params.set('fechaInicio', calidadFechaInicio);
+      params.set('fechaFin', calidadFechaFin);
+      params.set('area', calidadSeccion);
+      params.set('subarea', calidadSubArea);
+      params.set('item', calidadItem);
 
-      // 1. Sheet: Evolución por Sección
-      const rowsEvolucion = (calidadData.evolucion_por_seccion || []).map(s => ({
-        'Sección / Sub-Área': s.seccion_nombre,
-        'Puntaje Promedio (%)': s.puntaje_promedio,
-        'Visitas Evaluadas': s.visitas_evaluadas,
-        'Alertas de Disminución Recientes': s.caidas_recientes,
-        'Mejor PDV en la Sección': `${s.mejor_pdv?.nombre || '-'} (${s.mejor_pdv?.puntaje || 0} pts)`,
-        'Peor PDV en la Sección': `${s.peor_pdv?.nombre || '-'} (${s.peor_pdv?.puntaje || 0} pts)`,
-      }));
-      const wsEvol = XLSX.utils.json_to_sheet(rowsEvolucion);
-      XLSX.utils.book_append_sheet(wb, wsEvol, 'Comportamiento por Sección');
+      // Llamar al endpoint del servidor para generar el Excel
+      const res = await fetch(`/api/reportes/calidad-comportamiento/export?${params.toString()}`);
 
-      // 2. Sheet: Ranking Gerencial por PDV (Mes Anterior vs Actual)
-      const rowsRanking = (calidadData.ranking_pdv || []).map((p, i) => {
-        const pctActual = p.puntaje_mes_actual !== undefined ? p.puntaje_mes_actual : p.puntaje_promedio;
-        const pctAnterior = p.puntaje_mes_anterior !== undefined ? p.puntaje_mes_anterior : p.puntaje_promedio;
-        return {
-          'Puesto #': i + 1,
-          'Punto de Venta (PDV)': p.pdv_nombre,
-          'Ciudad': p.ciudad_nombre,
-          'Mes Anterior (%)': pctAnterior,
-          'Mes Actual (%)': pctActual,
-          'Diferencia (Pts)': p.diferencia_puntos || 0,
-          'Variación (%)': p.variacion_porcentual || 0,
-          'Tendencia': p.tendencia || 'Se mantuvo',
-          'Total Evaluaciones': p.total_evaluaciones,
-          'Secciones en Alerta': p.secciones_en_alerta,
-          'Estado Actual': pctActual >= 90 ? 'Excelente' : (pctActual >= 75 ? 'Regular' : 'Crítico')
-        };
-      });
-      const wsRanking = XLSX.utils.json_to_sheet(rowsRanking);
-      XLSX.utils.book_append_sheet(wb, wsRanking, 'Ranking Mes Anterior vs Actual');
-
-      // 3. Sheet: Historial Longitudinal y Alertas
-      const rowsHist = (calidadData.historial || []).map(h => ({
-        'ID Visita': h.visita_id,
-        'Fecha Inspección': h.fecha,
-        'Punto de Venta': h.pdv_nombre,
-        'Ciudad': h.ciudad_nombre,
-        'Plantilla / Formato': h.plantilla_nombre,
-        'Sección Evaluada': h.seccion_nombre,
-        'Puntaje Actual (%)': h.puntaje,
-        'Puntaje Visita Anterior (%)': h.puntaje_anterior !== null ? h.puntaje_anterior : 'Primera Visita',
-        'Variación (pts)': h.diferencia,
-        'Estado Alerta': h.alerta_disminucion ? '🔻 CAÍDA DETECTADA' : '🟢 Estable / Mejora',
-        'Preguntas Cumple (SI)': h.preguntas_si,
-        'Preguntas No Cumple (NO)': h.preguntas_no,
-        'No Aplica (NA)': h.preguntas_na,
-      }));
-      const wsHist = XLSX.utils.json_to_sheet(rowsHist);
-      XLSX.utils.book_append_sheet(wb, wsHist, 'Historial y Alertas');
-
-      const dateStr = new Date().toISOString().split('T')[0];
-      const fileName = `Analisis_Comportamiento_Calidad_${dateStr}.xlsx`;
-      XLSX.writeFile(wb, fileName);
-
-      // Guardar copia automáticamente en las carpetas y repositorio del servidor
-      try {
-        const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        const blob = new Blob([wbOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        const file = new File([blob], fileName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('categoria', 'analisis_calidad');
-        formData.append('tipo_documento', 'Análisis Comportamiento Calidad');
-        formData.append('observaciones', `Análisis de Comportamiento de Calidad exportado desde Reportes (${dateStr})`);
-        await fetch('/api/uploads', { method: 'POST', body: formData });
-      } catch (repoErr) {
-        console.warn('Error al almacenar en repositorio de archivos:', repoErr);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Error al exportar');
       }
+
+      // Descargar el archivo
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+
+      // Extraer nombre del archivo del header Content-Disposition
+      const contentDisposition = res.headers.get('Content-Disposition');
+      let fileName = `Analisis_Comportamiento_Calidad_${new Date().toISOString().split('T')[0]}.xlsx`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="([^"]+)"/);
+        if (match) fileName = match[1];
+      }
+
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      // También guardar copia en el repositorio del servidor (opcional, ya se genera en servidor)
+      // El servidor ya genera el archivo completo, así que no necesitamos subirlo de nuevo
     } catch (err) {
       console.error('Export Calidad error:', err);
       alert('Error al exportar analítica de Calidad: ' + err.message);
@@ -1065,6 +1032,13 @@ Impreso y registrado en el repositorio el ${new Date().toLocaleString('es-ES')}
             </button>
             <button
               type="button"
+              onClick={() => setCalidadSubTab('temporal')}
+              style={{ padding: '10px 16px', borderRadius: '10px', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: calidadSubTab === 'temporal' ? '#0891B2' : '#E0F2FE', color: calidadSubTab === 'temporal' ? '#FFF' : '#0369A1', border: '1px solid #BAE6FD' }}
+            >
+              📈 Evolución Temporal Mensual
+            </button>
+            <button
+              type="button"
               onClick={() => setCalidadSubTab('longitudinal')}
               style={{ padding: '10px 16px', borderRadius: '10px', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: calidadSubTab === 'longitudinal' ? '#7C3AED' : '#F5F3FF', color: calidadSubTab === 'longitudinal' ? '#FFF' : '#5B21B6', border: '1px solid #DDD6FE' }}
             >
@@ -1157,6 +1131,98 @@ Impreso y registrado en el repositorio el ${new Date().toLocaleString('es-ES')}
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* Sub-Tab: Evolución Temporal Mensual */}
+          {calidadSubTab === 'temporal' && (
+            <div className="card" style={{ padding: '22px', borderRadius: '14px', background: '#FFF' }}>
+              <h3 style={{ margin: '0 0 16px 0', color: '#0369A1', fontSize: '1.2rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                📈 Evolución Temporal Mensual por Sección / Sub-Área
+              </h3>
+              <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: '#64748B' }}>
+                Visualiza la tendencia mensual del puntaje promedio por cada sección evaluada a lo largo del tiempo.
+              </p>
+
+              {mounted && calidadData.evolucion_temporal && calidadData.evolucion_temporal.length > 0 && (
+                <div style={{ height: 450, marginBottom: '24px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={calidadData.evolucion_temporal}
+                      margin={{ top: 20, right: 120, left: 20, bottom: 60 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
+                      <RechartsTooltip
+                        formatter={(val, name) => [val !== undefined ? `${val}%` : '', name]}
+                        labelFormatter={(mes) => `Mes: ${mes}`}
+                      />
+                      <Legend verticalAlign="top" height={36} />
+                      {Object.keys(calidadData.evolucion_temporal[0] || {})
+                        .filter(k => k !== 'mes')
+                        .map((sec, idx) => {
+                          const colors = ['#16A34A', '#0891B2', '#7C3AED', '#EA580C', '#DB2777', '#65A30D', '#0D9488', '#4F46E5'];
+                          return (
+                            <Line
+                              key={sec}
+                              type="monotone"
+                              dataKey={sec}
+                              name={sec}
+                              stroke={colors[idx % colors.length]}
+                              strokeWidth={2.5}
+                              dot={{ r: 4, strokeWidth: 2 }}
+                              activeDot={{ r: 7, strokeWidth: 3 }}
+                            />
+                          );
+                        })}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {calidadData.evolucion_temporal && calidadData.evolucion_temporal.length > 0 && (
+                <div className="table-responsive">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Mes</th>
+                        {Object.keys(calidadData.evolucion_temporal[0] || {}).filter(k => k !== 'mes').map((sec, idx) => (
+                          <th key={sec} style={{ textAlign: 'center' }}>
+                            {sec}
+                            <br />
+                            <span style={{ fontWeight: 'normal', fontSize: '0.7rem', color: '#94A3B8' }}>
+                              (promedio mensual)
+                            </span>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {calidadData.evolucion_temporal.map((t, idx) => (
+                        <tr key={idx} style={{ background: idx % 2 === 0 ? '#F8FAFC' : 'inherit' }}>
+                          <td><strong style={{ color: '#1E293B' }}>{t.mes}</strong></td>
+                          {Object.entries(t).filter(([k]) => k !== 'mes').map(([sec, val]) => (
+                            <td key={sec} style={{ textAlign: 'center' }}>
+                              {val !== undefined && val !== null ? (
+                                <span style={{
+                                  fontWeight: '700',
+                                  color: val >= 90 ? '#15803D' : val >= 75 ? '#D97706' : '#DC2626',
+                                  fontSize: '0.95rem'
+                                }}>
+                                  {val}%
+                                </span>
+                              ) : (
+                                <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>—</span>
+                              )}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 

@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 258 290" width="258" height="290">
+  <title>Ampolla</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f2ece0"/><stop offset="1" stop-color="#e6dcce"/>
+    </linearGradient>
+    <filter id="glow">
+      <feMorphology in="SourceAlpha" operator="dilate" radius="4" result="expand"/>
+      <feFlood flood-color="#ffffff" />
+      <feComposite in2="expand" operator="in" />
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <rect width="258" height="290" fill="#fcfaf6"/>
+  <circle cx="129" cy="145" r="115" fill="url(#bg)" stroke="#fff" stroke-width="4"/>
+  
+  <g filter="url(#glow)">
+    <g fill="#fff" stroke="#fff" stroke-width="12" stroke-linejoin="round">
+      <path d="M 122 45 L 118 85 C 117 100, 111 110, 102 120 C 100 124, 100 127, 104 128 L 154 128 C 158 127, 158 124, 156 120 C 147 110, 141 100, 140 85 L 136 45 C 134 40, 124 40, 122 45 Z" />
+      <path d="M 105 140 C 101 140, 99 142, 99 146 L 99 225 C 99 238, 105 245, 115 245 L 143 245 C 153 245, 159 238, 159 225 L 159 146 C 159 142, 157 140, 153 140 Z" />
+    </g>
+
+    <g stroke="#0a592e" stroke-width="9" stroke-linejoin="round" stroke-linecap="round" fill="#fff">
+      <!-- Head / Cuello -->
+      <path d="M 122 45 
+               L 118 85 
+               C 117 100, 111 110, 102 120 
+               C 100 124, 100 127, 104 128 
+               L 154 128 
+               C 158 127, 158 124, 156 120 
+               C 147 110, 141 100, 140 85 
+               L 136 45 
+               C 134 40, 124 40, 122 45 Z" />
+      
+      <!-- Body / Cuerpo -->
+      <path d="M 105 140 
+               C 101 140, 99 142, 99 146 
+               L 99 225 
+               C 99 238, 105 245, 115 245 
+               L 143 245 
+               C 153 245, 159 238, 159 225 
+               L 159 146 
+               C 159 142, 157 140, 153 140 
+               Z" />
+    </g>
+    
+    <!-- Inner reflection/liquid -->
+    <rect x="113" y="152" width="32" height="78" rx="4" fill="#eee5d3" stroke="none" />
+  </g>
+</svg>
