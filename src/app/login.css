@@ -70,6 +70,10 @@
 }
 
 .official-brand-logo {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
   margin-bottom: var(--spacing-lg);
 }
 
