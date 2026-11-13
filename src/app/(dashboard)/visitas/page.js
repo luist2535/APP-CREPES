@@ -7670,7 +7670,7 @@ Generado e impreso el ${new Date().toLocaleString('es-ES')}
           }
 
           .print-only-header h2 {
-            font-family: 'Playfair Display', serif;
+            font-family: var(--font-display);
             color: #4A2518;
           }
 

@@ -83,7 +83,7 @@ export default function DashboardLayout({ children }) {
       formData.append('file', selectedAvatarFile);
       formData.append('categoria', 'avatar_usuario');
       formData.append('tipo_documento', 'Foto de Perfil');
-      
+
       const uploadRes = await fetch('/api/uploads', {
         method: 'POST',
         body: formData
@@ -332,7 +332,7 @@ export default function DashboardLayout({ children }) {
   const hasAccess = (path) => {
     const rol = parseInt(user.rol_id);
     if (rol === 1) return true; // Admin has access to all
-    
+
     const moduleMap = {
       '/dashboard': 'dashboard',
       '/territorial': 'territorial',
@@ -354,7 +354,7 @@ export default function DashboardLayout({ children }) {
     if (modKey && user.permisos_adicionales && user.permisos_adicionales[modKey] !== undefined) {
       return Boolean(user.permisos_adicionales[modKey].permitido);
     }
-    
+
     // Roles list groupings
     const jefesYCoordinador = [2, 3, 4, 5, 6, 7, 9];
     const auxiliares = [10, 11, 12, 13, 14, 15, 16];
@@ -684,8 +684,8 @@ export default function DashboardLayout({ children }) {
   return (
     <div className="app-layout">
       {/* Sidebar Overlay for Mobile */}
-      <div 
-        className={`sidebar-overlay ${sidebarOpen ? 'active' : ''}`} 
+      <div
+        className={`sidebar-overlay ${sidebarOpen ? 'active' : ''}`}
         onClick={() => setSidebarOpen(false)}
       ></div>
 
@@ -694,10 +694,10 @@ export default function DashboardLayout({ children }) {
         <div className="sidebar-header">
           <div className="sidebar-logo" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             {!logoError ? (
-              <img 
-                src="/images/logo-crepes-round-brown.png" 
-                alt="Logo" 
-                onError={() => setLogoError(true)} 
+              <img
+                src="/images/logo-crepes-round-brown.png"
+                alt="Logo"
+                onError={() => setLogoError(true)}
                 style={{ width: '100%', height: '100%', objectFit: 'contain' }}
               />
             ) : (
@@ -721,8 +721,8 @@ export default function DashboardLayout({ children }) {
               {section.items.map((item) => {
                 const isActive = pathname === item.path.split('?')[0];
                 return (
-                  <Link 
-                    key={item.path} 
+                  <Link
+                    key={item.path}
                     href={item.path}
                     className={`sidebar-link ${isActive ? 'active' : ''}`}
                     onClick={() => {
@@ -745,7 +745,7 @@ export default function DashboardLayout({ children }) {
         </nav>
 
         <div className="sidebar-footer">
-          <div 
+          <div
             className="sidebar-user"
             onClick={() => setAvatarModalOpen(true)}
             style={{ cursor: 'pointer', transition: 'all 0.2s' }}
@@ -772,15 +772,16 @@ export default function DashboardLayout({ children }) {
 
       {/* Main Content Area */}
       <div className="main-content">
+        <a href="#main-content" className="skip-link">Saltar al contenido principal</a>
         <header className="header">
-          <button 
-            className="header-menu-btn" 
+          <button
+            className="header-menu-btn"
             onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-label="Abrir menú"
           >
             ☰
           </button>
-          
+
           {/* Desktop Title & Date */}
           <div className="header-title desktop-only-header">
             <h1>{getPageTitle()}</h1>
@@ -801,10 +802,11 @@ export default function DashboardLayout({ children }) {
             )}
             {/* Notification Bell */}
             <div className="desktop-only-header" style={{ position: 'relative' }}>
-              <div 
-                style={{ cursor: 'pointer', position: 'relative' }} 
+              <button
+                style={{ cursor: 'pointer', position: 'relative', background: 'none', border: 'none', padding: '8px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '44px', minHeight: '44px' }}
                 onClick={() => { setNotifMenuOpen(prev => !prev); setProfileMenuOpen(false); }}
-                title="Notificaciones"
+                aria-label={notifications.length > 0 ? `Notificaciones, ${notifications.length} nuevas` : 'Notificaciones'}
+                className="touch-target-min"
               >
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#6B5B52' }}>
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -815,7 +817,7 @@ export default function DashboardLayout({ children }) {
                     {notifications.length}
                   </span>
                 )}
-              </div>
+              </button>
 
               {/* Notifications Dropdown */}
               {notifMenuOpen && (
@@ -829,10 +831,22 @@ export default function DashboardLayout({ children }) {
                   }}>
                     <div style={{ padding: '14px 16px', borderBottom: '1px solid #F0EAE1', background: '#FDFAF7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2C1810' }}>Notificaciones</div>
-                      <div style={{ fontSize: '0.65rem', color: '#6B3A2A', fontWeight: 600, cursor: 'pointer' }} onClick={() => setNotifications([])}>Marcar leídas</div>
+                      <button
+                        onClick={() => setNotifications([])}
+                        style={{
+                          fontSize: '0.65rem', color: '#6B3A2A', fontWeight: 600,
+                          background: 'none', border: 'none', padding: '8px 12px',
+                          borderRadius: '6px', cursor: 'pointer',
+                          minHeight: '44px', minWidth: '44px'
+                        }}
+                        className="touch-target-min"
+                        aria-label="Marcar todas las notificaciones como leídas"
+                      >
+                        Marcar leídas
+                      </button>
                     </div>
                     <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-                      
+
                       {notifications.length === 0 ? (
                         <div style={{ padding: '20px', textAlign: 'center', color: '#9CA3AF', fontSize: '0.75rem' }}>No tienes notificaciones nuevas.</div>
                       ) : (
@@ -840,9 +854,9 @@ export default function DashboardLayout({ children }) {
                           const isWarning = notif.estado_color === 'yellow' || notif.estado_color === 'orange';
                           const isCritical = notif.estado_color === 'red';
                           const bgColor = isCritical ? '#EF4444' : isWarning ? '#EAB308' : '#22C55E';
-                          
+
                           const timeString = new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                          
+
                           return (
                             <div key={idx} className="notif-item" style={{ padding: '12px 16px', borderBottom: '1px solid #F9F7F5', cursor: 'pointer', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: bgColor, marginTop: '6px', flexShrink: 0 }}></div>
@@ -851,7 +865,7 @@ export default function DashboardLayout({ children }) {
                                   Cambio de estado: {notif.ciudad_nombre}
                                 </div>
                                 <div style={{ fontSize: '0.7rem', color: '#6B5B52' }}>
-                                  El PDV <strong>{notif.pdv_nombre}</strong> pasó a estado <span style={{color: bgColor, fontWeight: 700}}>{notif.estado_nombre}</span>. (Por {notif.usuario})
+                                  El PDV <strong>{notif.pdv_nombre}</strong> pasó a estado <span style={{ color: bgColor, fontWeight: 700 }}>{notif.estado_nombre}</span>. (Por {notif.usuario})
                                 </div>
                                 <div style={{ fontSize: '0.65rem', color: '#9CA3AF', marginTop: '4px' }}>Hoy a las {timeString}</div>
                               </div>
@@ -862,7 +876,19 @@ export default function DashboardLayout({ children }) {
 
                     </div>
                     <div style={{ padding: '10px 16px', borderTop: '1px solid #F0EAE1', textAlign: 'center', background: '#F8F6F2' }}>
-                      <Link href="#" style={{ fontSize: '0.75rem', color: '#6B3A2A', fontWeight: 600, textDecoration: 'none' }}>Ver todas las notificaciones</Link>
+                      <button
+                        style={{
+                          fontSize: '0.75rem', color: '#6B3A2A', fontWeight: 600,
+                          background: 'none', border: 'none', padding: '10px 16px',
+                          borderRadius: '8px', cursor: 'pointer', textDecoration: 'none',
+                          minHeight: '44px', width: '100%'
+                        }}
+                        className="touch-target-min"
+                        onClick={() => {/* navigate to notifications page */ }}
+                        aria-label="Ver todas las notificaciones"
+                      >
+                        Ver todas las notificaciones
+                      </button>
                     </div>
                   </div>
                 </>
@@ -870,27 +896,28 @@ export default function DashboardLayout({ children }) {
             </div>
             {/* Admin Profile with dropdown */}
             <div style={{ position: 'relative' }} className="desktop-only-header">
-              <div
-                className="header-admin-profile"
+              <button
+                className="header-admin-profile touch-target-min"
                 onClick={() => { setProfileMenuOpen(prev => !prev); setNotifMenuOpen(false); }}
-                title="Opciones de cuenta"
+                aria-label={`Menú de usuario, ${user?.nombre || 'Administrador'}`}
+                style={{ background: 'none', border: 'none', padding: '6px 10px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', minWidth: '44px', minHeight: '44px' }}
               >
-                <div className="header-admin-avatar" style={{ overflow: 'hidden', padding: 0 }}>
+                <div className="header-admin-avatar" style={{ overflow: 'hidden', padding: 0, flexShrink: 0, width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--color-primary-dark), var(--color-primary))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-on-primary)', fontWeight: 700, fontSize: '0.75rem' }}>
                   {user.avatar ? (
-                    <img src={user.avatar} alt={user.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={user.avatar} alt={user.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                   ) : (
                     user.nombre.substring(0, 2).toUpperCase()
                   )}
                 </div>
-                <div className="header-admin-info">
-                  <span className="header-admin-name">{user.nombre}</span>
-                  <span className="header-admin-email">{user.email || user.correo || 'admin@crepes.com'}</span>
+                <div className="header-admin-info" style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                  <span className="header-admin-name" style={{ fontSize: '0.78rem', fontWeight: 600, color: '#2C1810', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.nombre}</span>
+                  <span className="header-admin-email" style={{ fontSize: '0.62rem', color: '#9CA3AF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email || user.correo || 'admin@crepes.com'}</span>
                 </div>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
                   style={{ color: '#9CA3AF', flexShrink: 0, transform: profileMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
                   <polyline points="6 9 12 15 18 9" />
                 </svg>
-              </div>
+              </button>
 
               {/* Dropdown menu */}
               {profileMenuOpen && (
@@ -917,14 +944,16 @@ export default function DashboardLayout({ children }) {
                           padding: '10px 12px', border: 'none', background: 'transparent',
                           borderRadius: '8px', cursor: 'pointer', color: '#2C1810',
                           fontSize: '0.82rem', fontWeight: 600, textAlign: 'left',
-                          transition: 'background 0.15s', marginBottom: '4px'
+                          transition: 'background 0.15s', marginBottom: '4px',
+                          minHeight: '44px'
                         }}
                         onMouseEnter={e => e.currentTarget.style.background = '#F5ECE5'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        className="touch-target-min"
                       >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                          <circle cx="12" cy="13" r="4"/>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                          <circle cx="12" cy="13" r="4" />
                         </svg>
                         Cambiar foto de perfil
                       </button>
@@ -935,15 +964,17 @@ export default function DashboardLayout({ children }) {
                           padding: '10px 12px', border: 'none', background: 'transparent',
                           borderRadius: '8px', cursor: 'pointer', color: '#DC2626',
                           fontSize: '0.82rem', fontWeight: 600, textAlign: 'left',
-                          transition: 'background 0.15s'
+                          transition: 'background 0.15s',
+                          minHeight: '44px'
                         }}
                         onMouseEnter={e => e.currentTarget.style.background = '#FEE2E2'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        className="touch-target-min"
                       >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                          <polyline points="16 17 21 12 16 7"/>
-                          <line x1="21" y1="12" x2="9" y2="12"/>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                          <polyline points="16 17 21 12 16 7" />
+                          <line x1="21" y1="12" x2="9" y2="12" />
                         </svg>
                         Cerrar sesión
                       </button>
@@ -954,75 +985,111 @@ export default function DashboardLayout({ children }) {
             </div>
 
             {/* Mobile Right Icons (Bell + Profile) */}
-            <div className="mobile-only-right-actions" style={{ display: 'none', alignItems: 'center', gap: '12px' }}>
-              <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => { setNotifMenuOpen(prev => !prev); setProfileMenuOpen(false); }}>
+            <div className="mobile-only-right-actions" style={{ display: 'none', alignItems: 'center', gap: '8px', position: 'relative' }}>
+              <button
+                style={{ position: 'relative', cursor: 'pointer', background: 'none', border: 'none', padding: '8px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '44px', minHeight: '44px' }}
+                onClick={() => { setNotifMenuOpen(prev => !prev); setProfileMenuOpen(false); }}
+                aria-label={notifications.length > 0 ? `Notificaciones, ${notifications.length} nuevas` : 'Notificaciones'}
+                className="touch-target-min"
+              >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                   <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
                 {notifications.length > 0 && (
-                  <span style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#EF4444', color: '#fff', borderRadius: '50%', width: '14px', height: '14px', fontSize: '0.55rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #3D2314' }}>
+                  <span style={{ position: 'absolute', top: '4px', right: '4px', background: '#EF4444', color: '#fff', borderRadius: '50%', width: '16px', height: '16px', fontSize: '0.55rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #3D2314' }}>
                     {notifications.length}
                   </span>
                 )}
+              </button>
 
-                {/* Mobile Dropdown Menu for Notifications */}
-                {notifMenuOpen && (
-                  <>
-                    <div onClick={(e) => { e.stopPropagation(); setNotifMenuOpen(false); }} style={{ position: 'fixed', inset: 0, zIndex: 9998, cursor: 'default' }} />
-                    <div style={{
-                      position: 'absolute', top: 'calc(100% + 15px)', right: '-60px',
-                      background: '#fff', borderRadius: '12px', border: '1px solid #E8DDD4',
-                      boxShadow: '0 8px 24px rgba(107,58,42,0.2)', width: '280px',
-                      zIndex: 9999, overflow: 'hidden', animation: 'dropDown 0.15s ease', cursor: 'default'
-                    }} onClick={(e) => e.stopPropagation()}>
-                      <div style={{ padding: '14px 16px', borderBottom: '1px solid #F0EAE1', background: '#FDFAF7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2C1810' }}>Notificaciones</div>
-                        <div style={{ fontSize: '0.65rem', color: '#6B3A2A', fontWeight: 600, cursor: 'pointer' }} onClick={() => setNotifications([])}>Marcar leídas</div>
-                      </div>
-                      <div style={{ maxHeight: '250px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-                        {notifications.length === 0 ? (
-                          <div style={{ padding: '20px', textAlign: 'center', color: '#9CA3AF', fontSize: '0.75rem' }}>No tienes notificaciones nuevas.</div>
-                        ) : (
-                          notifications.map((notif, idx) => {
-                            const isWarning = notif.estado_color === 'yellow' || notif.estado_color === 'orange';
-                            const isCritical = notif.estado_color === 'red';
-                            const bgColor = isCritical ? '#EF4444' : isWarning ? '#EAB308' : '#22C55E';
-                            const timeString = new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                            return (
-                              <div key={idx} className="notif-item" style={{ padding: '12px 16px', borderBottom: '1px solid #F9F7F5', cursor: 'pointer', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: bgColor, marginTop: '6px', flexShrink: 0 }}></div>
-                                <div>
-                                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2C1810', marginBottom: '2px' }}>Cambio de estado: {notif.ciudad_nombre}</div>
-                                  <div style={{ fontSize: '0.7rem', color: '#6B5B52' }}>El PDV <strong>{notif.pdv_nombre}</strong> pasó a <span style={{color: bgColor, fontWeight: 700}}>{notif.estado_nombre}</span>.</div>
-                                  <div style={{ fontSize: '0.65rem', color: '#9CA3AF', marginTop: '4px' }}>Hoy a las {timeString}</div>
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                      <div style={{ padding: '10px 16px', borderTop: '1px solid #F0EAE1', textAlign: 'center', background: '#F8F6F2' }}>
-                        <Link href="#" style={{ fontSize: '0.75rem', color: '#6B3A2A', fontWeight: 600, textDecoration: 'none' }}>Ver todas las notificaciones</Link>
-                      </div>
+              {/* Mobile Dropdown Menu for Notifications */}
+              {notifMenuOpen && (
+                <>
+                  <div onClick={(e) => { e.stopPropagation(); setNotifMenuOpen(false); }} style={{ position: 'fixed', inset: 0, zIndex: 9998, cursor: 'default' }} />
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 15px)', right: '-60px',
+                    background: '#fff', borderRadius: '12px', border: '1px solid #E8DDD4',
+                    boxShadow: '0 8px 24px rgba(107,58,42,0.2)', width: '280px',
+                    zIndex: 9999, overflow: 'hidden', animation: 'dropDown 0.15s ease', cursor: 'default'
+                  }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ padding: '14px 16px', borderBottom: '1px solid #F0EAE1', background: '#FDFAF7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2C1810' }}>Notificaciones</div>
+                      <button
+                        onClick={() => setNotifications([])}
+                        style={{
+                          fontSize: '0.65rem', color: '#6B3A2A', fontWeight: 600,
+                          background: 'none', border: 'none', padding: '8px 12px',
+                          borderRadius: '6px', cursor: 'pointer',
+                          minHeight: '44px', minWidth: '44px'
+                        }}
+                        className="touch-target-min"
+                        aria-label="Marcar todas las notificaciones como leídas"
+                      >
+                        Marcar leídas
+                      </button>
                     </div>
-                  </>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative' }} onClick={() => { setProfileMenuOpen(prev => !prev); setNotifMenuOpen(false); }}>
-                <div 
-                  className="header-admin-avatar-mobile"
-                  style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#F5EBE1', color: '#3D2314', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 800, overflow: 'hidden' }}
+                    <div style={{ maxHeight: '250px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: '20px', textAlign: 'center', color: '#9CA3AF', fontSize: '0.75rem' }}>No tienes notificaciones nuevas.</div>
+                      ) : (
+                        notifications.map((notif, idx) => {
+                          const isWarning = notif.estado_color === 'yellow' || notif.estado_color === 'orange';
+                          const isCritical = notif.estado_color === 'red';
+                          const bgColor = isCritical ? '#EF4444' : isWarning ? '#EAB308' : '#22C55E';
+                          const timeString = new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                          return (
+                            <div key={idx} className="notif-item" style={{ padding: '12px 16px', borderBottom: '1px solid #F9F7F5', cursor: 'pointer', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: bgColor, marginTop: '6px', flexShrink: 0 }}></div>
+                              <div>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2C1810', marginBottom: '2px' }}>Cambio de estado: {notif.ciudad_nombre}</div>
+                                <div style={{ fontSize: '0.7rem', color: '#6B5B52' }}>El PDV <strong>{notif.pdv_nombre}</strong> pasó a <span style={{ color: bgColor, fontWeight: 700 }}>{notif.estado_nombre}</span>.</div>
+                                <div style={{ fontSize: '0.65rem', color: '#9CA3AF', marginTop: '4px' }}>Hoy a las {timeString}</div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                    <div style={{ padding: '10px 16px', borderTop: '1px solid #F0EAE1', textAlign: 'center', background: '#F8F6F2' }}>
+                      <button
+                        style={{
+                          fontSize: '0.75rem', color: '#6B3A2A', fontWeight: 600,
+                          background: 'none', border: 'none', padding: '10px 16px',
+                          borderRadius: '8px', cursor: 'pointer', textDecoration: 'none',
+                          minHeight: '44px', width: '100%'
+                        }}
+                        className="touch-target-min"
+                        onClick={() => {/* navigate to notifications page */ }}
+                        aria-label="Ver todas las notificaciones"
+                      >
+                        Ver todas las notificaciones
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+              <div style={{ position: 'relative' }}>
+                <button
+                  style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative', background: 'none', border: 'none', padding: '8px', borderRadius: 'var(--radius-md)', gap: '8px', minWidth: '44px', minHeight: '44px' }}
+                  onClick={() => { setProfileMenuOpen(prev => !prev); setNotifMenuOpen(false); }}
+                  aria-label={`Menú de usuario, ${user?.nombre || 'Administrador'}`}
+                  className="touch-target-min"
                 >
-                  {user?.avatar ? (
-                    <img src={user.avatar} alt={user.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    user?.nombre?.substring(0, 2).toUpperCase() || 'AD'
-                  )}
-                </div>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '4px', transform: profileMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
+                  <div
+                    className="header-admin-avatar-mobile"
+                    style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#F5EBE1', color: '#3D2314', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 800, overflow: 'hidden', flexShrink: 0 }}
+                  >
+                    {user?.avatar ? (
+                      <img src={user.avatar} alt={user.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      user?.nombre?.substring(0, 2).toUpperCase() || 'AD'
+                    )}
+                  </div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: profileMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', flexShrink: 0 }}>
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
 
                 {/* Mobile Dropdown Menu */}
                 {profileMenuOpen && (
@@ -1046,12 +1113,14 @@ export default function DashboardLayout({ children }) {
                             padding: '10px 12px', border: 'none', background: 'transparent',
                             borderRadius: '8px', cursor: 'pointer', color: '#2C1810',
                             fontSize: '0.82rem', fontWeight: 600, textAlign: 'left',
-                            marginBottom: '4px'
+                            marginBottom: '4px',
+                            minHeight: '44px'
                           }}
+                          className="touch-target-min"
                         >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                            <circle cx="12" cy="13" r="4"/>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                            <circle cx="12" cy="13" r="4" />
                           </svg>
                           Cambiar foto
                         </button>
@@ -1061,13 +1130,15 @@ export default function DashboardLayout({ children }) {
                             width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
                             padding: '10px 12px', border: 'none', background: 'transparent',
                             borderRadius: '8px', cursor: 'pointer', color: '#DC2626',
-                            fontSize: '0.82rem', fontWeight: 600, textAlign: 'left'
+                            fontSize: '0.82rem', fontWeight: 600, textAlign: 'left',
+                            minHeight: '44px'
                           }}
+                          className="touch-target-min"
                         >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                            <polyline points="16 17 21 12 16 7"/>
-                            <line x1="21" y1="12" x2="9" y2="12"/>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
                           </svg>
                           Cerrar sesión
                         </button>
@@ -1080,7 +1151,7 @@ export default function DashboardLayout({ children }) {
           </div>
         </header>
 
-        <main className="page-container animate-fade-in">
+        <main id="main-content" className="page-container animate-fade-in">
           {children}
         </main>
 
@@ -1238,7 +1309,7 @@ export default function DashboardLayout({ children }) {
           display: flex;
           flex-direction: column;
           line-height: 1.1;
-          font-family: 'Playfair Display', serif;
+          font-family: var(--font-display);
           font-weight: 700;
           text-align: left;
         }
@@ -1437,7 +1508,7 @@ export default function DashboardLayout({ children }) {
               <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#2C1810', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 📷 Foto de Perfil
               </h3>
-              <button 
+              <button
                 type="button"
                 onClick={() => setAvatarModalOpen(false)}
                 style={{ background: 'transparent', border: 'none', fontSize: '1.3rem', cursor: 'pointer', color: '#9CA3AF', padding: '4px 8px', borderRadius: '6px' }}
@@ -1449,7 +1520,7 @@ export default function DashboardLayout({ children }) {
 
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', margin: '15px 0' }}>
               {/* Previsualización Interactiva / Zona Drop */}
-              <div 
+              <div
                 onDragOver={(e) => { e.preventDefault(); setIsDraggingAvatar(true); }}
                 onDragLeave={() => setIsDraggingAvatar(false)}
                 onDrop={handleAvatarDrop}
@@ -1495,18 +1566,18 @@ export default function DashboardLayout({ children }) {
               )}
 
               {/* Inputs ocultos pero vinculados */}
-              <input 
+              <input
                 id="avatar-file-modal-input"
-                type="file" 
+                type="file"
                 ref={fileInputRef}
                 onChange={handleAvatarFileChange}
                 accept="image/png, image/jpeg, image/jpg, image/webp"
                 style={{ display: 'none' }}
               />
 
-              <input 
+              <input
                 id="avatar-camera-modal-input"
-                type="file" 
+                type="file"
                 onChange={handleAvatarFileChange}
                 accept="image/*"
                 capture="user"
@@ -1515,7 +1586,7 @@ export default function DashboardLayout({ children }) {
 
               {/* Botones de acción para seleccionar archivo */}
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
-                <label 
+                <label
                   htmlFor="avatar-file-modal-input"
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '6px',
@@ -1530,7 +1601,7 @@ export default function DashboardLayout({ children }) {
                   📁 Seleccionar archivo
                 </label>
 
-                <label 
+                <label
                   htmlFor="avatar-camera-modal-input"
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '6px',
@@ -1583,9 +1654,9 @@ export default function DashboardLayout({ children }) {
             </p>
 
             <div className="inactivity-modal-actions" style={{ gap: '10px' }}>
-              <button 
+              <button
                 type="button"
-                className="btn-secondary" 
+                className="btn-secondary"
                 onClick={() => {
                   setAvatarModalOpen(false);
                   setSelectedAvatarFile(null);
@@ -1598,9 +1669,9 @@ export default function DashboardLayout({ children }) {
               >
                 Cancelar
               </button>
-              <button 
+              <button
                 type="button"
-                className="btn-primary" 
+                className="btn-primary"
                 onClick={handleSaveAvatar}
                 disabled={!selectedAvatarFile || uploadingAvatar}
                 style={{

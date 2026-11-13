@@ -379,7 +379,7 @@ export default function BloqueosPage() {
 
         .bloqueos-actions-row h2 {
           color: var(--color-primary-dark);
-          font-family: 'Playfair Display', serif;
+          font-family: var(--font-display);
         }
 
         .bloqueos-layout-grid {

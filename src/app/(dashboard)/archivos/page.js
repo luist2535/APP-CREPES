@@ -623,7 +623,7 @@ export default function RepositorioArchivosPage() {
           flex-wrap: wrap;
         }
         .repo-hero-title {
-          font-family: 'Playfair Display', 'Georgia', serif;
+          font-family: var(--font-display);
           font-size: 1.65rem;
           font-weight: 800;
           color: #2C1810;

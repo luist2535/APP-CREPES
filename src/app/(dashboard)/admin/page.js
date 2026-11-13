@@ -2101,7 +2101,7 @@ function AdminContent() {
 
         .admin-actions-row h3 {
           color: var(--color-primary-dark);
-          font-family: 'Playfair Display', serif;
+          font-family: var(--font-display);
         }
 
         .admin-layout-grid {

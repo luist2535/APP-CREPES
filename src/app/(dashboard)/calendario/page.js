@@ -1146,7 +1146,7 @@ export default function CalendarioPage() {
 
         .calendar-month-header h2 {
           color: #3a2113;
-          font-family: 'Playfair Display', serif;
+          font-family: var(--font-display);
           font-size: 1.3rem;
           font-weight: 700;
           margin: 0;

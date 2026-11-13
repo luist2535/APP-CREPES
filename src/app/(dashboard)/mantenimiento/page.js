@@ -1378,7 +1378,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: '#2C1810', fontFamily: "'Playfair Display', serif" }}>Módulo de Mantenimiento</h1>
+            <h1 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: '#2C1810', fontFamily: 'var(--font-display)' }}>Módulo de Mantenimiento</h1>
             <div style={{ fontSize: '0.85rem', color: '#6B7280', marginTop: '3px', textTransform: 'capitalize' }}>
               {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </div>
@@ -1648,7 +1648,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
 
               {/* ====== ACCESOS RÁPIDOS FOOTER DESKTOP EXACTO A input_file_0.png ====== */}
               <div className="desktop-only-table" style={{ background: '#fff', borderRadius: '16px', border: '1px solid #E5D8CC', padding: '22px 24px', marginTop: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 800, color: '#2C1810', fontFamily: "'Playfair Display', serif" }}>Accesos Rápidos</h3>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 800, color: '#2C1810', fontFamily: 'var(--font-display)' }}>Accesos Rápidos</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '14px' }}>
                   {[
                     { icon: '📅', title: 'Calendario', desc: 'Ver agenda', path: '/calendario' },
@@ -1705,7 +1705,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
       {activeTab === 'nuevo' && (
         <div className="card animate-fade-in" style={{ borderRadius: '16px', border: '1px solid #E8DDD4', overflow: 'hidden' }}>
           <div style={{ background: 'linear-gradient(135deg, #6B3A2A 0%, #8B5E3C 100%)', padding: '20px 24px' }}>
-            <h3 style={{ margin: 0, color: '#fff', fontFamily: "'Playfair Display', serif" }}>➕ Registrar Hallazgo / Ticket</h3>
+            <h3 style={{ margin: 0, color: '#fff', fontFamily: 'var(--font-display)' }}>➕ Registrar Hallazgo / Ticket</h3>
             <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.75)', fontSize: '0.85rem' }}>
               El prefijo <strong>MT</strong> o <strong>ST</strong> se asignará automáticamente según el área de registro.
             </p>
@@ -1837,7 +1837,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
       {activeTab === 'inspeccion' && (
         <div className="card animate-fade-in" style={{ borderRadius: '16px', border: '1px solid #E8DDD4', overflow: 'hidden' }}>
           <div style={{ background: 'linear-gradient(135deg, #1D4ED8 0%, #3B82F6 100%)', padding: '20px 24px' }}>
-            <h3 style={{ margin: 0, color: '#fff', fontFamily: "'Playfair Display', serif" }}>🔍 Registrar Inspección</h3>
+            <h3 style={{ margin: 0, color: '#fff', fontFamily: 'var(--font-display)' }}>🔍 Registrar Inspección</h3>
             <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.75)', fontSize: '0.85rem' }}>Cada hallazgo generará automáticamente un ticket MT o ST.</p>
           </div>
           <form onSubmit={submitInspeccion} style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1929,7 +1929,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ background: 'linear-gradient(135deg, #166534 0%, #15803D 100%)', padding: '20px 24px', borderRadius: '14px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
-                  <h3 style={{ margin: 0, fontFamily: "'Playfair Display', serif" }}>🛠️ Tareas de Soporte por Ejecutar (Modo Visita)</h3>
+                  <h3 style={{ margin: 0, fontFamily: 'var(--font-display)' }}>🛠️ Tareas de Soporte por Ejecutar (Modo Visita)</h3>
                   <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.85)', fontSize: '0.85rem' }}>
                     Selecciona una orden de trabajo para ver el checklist de actividades, capturar fotografías y firmar en pantalla completa.
                   </p>
@@ -2465,7 +2465,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
       {/* ====== TAB: ALERTAS / NOTIFICACIONES ====== */}
       {activeTab === 'alertas' && (
         <div className="card animate-fade-in" style={{ borderRadius: '16px', border: '1px solid #E8DDD4', padding: '24px 28px', maxWidth: '480px' }}>
-          <h4 style={{ margin: '0 0 16px', color: '#4A2518', fontFamily: "'Playfair Display', serif", fontSize: '1.1rem' }}>🔔 Configuración de Notificaciones</h4>
+          <h4 style={{ margin: '0 0 16px', color: '#4A2518', fontFamily: 'var(--font-display)', fontSize: '1.1rem' }}>🔔 Configuración de Notificaciones</h4>
           <p style={{ margin: '0 0 20px', color: '#666', fontSize: '0.88rem', lineHeight: 1.5 }}>
             Configura si deseas recibir notificaciones por correo electrónico cuando esta funcionalidad esté habilitada.
           </p>
@@ -2694,7 +2694,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.6)', backdropFilter: 'blur(6px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '440px', boxShadow: '0 20px 60px rgba(107,58,42,0.25)', overflow: 'hidden' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #F0EAE1' }}>
-              <h4 style={{ margin: 0, color: '#4A2518', fontFamily: "'Playfair Display', serif" }}>
+              <h4 style={{ margin: 0, color: '#4A2518', fontFamily: 'var(--font-display)' }}>
                 {accionModal.tipo === 'finalizar' ? '✅ Finalizar Ticket' : accionModal.tipo === 'cancelar' ? '✕ Cancelar Ticket' : accionModal.tipo === 'iniciar' ? '▶️ Iniciar Ejecución' : '👔 Asignar Ticket'}
               </h4>
               <div style={{ fontSize: '0.82rem', color: '#888', marginTop: '4px' }}>Ticket: {accionModal.ticketId}</div>
@@ -3220,7 +3220,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
             </div>
 
             <div style={{ padding: '0 28px' }}>
-              <h1 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: '#1F2937', fontFamily: "'Playfair Display', serif", display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <h1 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: '#1F2937', fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ fontSize: '1.5rem', color: '#4F46E5' }}>👔</span> Revisión y Aprobación del Trabajo
               </h1>
               <p style={{ margin: '2px 0 0', fontSize: '0.85rem', color: '#6B7280' }}>Evalúa la calidad de la reparación antes del cierre oficial</p>
@@ -3229,7 +3229,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
             <div style={{ background: '#fff', borderBottom: '1px solid #E5E7EB', padding: '16px 28px', flexShrink: 0 }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
                 <div style={{ background: '#4F46E5', color: '#fff', fontSize: '0.72rem', fontWeight: 800, padding: '5px 12px', borderRadius: '8px', letterSpacing: '0.5px' }}>TICKET</div>
-                <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#1F2937', fontFamily: "'Playfair Display', serif" }}>{approvalModalTicket.id}</span>
+                <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#1F2937', fontFamily: 'var(--font-display)' }}>{approvalModalTicket.id}</span>
                 {approvalModalTicket.equipo_nombre && (
                   <span style={{ background: approvalModalTicket.estado === 'Finalizado' ? '#DCFCE7' : '#FEF3C7', color: approvalModalTicket.estado === 'Finalizado' ? '#166534' : '#92400E', fontSize: '0.75rem', fontWeight: 700, padding: '4px 12px', borderRadius: '8px', border: `1px solid ${approvalModalTicket.estado === 'Finalizado' ? '#BBF7D0' : '#FDE68A'}` }}>
                     {approvalModalTicket.equipo_nombre || approvalModalTicket.area_hallazgo || 'Locativo'}
@@ -3759,7 +3759,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
 
           <div style={{ fontFamily: "'Inter', sans-serif", color: '#1f2937', maxWidth: '800px', margin: '0 auto' }}>
             <div style={{ textAlign: 'center', borderBottom: '3px solid #6B3A2A', paddingBottom: '15px', marginBottom: '25px' }}>
-              <h1 style={{ margin: '0 0 5px 0', fontSize: '1.8rem', color: '#4A2518', fontFamily: "'Playfair Display', serif" }}>CREPES EN PUNTO</h1>
+              <h1 style={{ margin: '0 0 5px 0', fontSize: '1.8rem', color: '#4A2518', fontFamily: 'var(--font-display)' }}>CREPES EN PUNTO</h1>
               <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#6B3A2A', textTransform: 'uppercase', letterSpacing: '1px' }}>Reporte Técnico de Mantenimiento y Cierre de Orden</h2>
             </div>
 

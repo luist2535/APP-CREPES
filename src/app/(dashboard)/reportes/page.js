@@ -2116,7 +2116,7 @@ Impreso y registrado en el repositorio el ${new Date().toLocaleString('es-ES')}
         }
 
         .rep-title {
-          font-family: 'Playfair Display', serif;
+          font-family: var(--font-display);
           font-size: 1.8rem;
           font-weight: 700;
           color: var(--color-primary-dark);

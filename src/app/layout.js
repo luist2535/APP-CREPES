@@ -23,6 +23,9 @@ export default function RootLayout({ children }) {
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png?v=6" />
         <link rel="shortcut icon" href="/favicon.ico?v=6" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=6" />
+        {/* Font preload para performance */}
+        <link rel="preload" as="font" type="font/woff2" crossOrigin="anonymous"
+          href="https://fonts.gstatic.com/s/outfit/v14/QGY_z_wNahGAdqG43RhVcEgY.woff2" />
       </head>
       <body>{children}</body>
     </html>
