@@ -61,6 +61,7 @@ export default function AuditoriaPage() {
   const [lastSynced, setLastSynced] = useState(null);
   const [newLogsFlash, setNewLogsFlash] = useState(false);
   const lastTopIdRef = useRef(null);
+  const lastCountRef = useRef(0);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -78,10 +79,10 @@ export default function AuditoriaPage() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(15);
 
-  const fetchLogs = useCallback(async ({ silent = false } = {}) => {
+  const fetchLogs = useCallback(async ({ silent = false, manual = false } = {}) => {
     try {
       if (!silent) setLoading(true);
-      else setRefreshing(true);
+      else if (manual) setRefreshing(true);
 
       const res = await fetch(`/api/auditorias?_t=${Date.now()}`, {
         cache: 'no-store',
@@ -94,22 +95,33 @@ export default function AuditoriaPage() {
         usuario: cleanName(l.usuario)
       }));
 
-      if (incoming.length > 0 && lastTopIdRef.current && incoming[0].id !== lastTopIdRef.current) {
+      const newTopId = incoming[0]?.id || null;
+      const hasChanges =
+        !silent ||
+        manual ||
+        newTopId !== lastTopIdRef.current ||
+        incoming.length !== lastCountRef.current;
+
+      if (incoming.length > 0 && lastTopIdRef.current && newTopId !== lastTopIdRef.current) {
         setNewLogsFlash(true);
         setTimeout(() => setNewLogsFlash(false), 1800);
       }
-      if (incoming.length > 0) {
-        lastTopIdRef.current = incoming[0].id;
-      }
 
-      setLogs(incoming);
-      setLastSynced(new Date());
+      lastTopIdRef.current = newTopId;
+      lastCountRef.current = incoming.length;
+
+      // Solo actualizamos el estado si realmente llegaron registros nuevos o es carga inicial/manual
+      // Así evitamos cualquier re-render o parpadeo cada 5 segundos
+      if (hasChanges) {
+        setLogs(incoming);
+        setLastSynced(new Date());
+      }
       setError(null);
     } catch (err) {
       if (!silent) setError(err.message);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!silent) setLoading(false);
+      if (manual) setRefreshing(false);
     }
   }, []);
 
@@ -257,7 +269,7 @@ export default function AuditoriaPage() {
             <h1 className="page-title">Bitácora de Auditoría</h1>
             <span className={`live-pill ${autoRefresh ? 'on' : 'off'} ${newLogsFlash ? 'flash' : ''}`}>
               <span className="live-dot" />
-              {refreshing ? 'Sincronizando...' : autoRefresh ? `EN VIVO (cada ${refreshIntervalSec}s)` : 'Pausado'}
+              {newLogsFlash ? '¡Nuevo evento!' : autoRefresh ? `EN VIVO (cada ${refreshIntervalSec}s)` : 'Pausado'}
             </span>
           </div>
           <p className="page-subtitle">
@@ -297,12 +309,12 @@ export default function AuditoriaPage() {
 
           <button
             className="btn-refresh"
-            onClick={() => fetchLogs({ silent: true })}
+            onClick={() => fetchLogs({ silent: true, manual: true })}
             disabled={refreshing}
             title="Actualizar ahora mismo"
           >
             <span className={refreshing ? 'spin-icon' : ''} style={{ display: 'inline-block' }}>🔄</span>
-            <span>{refreshing ? 'Actualizando...' : 'Actualizar'}</span>
+            <span>Actualizar</span>
           </button>
 
           <button className="btn-export" onClick={handleExportCSV} disabled={filteredLogs.length === 0}>
