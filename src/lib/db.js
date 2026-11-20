@@ -192,6 +192,65 @@ function getDb() {
       console.error('Error migrando plantillas:', e);
     }
 
+    // ── Índices de rendimiento para Mantenimiento ──────────────────
+    try {
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_mant_estado ON mantenimientos(estado);
+        CREATE INDEX IF NOT EXISTS idx_mant_tecnico ON mantenimientos(tecnico_id);
+        CREATE INDEX IF NOT EXISTS idx_mant_fecha_reg ON mantenimientos(fecha_registro DESC);
+        CREATE INDEX IF NOT EXISTS idx_mant_fecha_prog ON mantenimientos(fecha_programada);
+        CREATE INDEX IF NOT EXISTS idx_mant_equipo ON mantenimientos(equipo_id);
+        CREATE INDEX IF NOT EXISTS idx_mant_prefijo ON mantenimientos(prefijo);
+        CREATE INDEX IF NOT EXISTS idx_mant_user_reg ON mantenimientos(user_id_registro);
+        CREATE INDEX IF NOT EXISTS idx_mant_prioridad ON mantenimientos(prioridad);
+        CREATE INDEX IF NOT EXISTS idx_mant_tipo ON mantenimientos(tipo_mantenimiento);
+        CREATE INDEX IF NOT EXISTS idx_mant_area_reg ON mantenimientos(area_registro);
+        CREATE INDEX IF NOT EXISTS idx_hist_mant_id ON historial_mantenimientos(mantenimiento_id);
+        CREATE INDEX IF NOT EXISTS idx_hist_mant_fecha ON historial_mantenimientos(created_at);
+      `);
+      console.log('✅ Índices de mantenimiento creados/verificados');
+    } catch (e) {
+      console.error('Error creando índices de mantenimiento:', e);
+    }
+
+    // ── Tabla de Plantillas de Checklist para Mantenimiento ─────────
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS checklist_plantillas (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          nombre TEXT NOT NULL,
+          area_registro TEXT NOT NULL,
+          tipo_mantenimiento TEXT NOT NULL,
+          equipo_id TEXT,
+          items TEXT NOT NULL,
+          created_by INTEGER,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (created_by) REFERENCES users(id)
+        )
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_checklist_tpl_area_tipo ON checklist_plantillas(area_registro, tipo_mantenimiento)');
+      console.log('✅ Tabla checklist_plantillas creada/verificada');
+    } catch (e) {
+      console.error('Error creando tabla checklist_plantillas:', e);
+    }
+
+    // ── Tabla de Notificaciones Enviadas (para evitar duplicados) ───
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS notificaciones_enviadas (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          mantenimiento_id TEXT NOT NULL,
+          tipo TEXT NOT NULL,
+          destinatario_id INTEGER NOT NULL,
+          enviado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(mantenimiento_id, tipo, destinatario_id)
+        )
+      `);
+      console.log('✅ Tabla notificaciones_enviadas creada/verificada');
+    } catch (e) {
+      console.error('Error creando tabla notificaciones_enviadas:', e);
+    }
+
     // Auto-importar activos fijos de Logika si aún no están en la BD
     try {
       const countLogika = db.prepare("SELECT count(*) as c FROM equipos WHERE pdv_id = 17").get();

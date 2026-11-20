@@ -2,6 +2,23 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // Custom Interactive Signature Pad Component using HTML5 Canvas
 function SignaturePad({ onSave, onClear, label, value }) {
@@ -335,8 +352,25 @@ function parseChecklist(input) {
   });
 }
 
+// Helper functions for filter presets
+function getWeekStart() {
+  const d = new Date();
+  const day = d.getDay(); // 0 = Domingo
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Lunes
+  const monday = new Date(d.setDate(diff));
+  return monday.toISOString().split('T')[0];
+}
+
+function getWeekEnd() {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? 0 : 7); // Domingo
+  const sunday = new Date(d.setDate(diff));
+  return sunday.toISOString().split('T')[0];
+}
+
 // =================== TICKET CARD (Mobile exacto a input_file_1.png) ===================
-function TicketCard({ ticket, onOpen, onStartModoVisita, onOpenModoVisita, onApprove, esJefe }) {
+function TicketCard({ ticket, onOpen, onAssign, onStartModoVisita, onOpenModoVisita, onApprove, esJefe }) {
   const ec = ESTADO_COLORS[ticket.estado] || ESTADO_COLORS['Pendiente'];
   const pc = PRIORIDAD_COLORS[ticket.prioridad] || PRIORIDAD_COLORS['Media'];
   const pref = PREFIJO_STYLE[ticket.prefijo] || PREFIJO_STYLE['MT'];
@@ -397,6 +431,11 @@ function TicketCard({ ticket, onOpen, onStartModoVisita, onOpenModoVisita, onApp
           >
             Ver
           </button>
+          {ticket.estado === 'Pendiente' && esJefe && onAssign && (
+            <button onClick={() => onAssign(ticket)} style={{ padding: '6px 12px', borderRadius: '10px', border: 'none', background: '#3D2314', color: '#fff', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+              👤 Asignar
+            </button>
+          )}
           {ticket.estado === 'Asignado' && (
             <button onClick={() => onStartModoVisita ? onStartModoVisita(ticket) : null} style={{ padding: '6px 12px', borderRadius: '10px', border: 'none', background: '#D97706', color: '#fff', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
               🚀 Iniciar
@@ -412,6 +451,453 @@ function TicketCard({ ticket, onOpen, onStartModoVisita, onOpenModoVisita, onApp
               🔍 Aprobar
             </button>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===================== KANBAN BOARD COMPONENT =====================
+function KanbanColumn({ estado, tickets, onTicketClick, onAssignTicket, esJefe, currentUserId, onMoveTicket }) {
+  const ec = ESTADO_COLORS[estado] || ESTADO_COLORS['Pendiente'];
+  const canDrop = (ticket) => {
+    if (estado === 'Asignado') return esJefe;
+    if (estado === 'En proceso') return ticket.tecnico_id === currentUserId;
+    if (estado === 'Por Aprobar') return ticket.tecnico_id === currentUserId;
+    if (estado === 'Finalizado') return esJefe;
+    return true;
+  };
+
+  return (
+    <div style={{
+      minWidth: '320px',
+      maxWidth: '320px',
+      flex: '0 0 320px',
+      background: '#F8F4EE',
+      borderRadius: '16px',
+      border: '1px solid #E5D8CC',
+      display: 'flex',
+      flexDirection: 'column',
+      minHeight: '500px'
+    }}>
+      <div style={{
+        background: `linear-gradient(135deg, ${ec.bg} 0%, ${ec.color}20 100%)`,
+        padding: '16px',
+        borderRadius: '16px 16px 0 0',
+        borderBottom: `2px solid ${ec.border}`
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{
+            fontSize: '0.8rem',
+            fontWeight: 800,
+            color: ec.color,
+            background: 'rgba(255,255,255,0.3)',
+            padding: '4px 12px',
+            borderRadius: '20px',
+            border: `1px solid ${ec.border}80`
+          }}>
+            {estado}
+          </span>
+          <span style={{ fontSize: '1.2rem', fontWeight: 800, color: ec.color }}>
+            {tickets.length}
+          </span>
+        </div>
+      </div>
+
+      <SortableContext
+        items={tickets.map(t => t.id)}
+        strategy={verticalListSortingStrategy}
+      >
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          {tickets.length === 0 && (
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#888',
+              padding: '20px',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '2rem', marginBottom: '8px' }}>📭</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>Sin tickets</div>
+              <div style={{ fontSize: '0.7rem', color: '#aaa' }}>Arrastra tickets aquí</div>
+            </div>
+          )}
+
+          {tickets.map(ticket => (
+            <KanbanTicketCard
+              key={ticket.id}
+              ticket={ticket}
+              estado={estado}
+              canDrop={canDrop(ticket)}
+              onClick={onTicketClick}
+              onAssign={onAssignTicket}
+              esJefe={esJefe}
+              currentUserId={currentUserId}
+            />
+          ))}
+        </div>
+      </SortableContext>
+    </div>
+  );
+}
+
+function KanbanTicketCard({ ticket, estado, canDrop, onClick, onAssign, esJefe, currentUserId }) {
+  const ec = ESTADO_COLORS[ticket.estado] || ESTADO_COLORS['Pendiente'];
+  const pc = PRIORIDAD_COLORS[ticket.prioridad] || PRIORIDAD_COLORS['Media'];
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ticket.id });
+
+  const style = {
+    background: '#fff',
+    borderRadius: '14px',
+    border: canDrop ? '1px solid #E5D8CC' : '1px dashed #D1C7BD',
+    padding: '14px 16px',
+    cursor: canDrop ? 'grab' : 'not-allowed',
+    opacity: isDragging ? 0.5 : 1,
+    transform: CSS.Transform.toString(transform),
+    transition: transition ? 'transform 200ms ease' : 'none',
+    boxShadow: isDragging ? '0 8px 24px rgba(61,35,20,0.15)' : '0 2px 8px rgba(0,0,0,0.04)',
+    position: 'relative',
+  };
+
+  if (!canDrop) {
+    style.background = '#FAF6F0';
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={() => canDrop && onClick(ticket)}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+        <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#2C1810' }}>
+          {ticket.id}
+        </span>
+        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: ec.color, background: ec.bg, padding: '2px 8px', borderRadius: '10px', border: `1px solid ${ec.border}` }}>
+          {ticket.prioridad}
+        </span>
+      </div>
+
+      <div style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '4px', fontWeight: 500 }}>
+        {ticket.tipo_mantenimiento} &bull; {ticket.area_registro}
+      </div>
+
+      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1F2937', lineHeight: 1.3, marginBottom: '8px' }}>
+        {ticket.descripcion?.length > 80 ? ticket.descripcion.substring(0, 80) + '…' : ticket.descripcion}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem', color: '#888', gap: '8px' }}>
+        <span>{formatDate(ticket.fecha_registro)}</span>
+        {ticket.estado === 'Pendiente' && esJefe && onAssign ? (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onAssign(ticket); }}
+            style={{
+              background: '#3D2314', color: '#FFFFFF', border: 'none',
+              borderRadius: '8px', padding: '4px 10px', fontWeight: 700,
+              fontSize: '0.72rem', cursor: 'pointer'
+            }}
+          >
+            👤 Asignar
+          </button>
+        ) : (
+          <span>{ticket.tecnico_nombre ? `👤 ${String(ticket.tecnico_nombre).replace(/\|/g, '').trim()}` : '👤 Sin asignar'}</span>
+        )}
+      </div>
+
+      {!canDrop && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: 'rgba(255,255,255,0.95)',
+          padding: '8px 12px',
+          borderRadius: '8px',
+          fontSize: '0.65rem',
+          fontWeight: 700,
+          color: '#92400E',
+          textAlign: 'center',
+          border: '1px solid #FDE68A',
+          pointerEvents: 'none',
+          whiteSpace: 'nowrap',
+          zIndex: 10
+        }}>
+          🔒 Acción no permitida
+        </div>
+      )}
+    </div>
+  );
+}
+
+function KanbanBoard({ tickets, onTicketClick, onAssignTicket, esJefe, currentUserId, showToast, onReload }) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const ESTADOS_KANBAN = ['Pendiente', 'Asignado', 'En proceso', 'Por Aprobar', 'Finalizado', 'Cancelado'];
+
+  const handleDragEnd = async (event) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    const ticket = tickets.find(t => t.id === active.id);
+    if (!ticket) return;
+
+    let targetEstado = null;
+
+    const ticketEstadoMap = {};
+    ESTADOS_KANBAN.forEach(estado => {
+      const columnTickets = tickets.filter(t => t.estado === estado);
+      columnTickets.forEach(t => { ticketEstadoMap[t.id] = estado; });
+    });
+
+    targetEstado = ticketEstadoMap[over.id];
+    if (!targetEstado) return;
+
+    if (targetEstado === ticket.estado) return;
+
+    const validTransitions = {
+      'Pendiente': { 'Asignado': 'asignar' },
+      'Asignado': { 'En proceso': 'iniciar' },
+      'En proceso': { 'Por Aprobar': 'finalizar' },
+      'Por Aprobar': { 'Finalizado': 'aprobar', 'En proceso': 'devolver' },
+    };
+
+    const currentEstado = ticket.estado;
+    const action = validTransitions[currentEstado]?.[targetEstado];
+
+    if (!action) {
+      if (showToast) showToast(`Transición no válida: ${currentEstado} → ${targetEstado}`, 'error');
+      return;
+    }
+
+    if (action === 'asignar' && !esJefe) {
+      if (showToast) showToast('Solo jefes pueden asignar tickets', 'error');
+      return;
+    }
+    if (action === 'iniciar' && ticket.tecnico_id !== currentUserId) {
+      if (showToast) showToast('Solo el técnico asignado puede iniciar el trabajo', 'error');
+      return;
+    }
+    if (action === 'finalizar' && ticket.tecnico_id !== currentUserId) {
+      if (showToast) showToast('Solo el técnico asignado puede finalizar', 'error');
+      return;
+    }
+    if (action === 'aprobar' && !esJefe) {
+      if (showToast) showToast('Solo jefes pueden aprobar tickets', 'error');
+      return;
+    }
+    if (action === 'devolver' && !esJefe) {
+      if (showToast) showToast('Solo jefes pueden devolver tickets', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/mantenimientos/${ticket.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: action })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      if (showToast) showToast(data.message || `Ticket movido a ${targetEstado}`, 'success');
+      if (onReload) onReload();
+      if (window.loadTickets) window.loadTickets();
+      if (window.loadMisTickets) window.loadMisTickets();
+    } catch (e) {
+      if (showToast) showToast(e.message, 'error');
+    }
+  };
+
+  const columns = ESTADOS_KANBAN.map(estado => ({
+    estado,
+    tickets: tickets.filter(t => t.estado === estado)
+  }));
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <div style={{
+        display: 'flex',
+        gap: '16px',
+        overflowX: 'auto',
+        padding: '16px 8px 24px',
+        minHeight: '600px'
+      }}>
+        {columns.map(col => (
+          <KanbanColumn
+            key={col.estado}
+            estado={col.estado}
+            tickets={col.tickets}
+            onTicketClick={onTicketClick}
+            onAssignTicket={onAssignTicket}
+            esJefe={esJefe}
+            currentUserId={currentUserId}
+          />
+        ))}
+      </div>
+    </DndContext>
+  );
+}
+
+// ===================== CHECKLIST TEMPLATE MODAL =====================
+function ChecklistTemplateModal({ isOpen, onClose, templateForm, setTemplateForm, editingTemplate, onSave, saving }) {
+  if (!isOpen) return null;
+
+  const addItem = () => {
+    setTemplateForm(prev => ({ ...prev, items: [...prev.items, { texto: '', obligatorio: true }] }));
+  };
+
+  const removeItem = (idx) => {
+    setTemplateForm(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }));
+  };
+
+  const updateItem = (idx, field, value) => {
+    setTemplateForm(prev => {
+      const newItems = [...prev.items];
+      newItems[idx] = { ...newItems[idx], [field]: value };
+      return { ...prev, items: newItems };
+    });
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.55)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overflowY: 'auto' }}>
+      <div style={{ background: '#fff', borderRadius: '18px', width: '100%', maxWidth: '600px', boxShadow: '0 20px 60px rgba(107,58,42,0.25)', overflow: 'hidden' }}>
+        <div style={{ background: 'linear-gradient(135deg, #0369A1 0%, #0284C7 100%)', padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0, color: '#fff', fontSize: '1.1rem', fontWeight: 800 }}>
+            {editingTemplate ? '✏️ Editar Plantilla' : '➕ Nueva Plantilla de Checklist'}
+          </h3>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: '1.3rem', cursor: 'pointer', borderRadius: '8px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+        </div>
+
+        <div style={{ padding: '24px', maxHeight: '80vh', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+            <div>
+              <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#4A2518', display: 'block', marginBottom: '6px' }}>Nombre de la Plantilla *</label>
+              <input
+                type="text"
+                value={templateForm.nombre}
+                onChange={e => setTemplateForm(prev => ({ ...prev, nombre: e.target.value }))}
+                placeholder="Ej: Checklist Preventivo Aires Acondicionados"
+                style={{ width: '100%', padding: '10px 12px', border: '1px solid #E5D8CC', borderRadius: '8px', fontSize: '0.9rem', outline: 'none' }}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#4A2518', display: 'block', marginBottom: '6px' }}>Área de Registro *</label>
+                <select
+                  value={templateForm.area_registro}
+                  onChange={e => setTemplateForm(prev => ({ ...prev, area_registro: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #E5D8CC', borderRadius: '8px', fontSize: '0.9rem', outline: 'none' }}
+                >
+                  <option value="Mantenimiento">Mantenimiento</option>
+                  <option value="Sistemas">Sistemas</option>
+                  <option value="Calidad">Calidad</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#4A2518', display: 'block', marginBottom: '6px' }}>Tipo de Mantenimiento *</label>
+                <select
+                  value={templateForm.tipo_mantenimiento}
+                  onChange={e => setTemplateForm(prev => ({ ...prev, tipo_mantenimiento: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #E5D8CC', borderRadius: '8px', fontSize: '0.9rem', outline: 'none' }}
+                >
+                  <option value="Preventivo">Preventivo</option>
+                  <option value="Correctivo">Correctivo</option>
+                  <option value="Locativo">Locativo</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#4A2518', display: 'block', marginBottom: '6px' }}>Equipo (Opcional - vacío = general para el tipo)</label>
+              <input
+                type="text"
+                value={templateForm.equipo_id}
+                onChange={e => setTemplateForm(prev => ({ ...prev, equipo_id: e.target.value }))}
+                placeholder="ID o código del equipo (ej: EQ-AIRE-001)"
+                style={{ width: '100%', padding: '10px 12px', border: '1px solid #E5D8CC', borderRadius: '8px', fontSize: '0.9rem', outline: 'none' }}
+              />
+              <p style={{ margin: '4px 0 0', fontSize: '0.72rem', color: '#888' }}>Deja vacío para aplicar a todos los equipos de este tipo/área</p>
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#4A2518', margin: 0 }}>Tareas del Checklist *</label>
+                <button onClick={addItem} style={{ background: '#EFF6FF', color: '#1E40AF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '6px 12px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>
+                  ➕ Añadir Tarea
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {templateForm.items.map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center', background: '#FAF6F0', border: '1px solid #E8DDD4', borderRadius: '8px', padding: '10px' }}>
+                    <input
+                      type="checkbox"
+                      checked={item.obligatorio}
+                      onChange={e => updateItem(idx, 'obligatorio', e.target.checked)}
+                      style={{ width: '18px', height: '18px', accentColor: '#DC2626', flexShrink: 0 }}
+                    />
+                    <input
+                      type="text"
+                      value={item.texto}
+                      onChange={e => updateItem(idx, 'texto', e.target.value)}
+                      placeholder="Descripción de la tarea..."
+                      style={{ flex: 1, padding: '8px 10px', border: '1px solid #E5D8CC', borderRadius: '6px', fontSize: '0.85rem', outline: 'none' }}
+                    />
+                    <span style={{ fontSize: '0.65rem', fontWeight: 700, color: item.obligatorio ? '#DC2626' : '#166534', background: item.obligatorio ? '#FEE2E2' : '#DCFCE7', padding: '2px 8px', borderRadius: '4px' }}>
+                      {item.obligatorio ? 'Obligatorio' : 'Opcional'}
+                    </span>
+                    {templateForm.items.length > 1 && (
+                      <button
+                        onClick={() => removeItem(idx)}
+                        style={{ background: '#FEE2E2', color: '#991B1B', border: 'none', borderRadius: '6px', width: '28px', height: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div style={{ background: '#FAF6F0', borderTop: '1px solid #E8DDD4', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          <button onClick={onClose} style={{ ...btnSecondary, padding: '10px 20px' }}>Cancelar</button>
+          <button
+            onClick={() => {
+              if (!templateForm.nombre.trim()) { alert('El nombre es obligatorio'); return; }
+              if (templateForm.items.some(i => !i.texto.trim())) { alert('Todas las tareas deben tener texto'); return; }
+              onSave();
+            }}
+            disabled={saving}
+            style={{ ...btnPrimary, background: '#0369A1', padding: '10px 24px' }}
+          >
+            {saving ? '⏳ Guardando...' : (editingTemplate ? '✅ Actualizar' : '✅ Crear')}
+          </button>
         </div>
       </div>
     </div>
@@ -648,6 +1134,36 @@ function SearchableCategorySelect({ categories, selectedId, onChange, areaId }) 
 
 
 // =================== MAIN PAGE ===================
+// Selector visual de técnicos con su carga actual de trabajo
+function TecnicoPicker({ tecnicos = [], tickets = [], value, onChange }) {
+  const carga = (id) => tickets.filter(t => String(t.tecnico_id) === String(id) && ['Asignado', 'En proceso'].includes(t.estado)).length;
+  const sorted = [...tecnicos].sort((a, b) => carga(a.id) - carga(b.id));
+  if (!tecnicos.length) {
+    return <div style={{ padding: '12px', borderRadius: '10px', background: '#FAF6F0', color: '#6B7280', fontSize: '0.8rem' }}>No hay técnicos disponibles para esta área.</div>;
+  }
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '8px', maxHeight: '230px', overflowY: 'auto', padding: '2px' }}>
+      {sorted.map((t, i) => {
+        const c = carga(t.id);
+        const sel = String(value) === String(t.id);
+        const ini = (t.nombre || '?').split(' ').filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase();
+        return (
+          <button type="button" key={t.id} onClick={() => onChange(t.id)}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '12px', border: sel ? '2px solid #3D2314' : '1px solid #E5D8CC', background: sel ? '#F5ECE5' : '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}>
+            <span style={{ width: '34px', height: '34px', borderRadius: '50%', background: sel ? '#3D2314' : '#F5EBE1', color: sel ? '#fff' : '#3D2314', fontWeight: 800, fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{ini}</span>
+            <span style={{ minWidth: 0 }}>
+              <span style={{ display: 'block', fontWeight: 700, fontSize: '0.82rem', color: '#2C1810', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.nombre}</span>
+              <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: c >= 5 ? '#B91C1C' : c >= 3 ? '#B45309' : '#15803D' }}>
+                {c} activo{c === 1 ? '' : 's'}{i === 0 && sorted.length > 1 ? ' · Recomendado' : ''}
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function MantenimientoPage() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
@@ -663,6 +1179,31 @@ export default function MantenimientoPage() {
   const [pdvs, setPdvs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
+
+  // Mis Tickets state
+  const [misTicketsData, setMisTicketsData] = useState({
+    asignados: [],
+    reportados: [],
+    asignadosPorEstado: {},
+    stats: {}
+  });
+  const [misTicketsLoading, setMisTicketsLoading] = useState(false);
+
+  // Kanban view toggle (por defecto entra directo a Kanban)
+  const [kanbanView, setKanbanView] = useState(true);
+
+  // Checklist Templates state
+  const [checklistTemplates, setChecklistTemplates] = useState([]);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState(null);
+  const [templateForm, setTemplateForm] = useState({
+    nombre: '',
+    area_registro: 'Mantenimiento',
+    tipo_mantenimiento: 'Correctivo',
+    equipo_id: '',
+    items: [{ texto: '', obligatorio: true }]
+  });
+  const [templateLoading, setTemplateLoading] = useState(false);
 
   // New Layout States
   const [approvalTab, setApprovalTab] = useState('resumen');
@@ -685,6 +1226,11 @@ export default function MantenimientoPage() {
   const [filtroFechaHasta, setFiltroFechaHasta] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [showFiltrosAvanzados, setShowFiltrosAvanzados] = useState(false);
+
+  // Auto-refresh
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState(null);
+  const autoRefreshIntervalRef = useRef(null);
 
   // Modal de ticket
   const [ticketModal, setTicketModal] = useState({ open: false, ticket: null, historial: [] });
@@ -710,6 +1256,10 @@ export default function MantenimientoPage() {
   const [tipoElemento, setTipoElemento] = useState('equipo'); // 'equipo' | 'locativo'
   const [formMsg, setFormMsg] = useState(null);
   const [formSubmitting, setFormSubmitting] = useState(false);
+  // Panel lateral "Nuevo ticket" + asignación en el mismo paso
+  const [newTicketOpen, setNewTicketOpen] = useState(false);
+  const [assignNow, setAssignNow] = useState(true);
+  const [assignForm, setAssignForm] = useState({ tecnico_id: '', fecha_programada: new Date().toISOString().split('T')[0], categoria_id: '', observaciones_asignacion: '' });
 
   // Scanner state
   const [isScanning, setIsScanning] = useState(false);
@@ -847,8 +1397,25 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
     }
     try {
       showToast('Generando archivo Excel de Mantenimiento...', 'info');
+
+      // Construir query params con los filtros actuales
+      const p = new URLSearchParams();
+      if (filtroEstado) p.set('estado', filtroEstado);
+      if (filtroPrefijo) p.set('prefijo', filtroPrefijo);
+      if (filtroTipo) p.set('tipo', filtroTipo);
+      if (filtroTecnico) p.set('tecnico_id', filtroTecnico);
+      if (filtroFechaDesde) p.set('fecha_desde', filtroFechaDesde);
+      if (filtroFechaHasta) p.set('fecha_hasta', filtroFechaHasta);
+      if (busqueda) p.set('search', busqueda);
+      // Agregar flag para exportar todos (sin límite)
+      p.set('export', 'true');
+
+      const res = await fetch(`/api/mantenimientos?${p}`);
+      const data = await res.json();
+      const allTickets = data.mantenimientos || [];
+
       const XLSX = await import('xlsx');
-      const rows = tickets.map(t => ({
+      const rows = allTickets.map(t => ({
         'ID Ticket': t.id,
         'Prefijo': t.prefijo,
         'Estado': t.estado,
@@ -877,7 +1444,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
       const dateStr = new Date().toISOString().split('T')[0];
       const fileName = `Reporte_Mantenimiento_${dateStr}.xlsx`;
       XLSX.writeFile(wb, fileName);
-      showToast('✅ Reporte Excel descargado exitosamente.', 'success');
+      showToast(`✅ Reporte Excel descargado: ${allTickets.length} registros.`, 'success');
     } catch (e) {
       console.error(e);
       showToast('Error al exportar a Excel: ' + e.message, 'error');
@@ -907,7 +1474,148 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
     setLoading(false);
   }, [filtroEstado, filtroPrefijo, filtroTipo, filtroTecnico, filtroFechaDesde, filtroFechaHasta, busqueda]);
 
+  // Load Mis Tickets
+  const loadMisTickets = useCallback(async () => {
+    if (!currentUser?.id) return;
+    setMisTicketsLoading(true);
+    try {
+      const res = await fetch('/api/mantenimientos?mis_tickets=true');
+      const data = await res.json();
+      if (data.asignados !== undefined) {
+        setMisTicketsData({
+          asignados: data.asignados || [],
+          reportados: data.reportados || [],
+          asignadosPorEstado: data.asignadosPorEstado || {},
+          stats: data.stats || {}
+        });
+        // Also populate tecnicos and categorias for other tabs
+        if (data.tecnicosMT) setTecnicosMT(data.tecnicosMT);
+        if (data.tecnicosST) setTecnicosST(data.tecnicosST);
+        if (data.categorias) setCategorias(data.categorias);
+      }
+    } catch (e) { console.error(e); }
+    setMisTicketsLoading(false);
+  }, [currentUser?.id]);
+
+  // Load Checklist Templates
+  const loadChecklistTemplates = useCallback(async () => {
+    try {
+      const res = await fetch('/api/mantenimientos/checklist-plantillas');
+      const data = await res.json();
+      if (data.plantillas) setChecklistTemplates(data.plantillas);
+    } catch (e) { console.error(e); }
+  }, []);
+
+  // Handle Save Checklist Template
+  const handleSaveTemplate = useCallback(async () => {
+    setTemplateLoading(true);
+    try {
+      const method = editingTemplate ? 'PUT' : 'POST';
+      const url = editingTemplate
+        ? `/api/mantenimientos/checklist-plantillas?id=${editingTemplate.id}`
+        : '/api/mantenimientos/checklist-plantillas';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...templateForm,
+          items: templateForm.items.map((item, idx) => ({
+            ...item,
+            orden: idx + 1
+          }))
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al guardar plantilla');
+
+      showToast(editingTemplate ? 'Plantilla actualizada' : 'Plantilla creada', 'success');
+      setShowTemplateModal(false);
+      setEditingTemplate(null);
+      setTemplateForm({ nombre: '', area_registro: 'Mantenimiento', tipo_mantenimiento: 'Correctivo', equipo_id: '', items: [{ texto: '', obligatorio: true }] });
+      loadChecklistTemplates();
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+    setTemplateLoading(false);
+  }, [editingTemplate, templateForm, loadChecklistTemplates, showToast]);
+
+  // Handle Delete Checklist Template
+  const handleDeleteTemplate = useCallback(async (id) => {
+    if (!confirm('¿Eliminar esta plantilla?')) return;
+    try {
+      const res = await fetch(`/api/mantenimientos/checklist-plantillas?id=${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Error al eliminar');
+      showToast('Plantilla eliminada', 'success');
+      loadChecklistTemplates();
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }, [loadChecklistTemplates, showToast]);
+
+  // Handle New Template (reset form)
+  const handleNewTemplate = useCallback(() => {
+    setTemplateForm({ nombre: '', area_registro: 'Mantenimiento', tipo_mantenimiento: 'Correctivo', equipo_id: '', items: [{ texto: '', obligatorio: true }] });
+    setEditingTemplate(null);
+    setShowTemplateModal(true);
+  }, []);
+
+  // Handle Edit Template
+  const handleEditTemplate = useCallback((tpl) => {
+    setEditingTemplate(tpl);
+    setTemplateForm({
+      nombre: tpl.nombre,
+      area_registro: tpl.area_registro,
+      tipo_mantenimiento: tpl.tipo_mantenimiento,
+      equipo_id: tpl.equipo_id || '',
+      items: typeof tpl.items === 'string' ? JSON.parse(tpl.items) : tpl.items
+    });
+    setShowTemplateModal(true);
+  }, []);
+
   useEffect(() => { loadTickets(); }, [loadTickets]);
+  useEffect(() => { if (currentUser?.id) loadMisTickets(); }, [loadMisTickets, currentUser?.id]);
+  useEffect(() => { if (esJefe) loadChecklistTemplates(); }, [loadChecklistTemplates, esJefe]);
+
+  // Filter presets helpers
+  const applyPreset = (preset) => {
+    setFiltroEstado(preset.estado || '');
+    setFiltroPrefijo(preset.prefijo || '');
+    setFiltroTipo(preset.tipo || '');
+    setFiltroTecnico(preset.tecnico_id || '');
+    setFiltroFechaDesde(preset.fecha_desde || '');
+    setFiltroFechaHasta(preset.fecha_hasta || '');
+    setBusqueda(preset.busqueda || '');
+    setShowFiltrosAvanzados(false);
+  };
+
+  const isPresetActive = (preset) => {
+    return (preset.estado === '' || filtroEstado === preset.estado) &&
+           (preset.prefijo === '' || filtroPrefijo === preset.prefijo) &&
+           (preset.tipo === '' || filtroTipo === preset.tipo) &&
+           (preset.tecnico_id === '' || filtroTecnico === String(preset.tecnico_id)) &&
+           (preset.fecha_desde === '' || filtroFechaDesde === preset.fecha_desde) &&
+           (preset.fecha_hasta === '' || filtroFechaHasta === preset.fecha_hasta);
+  };
+
+  // Auto-refresh logic
+  useEffect(() => {
+    if (autoRefresh) {
+      autoRefreshIntervalRef.current = setInterval(() => {
+        loadTickets();
+        setLastRefresh(new Date());
+      }, 30000); // 30 segundos
+    } else if (autoRefreshIntervalRef.current) {
+      clearInterval(autoRefreshIntervalRef.current);
+      autoRefreshIntervalRef.current = null;
+    }
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+      }
+    };
+  }, [autoRefresh, loadTickets]);
 
   // Auto-abrir en Modo Visita si se pasa el ID por la URL desde la pantalla central de Modo Visita (/visitas)
   useEffect(() => {
@@ -1230,8 +1938,33 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setFormMsg({ type: 'success', text: data.message });
-      showToast(data.message, 'success');
+      let successMsg = data.message;
+      const nuevoId = data.mantenimiento?.id;
+      if ((esJefe || esAdmin) && assignNow && assignForm.tecnico_id && nuevoId) {
+        try {
+          const resA = await fetch(`/api/mantenimientos/${nuevoId}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              accion: 'asignar',
+              tecnico_id: parseInt(assignForm.tecnico_id),
+              fecha_programada: assignForm.fecha_programada,
+              categoria_id: assignForm.categoria_id || null,
+              observaciones_asignacion: assignForm.observaciones_asignacion || ''
+            })
+          });
+          const dA = await resA.json();
+          if (!resA.ok) throw new Error(dA.error);
+          const tec = [...tecnicosMT, ...tecnicosST].find(t => String(t.id) === String(assignForm.tecnico_id));
+          successMsg = `Ticket ${nuevoId} creado y asignado a ${tec?.nombre || 'técnico'}`;
+        } catch (errA) {
+          showToast(`Ticket ${nuevoId} creado, pero no se pudo asignar: ${errA.message}`, 'error');
+        }
+      }
+      setFormMsg({ type: 'success', text: successMsg });
+      showToast(successMsg, 'success');
+      setNewTicketOpen(false);
+      setFormMsg(null);
+      setAssignForm(p => ({ ...p, tecnico_id: '', categoria_id: '', observaciones_asignacion: '' }));
       setFormTicket({ tipo_mantenimiento: 'Correctivo', area_registro: 'Mantenimiento', pdv_id: '', area_hallazgo: '', equipo_id: '', descripcion: '', fecha_evidencia: new Date().toISOString().split('T')[0], prioridad: 'Media', observaciones: '' });
       setEvidenciasFiles([]);
       loadTickets();
@@ -1343,16 +2076,24 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
     setFormInspeccion(prev => ({ ...prev, hallazgos: prev.hallazgos.filter((_, i) => i !== idx) }));
   };
 
+  // Compatibilidad: la antigua pestaña "nuevo" ahora abre el panel lateral
+  useEffect(() => {
+    if (activeTab === 'nuevo') {
+      setNewTicketOpen(true);
+      setActiveTab(puedeVerTablero ? 'tablero' : (esTecnicoMantenimiento ? 'ejecucion' : 'inspeccion'));
+    }
+  }, [activeTab, puedeVerTablero, esTecnicoMantenimiento]);
+
   // ========================= RENDER =========================
   const tabs = [
     ...(puedeVerTablero ? [{ id: 'tablero', label: '📋 Tablero', emoji: '📋' }] : []),
     ...(esTecnicoMantenimiento ? [] : [{ id: 'nuevo', label: '➕ Nuevo Ticket', emoji: '➕' }]),
-    ...(esTecnicoMantenimiento ? [] : [{ id: 'inspeccion', label: '🔍 Inspección / Mis Tickets', emoji: '🔍' }]),
+    ...(esTecnicoMantenimiento ? [] : [{ id: 'inspeccion', label: '🔍 Inspección', emoji: '🔍' }]),
     ...(esSistemasCalidad ? [] : [{ id: 'ejecucion', label: `🛠️ Modo Visita (${tickets.filter(t => t.estado === 'En proceso' || (t.estado === 'Asignado' && (!currentUser?.id || t.tecnico_id === currentUser?.id || esJefe))).length})`, emoji: '🛠️' }]),
     ...(esJefe ? [{ id: 'asignacion', label: '👔 Asignación', emoji: '👔' }] : []),
+    [{ id: 'mis-tickets', label: '📌 Mis Tickets', emoji: '📌' }],
     ...(puedeVerIndicadores ? [{ id: 'indicadores', label: '📊 Indicadores', emoji: '📊' }] : []),
-    ...(puedeVerIndicadores ? [{ id: 'alertas', label: '🔔 Alertas', emoji: '🔔' }] : []),
-  ];
+  ].flat();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', paddingBottom: '70px' }}>
@@ -1398,7 +2139,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           {!esTecnicoMantenimiento && (
             <button
-              onClick={() => setActiveTab('nuevo')}
+              onClick={() => setNewTicketOpen(true)}
               style={{
                 background: activeTab === 'nuevo' ? '#2C1810' : '#3D2314', color: '#fff', border: 'none',
                 borderRadius: '12px', padding: '11px 20px', fontWeight: 800, fontSize: '0.88rem',
@@ -1464,14 +2205,14 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
 
           let shortLabel = item.id.charAt(0).toUpperCase() + item.id.slice(1);
           if (item.id === 'ejecucion') shortLabel = 'Modo Visita';
-          if (item.id === 'inspeccion') shortLabel = 'Mis Tickets';
+          if (item.id === 'inspeccion') shortLabel = 'Inspección';
           if (item.id === 'nuevo') shortLabel = 'Nuevo Ticket';
           if (item.id === 'asignacion') shortLabel = 'Asignación';
 
           return (
             <div
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => item.id === 'nuevo' ? setNewTicketOpen(true) : setActiveTab(item.id)}
               style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer', minWidth: '65px' }}
             >
               <div style={{
@@ -1494,6 +2235,54 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
       {/* ====== TAB: TABLERO ====== */}
       {activeTab === 'tablero' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+          {/* ====== HEADER CON VISTA SELECTOR ====== */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#2C1810', fontFamily: 'var(--font-display)' }}>📋 Tablero Kanban</h3>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.75rem', color: '#888', fontWeight: 600 }}>Vista:</span>
+              <div style={{ display: 'flex', background: '#F3EBE3', borderRadius: '10px', padding: '4px', border: '1px solid #E5D8CC' }}>
+                <button
+                  onClick={() => setKanbanView(true)}
+                  style={{
+                    background: kanbanView ? '#3D2314' : 'transparent',
+                    color: kanbanView ? '#fff' : '#6B3A2A',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '8px 16px',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  📋 Kanban
+                </button>
+                <button
+                  onClick={() => setKanbanView(false)}
+                  style={{
+                    background: !kanbanView ? '#fff' : 'transparent',
+                    color: !kanbanView ? '#2C1810' : '#6B3A2A',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '8px 16px',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  📊 Tabla
+                </button>
+              </div>
+            </div>
+          </div>
 
           {/* ====== BUSCADOR Y BOTÓN FILTROS EXACTO A AMBOS MOCKUPS ====== */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -1524,6 +2313,52 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                 <span>⚙️</span>
                 <span>Filtros</span>
               </button>
+            </div>
+
+            {/* ====== PRESETS DE FILTRO (Chips rápidos) ====== */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.75rem', color: '#888', fontWeight: 600 }}>Accesos rápidos:</span>
+              {[
+                ...((esJefe || esAdmin) ? [{ label: '⏳ Sin asignar', estado: 'Pendiente', prefijo: '', tipo: '', tecnico_id: '', fecha_desde: '', fecha_hasta: '', tooltip: 'Tickets pendientes de asignar técnico' }] : []),
+                { label: '🔴 Vencidos', vencidos: true, tooltip: 'Tickets con fecha programada vencida y no finalizados' },
+                { label: '⚡ Críticos', prioridad: 'Crítica', estado: '', tooltip: 'Tickets prioridad Crítica no finalizados' },
+                { label: '🟡 Asignados míos', tecnico_id: currentUser?.id, estado: 'Asignado', tooltip: 'Tickets asignados a ti pendientes de iniciar' },
+                { label: '🟢 En proceso míos', tecnico_id: currentUser?.id, estado: 'En proceso', tooltip: 'Tickets que estás ejecutando ahora' },
+                { label: '📅 Esta semana', fecha_desde: getWeekStart(), fecha_hasta: getWeekEnd(), tooltip: 'Tickets registrados esta semana' },
+                { label: '✅ Finalizados hoy', estado: 'Finalizado', fecha_desde: new Date().toISOString().split('T')[0], tooltip: 'Tickets finalizados hoy' },
+              ].map((preset, i) => (
+                <button
+                  key={i}
+                  onClick={() => applyPreset(preset)}
+                  style={{
+                    background: isPresetActive(preset) ? '#4A2C20' : '#F3EBE3',
+                    color: isPresetActive(preset) ? '#fff' : '#2C1810',
+                    border: `1px solid ${isPresetActive(preset) ? '#4A2C20' : '#E5D8CC'}`,
+                    borderRadius: '20px', padding: '6px 12px',
+                    fontWeight: 600, fontSize: '0.72rem', cursor: 'pointer',
+                    transition: 'all 0.2s ease', whiteSpace: 'nowrap',
+                    boxShadow: isPresetActive(preset) ? '0 2px 8px rgba(74,44,32,0.2)' : 'none'
+                  }}
+                  title={preset.tooltip}
+                >
+                  {preset.label}
+                </button>
+              ))}
+              {/* Auto-refresh toggle */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto', cursor: 'pointer', fontSize: '0.75rem', color: '#6B3A2A', fontWeight: 600 }}>
+                <input
+                  type="checkbox"
+                  checked={autoRefresh}
+                  onChange={e => setAutoRefresh(e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: '#166534', cursor: 'pointer' }}
+                />
+                🔄 Auto (30s)
+                {lastRefresh && (
+                  <span style={{ fontSize: '0.68rem', color: '#888', fontWeight: 400 }}>
+                    · Última: {lastRefresh.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </label>
             </div>
 
             {/* Panel de filtros colapsable */}
@@ -1571,129 +2406,171 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
             </div>
           ) : (
             <>
-              {/* Vista desktop: tabla exacta a input_file_0.png */}
-              <div className="desktop-only-table" style={{ overflowX: 'auto', background: '#fff', borderRadius: '16px', border: '1px solid #E5D8CC', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
-                  <thead>
-                    <tr style={{ background: '#FAF6F0' }}>
-                      {['ID', 'Tipo', 'Área', 'Descripción', 'Prioridad', 'Estado', 'Técnico', 'Fecha', 'Acciones'].map(h => (
-                        <th key={h} style={{ padding: '14px 16px', textAlign: 'left', color: '#2C1810', fontWeight: 800, borderBottom: '2px solid #E5D8CC', whiteSpace: 'nowrap', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tickets.map(t => {
-                      const ec = ESTADO_COLORS[t.estado] || ESTADO_COLORS['Pendiente'];
-                      const pc = PRIORIDAD_COLORS[t.prioridad] || PRIORIDAD_COLORS['Media'];
-                      const pref = PREFIJO_STYLE[t.prefijo] || PREFIJO_STYLE['MT'];
-
-                      let prioStyle = { bg: '#FEF3C7', color: '#92400E' };
-                      if (t.prioridad === 'Alta') prioStyle = { bg: '#FEE2E2', color: '#991B1B' };
-                      if (t.prioridad === 'Crítica') prioStyle = { bg: '#FECACA', color: '#7F1D1D' };
-
-                      let estStyle = { bg: '#FEF3C7', color: '#92400E' };
-                      if (t.estado === 'Finalizado') estStyle = { bg: '#D1FAE5', color: '#065F46' };
-                      if (t.estado === 'Por Aprobar') estStyle = { bg: '#DBEAFE', color: '#1E40AF' };
-                      if (t.estado === 'En proceso') estStyle = { bg: '#FFEDD5', color: '#9A3412' };
-
-                      return (
-                        <tr key={t.id} style={{ borderBottom: '1px solid #F5ECE5', transition: 'background 0.15s' }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#FAF6F0'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                          <td style={{ padding: '14px 16px' }}>
-                            <span style={{ fontWeight: 800, fontSize: '0.84rem', background: '#FFFBEB', color: '#92400E', border: '1px solid #FDE68A', padding: '4px 12px', borderRadius: '8px', whiteSpace: 'nowrap' }}>{t.id}</span>
-                          </td>
-                          <td style={{ padding: '14px 16px', color: '#4B5563', fontWeight: 600 }}>{t.tipo_mantenimiento}</td>
-                          <td style={{ padding: '14px 16px', color: '#4B5563', fontWeight: 600 }}>{t.area_registro}</td>
-                          <td style={{ padding: '14px 16px', maxWidth: '240px' }}>
-                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1F2937', fontWeight: 600 }} title={t.descripcion}>{t.descripcion}</div>
-                          </td>
-                          <td style={{ padding: '14px 16px' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 800, background: prioStyle.bg, color: prioStyle.color, padding: '4px 10px', borderRadius: '8px' }}>{t.prioridad}</span>
-                          </td>
-                          <td style={{ padding: '14px 16px' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 800, background: estStyle.bg, color: estStyle.color, padding: '4px 12px', borderRadius: '8px' }}>{t.estado}</span>
-                          </td>
-                          <td style={{ padding: '14px 16px', color: '#4B5563', fontSize: '0.82rem', fontWeight: 600 }}>{t.tecnico_nombre || '—'}</td>
-                          <td style={{ padding: '14px 16px', color: '#6B7280', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{formatDate(t.fecha_registro)}</td>
-                          <td style={{ padding: '14px 16px', display: 'flex', gap: '8px' }}>
-                            <button onClick={() => openTicket(t)} style={{ background: '#3D2314', color: '#fff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}>Ver</button>
-                            {t.estado === 'Asignado' && (
-                              <button onClick={() => iniciarYAbriModoVisita(t)} style={{ background: '#D97706', color: '#fff', border: 'none', borderRadius: '8px', padding: '7px 14px', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                                🚀 Iniciar Trabajo
-                              </button>
-                            )}
-                            {t.estado === 'En proceso' && (
-                              <button onClick={() => openModoVisita(t)} style={{ background: '#166534', color: '#fff', border: 'none', borderRadius: '8px', padding: '7px 14px', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                                🛠️ Modo Visita
-                              </button>
-                            )}
-                            {t.estado === 'Por Aprobar' && (esJefe || esAdmin) && (
-                              <button onClick={() => setApprovalModalTicket(t)} style={{ background: '#4F46E5', color: '#fff', border: 'none', borderRadius: '8px', padding: '7px 14px', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                                🔍 Evaluar y Aprobar
-                              </button>
-                            )}
-                          </td>
+              {kanbanView ? (
+                <>
+                  {/* ====== VISTA KANBAN ====== */}
+                  <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #E5D8CC', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+                    <KanbanBoard
+                      tickets={tickets}
+                      onTicketClick={openTicket}
+                      onAssignTicket={(t) => {
+                        setAccionData({ categoria_id: t.categoria_id || '', fecha_programada: new Date().toISOString().split('T')[0] });
+                        setAccionModal({ open: true, tipo: 'asignar', ticketId: t.id, prefijo: t.prefijo });
+                      }}
+                      esJefe={esJefe || esAdmin}
+                      currentUserId={currentUser?.id}
+                      showToast={showToast}
+                      onReload={loadTickets}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Vista desktop: tabla exacta a input_file_0.png */}
+                  <div className="desktop-only-table" style={{ overflowX: 'auto', background: '#fff', borderRadius: '16px', border: '1px solid #E5D8CC', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                      <thead>
+                        <tr style={{ background: '#FAF6F0' }}>
+                          {['ID', 'Tipo', 'Área', 'Descripción', 'Prioridad', 'Estado', 'Técnico', 'Fecha', 'Acciones'].map(h => (
+                            <th key={h} style={{ padding: '14px 16px', textAlign: 'left', color: '#2C1810', fontWeight: 800, borderBottom: '2px solid #E5D8CC', whiteSpace: 'nowrap', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
+                          ))}
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                      </thead>
+                      <tbody>
+                        {tickets.map(t => {
+                          const ec = ESTADO_COLORS[t.estado] || ESTADO_COLORS['Pendiente'];
+                          const pc = PRIORIDAD_COLORS[t.prioridad] || PRIORIDAD_COLORS['Media'];
+                          const pref = PREFIJO_STYLE[t.prefijo] || PREFIJO_STYLE['MT'];
 
-              {/* Vista móvil: tarjetas exactas a input_file_1.png */}
-              <div className="mobile-only-cards" style={{ display: 'none', flexDirection: 'column', gap: '12px' }}>
-                {tickets.map(t => <TicketCard key={t.id} ticket={t} onOpen={openTicket} onStartModoVisita={iniciarYAbriModoVisita} onOpenModoVisita={openModoVisita} onApprove={setApprovalModalTicket} esJefe={esJefe || esAdmin} />)}
-              </div>
+                          let prioStyle = { bg: '#FEF3C7', color: '#92400E' };
+                          if (t.prioridad === 'Alta') prioStyle = { bg: '#FEE2E2', color: '#991B1B' };
+                          if (t.prioridad === 'Crítica') prioStyle = { bg: '#FECACA', color: '#7F1D1D' };
 
-              {/* ====== ACCESOS RÁPIDOS FOOTER DESKTOP EXACTO A input_file_0.png ====== */}
-              <div className="desktop-only-table" style={{ background: '#fff', borderRadius: '16px', border: '1px solid #E5D8CC', padding: '22px 24px', marginTop: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 800, color: '#2C1810', fontFamily: 'var(--font-display)' }}>Accesos Rápidos</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '14px' }}>
-                  {[
-                    { icon: '📅', title: 'Calendario', desc: 'Ver agenda', path: '/calendario' },
-                    { icon: '👥', title: 'Asignación', desc: 'Asignar técnicos', action: () => setActiveTab('asignacion') },
-                    { icon: '🔔', title: 'Alertas', desc: 'Ver alertas', action: () => setActiveTab('alertas') },
-                    { icon: '📄', title: 'Reportes PDF', desc: 'Generar reportes', path: '/reportes' },
-                    { icon: '📊', title: 'Exportar a Excel', desc: 'Exportar información', path: '/reportes' },
-                    { icon: '📁', title: 'Repositorio', desc: 'Archivos y evidencias', path: '/archivos' },
-                  ].map((acc, idx) => (
-                    <div key={idx} onClick={() => acc.action ? acc.action() : window.location.href = acc.path}
-                      style={{ background: '#FAF6F0', borderRadius: '14px', border: '1px solid #E5D8CC', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer', transition: 'all 0.2s ease' }}
-                      onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-                      onMouseLeave={e => e.currentTarget.style.transform = 'none'}
-                    >
-                      <div style={{ fontSize: '1.5rem', background: '#fff', width: '44px', height: '44px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
-                        {acc.icon}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#2C1810' }}>{acc.title}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>{acc.desc}</div>
-                      </div>
+                          let estStyle = { bg: '#FEF3C7', color: '#92400E' };
+                          if (t.estado === 'Finalizado') estStyle = { bg: '#D1FAE5', color: '#065F46' };
+                          if (t.estado === 'Por Aprobar') estStyle = { bg: '#DBEAFE', color: '#1E40AF' };
+                          if (t.estado === 'En proceso') estStyle = { bg: '#FFEDD5', color: '#9A3412' };
+
+                          return (
+                            <tr key={t.id} style={{ borderBottom: '1px solid #F5ECE5', transition: 'background 0.15s' }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#FAF6F0'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <td style={{ padding: '14px 16px' }}>
+                                <span style={{ fontWeight: 800, fontSize: '0.84rem', background: '#FFFBEB', color: '#92400E', border: '1px solid #FDE68A', padding: '4px 12px', borderRadius: '8px', whiteSpace: 'nowrap' }}>{t.id}</span>
+                              </td>
+                              <td style={{ padding: '14px 16px', color: '#4B5563', fontWeight: 600 }}>{t.tipo_mantenimiento}</td>
+                              <td style={{ padding: '14px 16px', color: '#4B5563', fontWeight: 600 }}>{t.area_registro}</td>
+                              <td style={{ padding: '14px 16px', maxWidth: '240px' }}>
+                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1F2937', fontWeight: 600 }} title={t.descripcion}>{t.descripcion}</div>
+                              </td>
+                              <td style={{ padding: '14px 16px' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, background: prioStyle.bg, color: prioStyle.color, padding: '4px 10px', borderRadius: '8px' }}>{t.prioridad}</span>
+                              </td>
+                              <td style={{ padding: '14px 16px' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, background: estStyle.bg, color: estStyle.color, padding: '4px 12px', borderRadius: '8px' }}>{t.estado}</span>
+                              </td>
+                              <td style={{ padding: '14px 16px', color: '#4B5563', fontSize: '0.82rem', fontWeight: 600 }}>{t.tecnico_nombre || '—'}</td>
+                              <td style={{ padding: '14px 16px', color: '#6B7280', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{formatDate(t.fecha_registro)}</td>
+                              <td style={{ padding: '14px 16px', display: 'flex', gap: '8px' }}>
+                                <button onClick={() => openTicket(t)} style={{ background: '#3D2314', color: '#fff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}>Ver</button>
+                                {t.estado === 'Pendiente' && (esJefe || esAdmin) && (
+                                  <button onClick={() => { setAccionData({ fecha_programada: new Date().toISOString().split('T')[0] }); setAccionModal({ open: true, tipo: 'asignar', ticketId: t.id, prefijo: t.prefijo }); }}
+                                    style={{ background: '#fff', color: '#3D2314', border: '1.5px solid #3D2314', borderRadius: '8px', padding: '6px 14px', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                    👤 Asignar
+                                  </button>
+                                )}
+                                {t.estado === 'Asignado' && (
+                                  <button onClick={() => iniciarYAbriModoVisita(t)} style={{ background: '#D97706', color: '#fff', border: 'none', borderRadius: '8px', padding: '7px 14px', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                    🚀 Iniciar Trabajo
+                                  </button>
+                                )}
+                                {t.estado === 'En proceso' && (
+                                  <button onClick={() => openModoVisita(t)} style={{ background: '#166534', color: '#fff', border: 'none', borderRadius: '8px', padding: '7px 14px', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                    🛠️ Modo Visita
+                                  </button>
+                                )}
+                                {t.estado === 'Por Aprobar' && (esJefe || esAdmin) && (
+                                  <button onClick={() => setApprovalModalTicket(t)} style={{ background: '#4F46E5', color: '#fff', border: 'none', borderRadius: '8px', padding: '7px 14px', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                    🔍 Evaluar y Aprobar
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Vista móvil: tarjetas exactas a input_file_1.png */}
+                  <div className="mobile-only-cards" style={{ display: 'none', flexDirection: 'column', gap: '12px' }}>
+                    {tickets.map(t => (
+                      <TicketCard
+                        key={t.id}
+                        ticket={t}
+                        onOpen={openTicket}
+                        onAssign={(tk) => {
+                          setAccionData({ categoria_id: tk.categoria_id || '', fecha_programada: new Date().toISOString().split('T')[0] });
+                          setAccionModal({ open: true, tipo: 'asignar', ticketId: tk.id, prefijo: tk.prefijo });
+                        }}
+                        onStartModoVisita={iniciarYAbriModoVisita}
+                        onOpenModoVisita={openModoVisita}
+                        onApprove={setApprovalModalTicket}
+                        esJefe={esJefe || esAdmin}
+                      />
+                    ))}
+                  </div>
+
+                  {/* ====== ACCESOS RÁPIDOS FOOTER DESKTOP EXACTO A input_file_0.png ====== */}
+                  <div className="desktop-only-table" style={{ background: '#fff', borderRadius: '16px', border: '1px solid #E5D8CC', padding: '22px 24px', marginTop: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                    <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 800, color: '#2C1810', fontFamily: 'var(--font-display)' }}>Accesos Rápidos</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '14px' }}>
+                      {[
+                        { icon: '📅', title: 'Calendario', desc: 'Ver agenda', path: '/calendario' },
+                        { icon: '👥', title: 'Sin asignar', desc: 'Tickets por asignar', action: () => applyPreset({ estado: 'Pendiente', prefijo: '', tipo: '', tecnico_id: '', fecha_desde: '', fecha_hasta: '' }) },
+                        { icon: '🔔', title: 'Alertas', desc: 'Ver alertas', action: () => setActiveTab('indicadores') },
+                        { icon: '📄', title: 'Reportes PDF', desc: 'Generar reportes', path: '/reportes' },
+                        { icon: '📊', title: 'Exportar a Excel', desc: 'Exportar información', path: '/reportes' },
+                        { icon: '📁', title: 'Repositorio', desc: 'Archivos y evidencias', path: '/archivos' },
+                      ].map((acc, idx) => (
+                        <div key={idx} onClick={() => acc.action ? acc.action() : window.location.href = acc.path}
+                          style={{ background: '#FAF6F0', borderRadius: '14px', border: '1px solid #E5D8CC', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer', transition: 'all 0.2s ease' }}
+                          onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                          onMouseLeave={e => e.currentTarget.style.transform = 'none'}
+                        >
+                          <div style={{ fontSize: '1.5rem', background: '#fff', width: '44px', height: '44px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
+                            {acc.icon}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#2C1810' }}>{acc.title}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>{acc.desc}</div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-                <div style={{ textAlign: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #E8DDD4', fontSize: '0.78rem', color: '#888' }}>
-                  Crepes & Waffles® | Sistema de Gestión Operativa | Versión 2.0.0
-                </div>
-              </div>
+                    <div style={{ textAlign: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #E8DDD4', fontSize: '0.78rem', color: '#888' }}>
+                      Crepes & Waffles® | Sistema de Gestión Operativa | Versión 2.0.0
+                    </div>
+                  </div>
 
-              {/* Floating Action Button para móvil (+ Nuevo Ticket) */}
-              {!esTecnicoMantenimiento && (
-                <div className="mobile-only-cards" style={{ position: 'fixed', bottom: '76px', left: '0', right: '0', display: 'none', justifyContent: 'center', zIndex: 999, pointerEvents: 'none' }}>
-                  <button
-                    onClick={() => setActiveTab('nuevo')}
-                    style={{
-                      background: '#3D2314', color: '#fff', border: 'none', borderRadius: '28px',
-                      padding: '13px 26px', fontWeight: 800, fontSize: '0.94rem',
-                      boxShadow: '0 8px 24px rgba(61,35,20,0.5)', display: 'flex', alignItems: 'center',
-                      gap: '8px', pointerEvents: 'auto', cursor: 'pointer'
-                    }}
-                  >
-                    <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>+</span>
-                    <span>Nuevo Ticket</span>
-                  </button>
-                </div>
+                  {/* Floating Action Button para móvil (+ Nuevo Ticket) */}
+                  {!esTecnicoMantenimiento && (
+                    <div className="mobile-only-cards" style={{ position: 'fixed', bottom: '76px', left: '0', right: '0', display: 'none', justifyContent: 'center', zIndex: 999, pointerEvents: 'none' }}>
+                      <button
+                        onClick={() => setNewTicketOpen(true)}
+                        style={{
+                          background: '#3D2314', color: '#fff', border: 'none', borderRadius: '28px',
+                          padding: '13px 26px', fontWeight: 800, fontSize: '0.94rem',
+                          boxShadow: '0 8px 24px rgba(61,35,20,0.5)', display: 'flex', alignItems: 'center',
+                          gap: '8px', pointerEvents: 'auto', cursor: 'pointer'
+                        }}
+                      >
+                        <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>+</span>
+                        <span>Nuevo Ticket</span>
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
@@ -1702,15 +2579,22 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
 
 
       {/* ====== TAB: NUEVO TICKET ====== */}
-      {activeTab === 'nuevo' && (
-        <div className="card animate-fade-in" style={{ borderRadius: '16px', border: '1px solid #E8DDD4', overflow: 'hidden' }}>
-          <div style={{ background: 'linear-gradient(135deg, #6B3A2A 0%, #8B5E3C 100%)', padding: '20px 24px' }}>
-            <h3 style={{ margin: 0, color: '#fff', fontFamily: 'var(--font-display)' }}>➕ Registrar Hallazgo / Ticket</h3>
-            <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.75)', fontSize: '0.85rem' }}>
-              El prefijo <strong>MT</strong> o <strong>ST</strong> se asignará automáticamente según el área de registro.
-            </p>
+      {newTicketOpen && (
+        <div onClick={() => { if (!formSubmitting) setNewTicketOpen(false); }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.45)', backdropFilter: 'blur(3px)', zIndex: 9990, display: 'flex', justifyContent: 'flex-end' }}>
+        <div onClick={e => e.stopPropagation()}
+          style={{ width: '100%', maxWidth: '640px', height: '100%', background: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '-12px 0 40px rgba(44,24,16,0.25)', animation: 'mtSlideIn 0.25s ease' }}>
+          <div style={{ background: 'linear-gradient(135deg, #3D2314 0%, #6B3A2A 100%)', padding: '18px 24px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexShrink: 0 }}>
+            <div>
+              <h3 style={{ margin: 0, color: '#fff', fontFamily: 'var(--font-display)', fontSize: '1.15rem' }}>Nuevo ticket</h3>
+              <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.75)', fontSize: '0.8rem' }}>
+                El prefijo <strong>MT</strong> o <strong>ST</strong> se asigna automáticamente según el área.
+              </p>
+            </div>
+            <button type="button" onClick={() => setNewTicketOpen(false)} aria-label="Cerrar"
+              style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: '34px', height: '34px', borderRadius: '10px', fontSize: '1rem', cursor: 'pointer', flexShrink: 0 }}>✕</button>
           </div>
-          <form onSubmit={submitTicket} style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <form onSubmit={submitTicket} style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflowY: 'auto' }}>
             {formMsg && <div style={{ padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, background: formMsg.type === 'success' ? '#DCFCE7' : '#FEE2E2', color: formMsg.type === 'success' ? '#166534' : '#991B1B' }}>{formMsg.text}</div>}
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
@@ -1826,10 +2710,58 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
               )}
             </div>
 
-            <button type="submit" disabled={formSubmitting} style={{ ...btnPrimary, alignSelf: 'flex-start', padding: '12px 28px', fontSize: '0.9rem' }}>
-              {formSubmitting ? '⏳ Registrando...' : '✅ Registrar Ticket'}
-            </button>
+            {(esJefe || esAdmin) && (
+              <div style={{ border: '1px solid #E8DDD4', borderRadius: '14px', overflow: 'hidden' }}>
+                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#FAF6F0', cursor: 'pointer' }}>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#2C1810' }}>👔 Asignar técnico ahora</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '2px' }}>Opcional. Si no eliges técnico, el ticket queda “Pendiente” para asignarlo después.</div>
+                  </div>
+                  <input type="checkbox" checked={assignNow} onChange={e => setAssignNow(e.target.checked)} style={{ width: '20px', height: '20px', accentColor: '#3D2314', flexShrink: 0 }} />
+                </label>
+                {assignNow && (
+                  <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                      <label style={labelStyle}>Técnico {formTicket.area_registro === 'Sistemas' ? '(Sistemas)' : '(Mantenimiento)'} <span style={{ fontWeight: 500, color: '#9CA3AF' }}>· ordenados por menor carga</span></label>
+                      <TecnicoPicker
+                        tecnicos={formTicket.area_registro === 'Sistemas' ? tecnicosST : tecnicosMT}
+                        tickets={tickets}
+                        value={assignForm.tecnico_id}
+                        onChange={(id) => setAssignForm(p => ({ ...p, tecnico_id: id }))}
+                      />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                      <div>
+                        <label style={labelStyle}>Fecha programada</label>
+                        <input type="date" value={assignForm.fecha_programada} onChange={e => setAssignForm(p => ({ ...p, fecha_programada: e.target.value }))} style={inputStyle} />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Categoría</label>
+                        <SearchableCategorySelect
+                          categories={categorias}
+                          selectedId={assignForm.categoria_id || ''}
+                          onChange={(val) => setAssignForm(p => ({ ...p, categoria_id: val }))}
+                          areaId={formTicket.area_registro === 'Sistemas' ? 7 : 3}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Instrucciones para el técnico</label>
+                      <input value={assignForm.observaciones_asignacion} onChange={e => setAssignForm(p => ({ ...p, observaciones_asignacion: e.target.value }))} placeholder="Ej: Llevar repuesto de termostato..." style={inputStyle} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{ position: 'sticky', bottom: '-22px', margin: '4px -24px -22px', padding: '14px 24px', background: '#fff', borderTop: '1px solid #F0EAE1', display: 'flex', justifyContent: 'flex-end', gap: '10px', zIndex: 2 }}>
+              <button type="button" onClick={() => setNewTicketOpen(false)} disabled={formSubmitting} style={{ ...btnSecondary, padding: '12px 20px' }}>Cancelar</button>
+              <button type="submit" disabled={formSubmitting} style={{ ...btnPrimary, padding: '12px 28px', fontSize: '0.9rem' }}>
+                {formSubmitting ? '⏳ Guardando...' : ((esJefe || esAdmin) && assignNow && assignForm.tecnico_id ? '✅ Crear y asignar' : '✅ Registrar ticket')}
+              </button>
+            </div>
           </form>
+        </div>
         </div>
       )}
 
@@ -2238,6 +3170,117 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
       {/* ====== TAB: ASIGNACIÓN (solo jefes) ====== */}
       {activeTab === 'asignacion' && esJefe && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {/* Checklist Templates Management Section */}
+          <div className="card animate-fade-in" style={{ borderRadius: '16px', border: '1px solid #E8DDD4', overflow: 'hidden' }}>
+            <div style={{ background: '#F0F9FF', padding: '16px 20px', borderBottom: '1px solid #BAE6FD', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h4 style={{ margin: 0, color: '#0369A1', fontFamily: 'var(--font-display)', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>📋</span> Plantillas de Checklist
+              </h4>
+              <button
+                onClick={() => {
+                  setTemplateForm({ nombre: '', area_registro: 'Mantenimiento', tipo_mantenimiento: 'Correctivo', equipo_id: '', items: [{ texto: '', obligatorio: true }] });
+                  setEditingTemplate(null);
+                  setShowTemplateModal(true);
+                }}
+                style={{ ...btnPrimary, background: '#0369A1', padding: '10px 20px', fontSize: '0.85rem' }}
+              >
+                ➕ Nueva Plantilla
+              </button>
+            </div>
+
+            <div style={{ padding: '20px' }}>
+              {templateLoading && <div style={{ textAlign: 'center', color: '#888', padding: '20px' }}>⏳ Cargando plantillas...</div>}
+
+              {!templateLoading && checklistTemplates.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '30px', color: '#888', background: '#FAF6F0', borderRadius: '12px', border: '1px dashed #E8DDD4' }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '8px' }}>📄</div>
+                  <p style={{ margin: '0 0 12px', fontWeight: 600, color: '#4A2518' }}>No hay plantillas de checklist</p>
+                  <p style={{ margin: '0 0 16px', fontSize: '0.85rem' }}>Crea plantillas para estandarizar los procedimientos por tipo de mantenimiento, área o equipo.</p>
+                  <button
+                    onClick={() => {
+                      setTemplateForm({ nombre: '', area_registro: 'Mantenimiento', tipo_mantenimiento: 'Correctivo', equipo_id: '', items: [{ texto: '', obligatorio: true }] });
+                      setEditingTemplate(null);
+                      setShowTemplateModal(true);
+                    }}
+                    style={{ ...btnPrimary, background: '#0369A1', padding: '10px 20px' }}
+                  >
+                    ➕ Crear primera plantilla
+                  </button>
+                </div>
+              )}
+
+              {!templateLoading && checklistTemplates.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
+                  {checklistTemplates.map(tpl => (
+                    <div key={tpl.id} style={{ background: '#fff', border: '1px solid #E5D8CC', borderRadius: '12px', padding: '16px', transition: 'all 0.2s ease' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#2C1810' }}>{tpl.nombre}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '2px' }}>
+                            {tpl.area_registro} • {tpl.tipo_mantenimiento}
+                            {tpl.equipo_id && ` • Equipo: ${tpl.equipo_id}`}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            onClick={() => {
+                              setEditingTemplate(tpl);
+                              setTemplateForm({
+                                nombre: tpl.nombre,
+                                area_registro: tpl.area_registro,
+                                tipo_mantenimiento: tpl.tipo_mantenimiento,
+                                equipo_id: tpl.equipo_id || '',
+                                items: typeof tpl.items === 'string' ? JSON.parse(tpl.items) : tpl.items
+                              });
+                              setShowTemplateModal(true);
+                            }}
+                            style={{ background: '#EFF6FF', color: '#1E40AF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '6px 10px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            ✏️ Editar
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`¿Eliminar plantilla "${tpl.nombre}"?`)) return;
+                              try {
+                                const res = await fetch(`/api/mantenimientos/checklist-plantillas/${tpl.id}`, { method: 'DELETE' });
+                                if (!res.ok) throw new Error('Error al eliminar');
+                                showToast('Plantilla eliminada', 'success');
+                                loadChecklistTemplates();
+                              } catch (e) { showToast(e.message, 'error'); }
+                            }}
+                            style={{ background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: '8px', padding: '6px 10px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '8px' }}>
+                        <strong>{Array.isArray(tpl.items) ? tpl.items.length : typeof tpl.items === 'string' ? JSON.parse(tpl.items).length : 0}</strong> tareas
+                        {tpl.equipo_id && <span style={{ marginLeft: '8px', background: '#EFF6FF', color: '#1E40AF', padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem' }}>Equipo específico</span>}
+                        {!tpl.equipo_id && <span style={{ marginLeft: '8px', background: '#DCFCE7', color: '#166534', padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem' }}>General</span>}
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '150px', overflowY: 'auto' }}>
+                        {(Array.isArray(tpl.items) ? tpl.items : typeof tpl.items === 'string' ? JSON.parse(tpl.items) : []).map((item, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#374151', padding: '4px 8px', background: '#F9FAFB', borderRadius: '6px' }}>
+                            <span style={{ color: item.obligatorio ? '#DC2626' : '#166534', fontWeight: 700 }}>
+                              {item.obligatorio ? '●' : '○'}
+                            </span>
+                            <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {item.texto || '(Sin texto)'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Divider */}
           <div style={{ background: '#FEF9C3', border: '1px solid #FDE68A', borderRadius: '12px', padding: '14px 18px', fontSize: '0.85rem', color: '#854D0E', fontWeight: 600 }}>
             👔 Mostrando solo tickets <strong>Pendientes</strong> listos para asignación.
           </div>
@@ -2463,7 +3506,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
       )}
 
       {/* ====== TAB: ALERTAS / NOTIFICACIONES ====== */}
-      {activeTab === 'alertas' && (
+      {(activeTab === 'alertas' || activeTab === 'indicadores') && (
         <div className="card animate-fade-in" style={{ borderRadius: '16px', border: '1px solid #E8DDD4', padding: '24px 28px', maxWidth: '480px' }}>
           <h4 style={{ margin: '0 0 16px', color: '#4A2518', fontFamily: 'var(--font-display)', fontSize: '1.1rem' }}>🔔 Configuración de Notificaciones</h4>
           <p style={{ margin: '0 0 20px', color: '#666', fontSize: '0.88rem', lineHeight: 1.5 }}>
@@ -2504,88 +3547,421 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
         </div>
       )}
 
-      {/* ====== MODAL: DETALLE TICKET ====== */}
+      {/* ====== TAB: MIS TICKETS ====== */}
+      {activeTab === 'mis-tickets' && (
+        <div className="animate-fade-in">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+            <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#2C1810', fontFamily: 'var(--font-display)' }}>📌 Mis Tickets</h3>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={loadMisTickets} disabled={misTicketsLoading} style={{ ...btnSecondary, padding: '10px 16px' }}>
+                {misTicketsLoading ? '⏳ Actualizando...' : '🔄 Actualizar'}
+              </button>
+              <button onClick={() => setNewTicketOpen(true)} style={{ ...btnPrimary, background: '#3D2314', padding: '10px 16px' }}>
+                ➕ Nuevo Ticket
+              </button>
+            </div>
+          </div>
+
+          {/* Stats Summary */}
+          {misTicketsData.stats && Object.keys(misTicketsData.stats).length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ background: '#FFF7ED', borderRadius: '12px', padding: '16px', border: '1px solid #FED7AA' }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#EA580C' }}>{misTicketsData.stats.asignados_pendientes || 0}</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9A3412', textTransform: 'uppercase' }}>Asignados Pendientes</div>
+              </div>
+              <div style={{ background: '#EFF6FF', borderRadius: '12px', padding: '16px', border: '1px solid #BFDBFE' }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563EB' }}>{misTicketsData.stats.por_aprobar || 0}</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#1E40AF', textTransform: 'uppercase' }}>Por Aprobar</div>
+              </div>
+              <div style={{ background: '#FEF3C7', borderRadius: '12px', padding: '16px', border: '1px solid #FDE68A' }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#D97706' }}>{misTicketsData.stats.en_proceso || 0}</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#92400E', textTransform: 'uppercase' }}>En Proceso</div>
+              </div>
+              <div style={{ background: '#ECFDF5', borderRadius: '12px', padding: '16px', border: '1px solid #A7F3D0' }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#059669' }}>{misTicketsData.stats.finalizados_semana || 0}</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#065F46', textTransform: 'uppercase' }}>Finalizados (Semana)</div>
+              </div>
+              <div style={{ background: '#FAF6F0', borderRadius: '12px', padding: '16px', border: '1px solid #E8DDD4' }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#4A2C20' }}>{misTicketsData.stats.asignados_total || 0}</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6B3A2A', textTransform: 'uppercase' }}>Total Asignados</div>
+              </div>
+              <div style={{ background: '#F0F9FF', borderRadius: '12px', padding: '16px', border: '1px solid #BAE6FD' }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0369A1' }}>{misTicketsData.stats.reportados_total || 0}</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0369A1', textTransform: 'uppercase' }}>Total Reportados</div>
+              </div>
+            </div>
+          )}
+
+          {/* ASIGNADOS A MÍ - Grouped by Estado */}
+          {(misTicketsData.asignados?.length || 0) > 0 && (
+            <div style={{ marginBottom: '32px' }}>
+              <h4 style={{ margin: '0 0 12px', fontSize: '1rem', fontWeight: 800, color: '#2C1810', fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ background: '#3D2314', color: '#fff', borderRadius: '8px', padding: '2px 10px', fontSize: '0.7rem' }}>🔧</span>
+                Asignados a mí ({misTicketsData.stats.asignados_total || misTicketsData.asignados.length})
+              </h4>
+              {(() => {
+                const estadosOrden = ['Por Aprobar', 'En proceso', 'Asignado', 'Pendiente', 'Finalizado', 'Cancelado'];
+                return estadosOrden.map(estado => {
+                  const ticketsEstado = misTicketsData.asignadosPorEstado?.[estado] || [];
+                  if (ticketsEstado.length === 0) return null;
+                  const colorEstado = ESTADO_COLORS[estado] || ESTADO_COLORS['Pendiente'];
+                  return (
+                    <div key={estado} style={{ marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, background: colorEstado.bg, color: colorEstado.color, border: `1px solid ${colorEstado.border}`, padding: '3px 10px', borderRadius: '20px', textTransform: 'uppercase' }}>{estado}</span>
+                        <span style={{ fontSize: '0.8rem', color: '#6B7280', fontWeight: 600 }}>{ticketsEstado.length} ticket{s}</span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '10px' }}>
+                        {ticketsEstado.map(t => (
+                          <TicketCard key={t.id} ticket={t} onClick={openTicket} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          )}
+
+          {/* REPORTADOS POR MÍ */}
+          {(misTicketsData.reportados?.length || 0) > 0 && (
+            <div>
+              <h4 style={{ margin: '0 0 12px', fontSize: '1rem', fontWeight: 800, color: '#2C1810', fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ background: '#0369A1', color: '#fff', borderRadius: '8px', padding: '2px 10px', fontSize: '0.7rem' }}>📝</span>
+                Reportados por mí ({misTicketsData.stats.reportados_total || misTicketsData.reportados.length})
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '10px' }}>
+                {misTicketsData.reportados.map(t => (
+                  <TicketCard key={t.id} ticket={t} onClick={openTicket} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* EMPTY STATE */}
+          {(!misTicketsData.asignados?.length && !misTicketsData.reportados?.length) && !misTicketsLoading && (
+            <div style={{ textAlign: 'center', padding: '60px 20px', background: '#FAF6F0', borderRadius: '16px', border: '1px solid #E8DDD4' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📭</div>
+              <h4 style={{ margin: '0 0 8px', color: '#4A2518', fontSize: '1.1rem', fontFamily: 'var(--font-display)' }}>No tienes tickets</h4>
+              <p style={{ margin: '0 0 20px', color: '#888' }}>No hay tickets asignados a ti ni reportados por ti.</p>
+              <button onClick={() => setNewTicketOpen(true)} style={{ ...btnPrimary, background: '#3D2314', padding: '12px 24px' }}>
+                ➕ Crear mi primer ticket
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ====== MODAL: DETALLE TICKET (REDISEÑO PROFESIONAL) ====== */}
       {ticketModal.open && ticketModal.ticket && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.55)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '20px', overflowY: 'auto' }}>
-          <div style={{ background: '#fff', borderRadius: '18px', width: '100%', maxWidth: '680px', boxShadow: '0 20px 60px rgba(107,58,42,0.25)', overflow: 'hidden', marginTop: '20px', marginBottom: '20px' }}>
-            {/* Header modal */}
+        <div
+          onClick={() => setTicketModal({ open: false, ticket: null, historial: [] })}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)',
+            backdropFilter: 'blur(6px)', zIndex: 9999, display: 'flex',
+            alignItems: 'center', justifyContent: 'center', padding: '16px', overflowY: 'auto'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF', borderRadius: '20px', width: '100%', maxWidth: '720px',
+              maxHeight: '92vh', display: 'flex', flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0,0,0,0.05)',
+              overflow: 'hidden'
+            }}
+          >
             {(() => {
               const t = ticketModal.ticket;
-              const pref = PREFIJO_STYLE[t.prefijo] || PREFIJO_STYLE['MT'];
+              const isST = t.prefijo === 'ST';
               const ec = ESTADO_COLORS[t.estado] || ESTADO_COLORS['Pendiente'];
+              const pc = PRIORIDAD_COLORS[t.prioridad] || PRIORIDAD_COLORS['Media'];
+              const cleanName = (n) => (n ? String(n).replace(/\|/g, '').trim() : '—');
+              const isAssigned = Boolean(t.tecnico_nombre);
+
               return (
                 <>
-                  <div style={{ background: `linear-gradient(135deg, ${pref.color} 0%, #8B5E3C 100%)`, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#fff', letterSpacing: '1px' }}>{t.id}</span>
-                      <span style={{ marginLeft: '10px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.2)', color: '#fff', padding: '3px 10px', borderRadius: '10px' }}>{t.tipo_mantenimiento}</span>
+                  {/* ── Header oscuro de alto contraste ── */}
+                  <div style={{
+                    background: isST
+                      ? 'linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%)'
+                      : 'linear-gradient(135deg, #23120B 0%, #4A2518 100%)',
+                    padding: '20px 26px', color: '#FFFFFF',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px',
+                    flexShrink: 0
+                  }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{
+                          fontWeight: 900, fontSize: '1.25rem', color: '#FFFFFF',
+                          letterSpacing: '0.5px', fontFamily: 'var(--font-display)'
+                        }}>
+                          {t.id}
+                        </span>
+                        <span style={{
+                          fontSize: '0.73rem', fontWeight: 700,
+                          background: 'rgba(255,255,255,0.16)', color: '#FFFFFF',
+                          border: '1px solid rgba(255,255,255,0.22)',
+                          padding: '3px 10px', borderRadius: '999px'
+                        }}>
+                          {t.tipo_mantenimiento}
+                        </span>
+                        <span style={{
+                          fontSize: '0.73rem', fontWeight: 800,
+                          background: ec.bg, color: ec.color, border: `1px solid ${ec.border}`,
+                          padding: '3px 11px', borderRadius: '999px'
+                        }}>
+                          ● {t.estado}
+                        </span>
+                        <span style={{
+                          fontSize: '0.73rem', fontWeight: 800,
+                          background: pc.bg, color: pc.color,
+                          padding: '3px 11px', borderRadius: '999px'
+                        }}>
+                          ⚡ Prioridad {t.prioridad}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.82)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <span>🏢 Área: <strong style={{ color: '#fff' }}>{t.area_registro || 'Mantenimiento'}</strong></span>
+                        {t.pdv_nombre && <span>• 📍 <strong style={{ color: '#fff' }}>{t.pdv_nombre}</strong></span>}
+                        <span>• 📅 Creado el <strong style={{ color: '#fff' }}>{formatDate(t.fecha_registro)}</strong></span>
+                      </div>
                     </div>
-                    <button onClick={() => setTicketModal({ open: false, ticket: null, historial: [] })} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: '1.3rem', cursor: 'pointer', borderRadius: '8px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                    <button
+                      onClick={() => setTicketModal({ open: false, ticket: null, historial: [] })}
+                      aria-label="Cerrar detalle"
+                      style={{
+                        background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
+                        color: '#fff', fontSize: '1.05rem', cursor: 'pointer', borderRadius: '10px',
+                        width: '36px', height: '36px', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', flexShrink: 0, transition: 'background 0.15s'
+                      }}
+                    >
+                      ✕
+                    </button>
                   </div>
-                  <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '80vh', overflowY: 'auto' }}>
-                    {/* Estado y prioridad */}
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700, background: ec.bg, color: ec.color, border: `1px solid ${ec.border}`, padding: '4px 14px', borderRadius: '20px' }}>{t.estado}</span>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700, background: PRIORIDAD_COLORS[t.prioridad]?.bg || '#FEF9C3', color: PRIORIDAD_COLORS[t.prioridad]?.color || '#854D0E', padding: '4px 14px', borderRadius: '20px' }}>⚡ {t.prioridad}</span>
+
+                  {/* ── Cuerpo scrolleable con secciones claras ── */}
+                  <div style={{
+                    padding: '22px 26px', display: 'flex', flexDirection: 'column',
+                    gap: '18px', overflowY: 'auto', flex: 1, background: '#F8FAFC'
+                  }}>
+
+                    {/* 1. Descripción del Hallazgo (destacada) */}
+                    <div style={{
+                      background: '#FFFFFF', borderRadius: '14px', padding: '16px 18px',
+                      border: '1px solid #E2E8F0', borderLeft: `4px solid ${isST ? '#2563EB' : '#6B3A2A'}`,
+                      boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)'
+                    }}>
+                      <div style={{
+                        fontSize: '0.7rem', color: '#475569', fontWeight: 800,
+                        textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '6px'
+                      }}>
+                        🔍 Descripción del Hallazgo / Problema
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.96rem', color: '#0F172A', fontWeight: 500, lineHeight: 1.55 }}>
+                        {t.descripcion || 'Sin descripción registrada.'}
+                      </p>
                     </div>
 
-                    {/* Descripción */}
-                    <div style={{ background: '#FAF6F0', borderRadius: '10px', padding: '14px' }}>
-                      <div style={{ fontSize: '0.72rem', color: '#888', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Descripción del Hallazgo</div>
-                      <p style={{ margin: 0, fontSize: '0.9rem', color: '#333', lineHeight: 1.5 }}>{t.descripcion}</p>
-                    </div>
-
-                    {/* Info grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-                      {[
-                        { label: 'Área Registro', value: t.area_registro },
-                        { label: 'Categoría', value: t.categoria_nombre || (t.categoria_id ? `Categoría #${t.categoria_id}` : '—') },
-                        { label: 'Área Hallazgo', value: t.area_hallazgo || '—' },
-                        { label: 'Equipo', value: t.equipo_nombre || 'Locativo', action: t.equipo_id ? <button onClick={() => handleConsultarEquipo(t.equipo_id, false)} style={{ marginLeft: '6px', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: '#DBEAFE', color: '#1E40AF', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>Ver Detalles</button> : null },
-                        { label: 'Fecha Evidencia', value: formatDate(t.fecha_evidencia) },
-                        { label: 'Fecha Registro', value: formatDate(t.fecha_registro) },
-                        { label: 'Fecha Programada', value: formatDate(t.fecha_programada) },
-                        { label: 'Registrado por', value: t.usuario_registro_nombre || '—' },
-                        { label: 'Asignado por', value: t.responsable_asignacion_nombre || '—' },
-                        { label: 'Técnico', value: t.tecnico_nombre || 'Sin asignar' },
-                        { label: 'T. Atención', value: formatMinutes(t.tiempo_atencion_minutos) },
-                        { label: 'T. Ejecución', value: formatMinutes(t.tiempo_ejecucion_minutos) },
-                        { label: 'Finalizado', value: formatDate(t.fecha_real_finalizacion) },
-                      ].map(f => (
-                        <div key={f.label} style={{ background: '#F8F4EE', borderRadius: '8px', padding: '10px 12px' }}>
-                          <div style={{ fontSize: '0.68rem', color: '#888', fontWeight: 700, textTransform: 'uppercase', marginBottom: '3px' }}>{f.label}</div>
-                          <div style={{ fontSize: '0.85rem', color: '#2C1810', fontWeight: 600, display: 'flex', alignItems: 'center' }}>{f.value} {f.action}</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Solución aplicada */}
+                    {/* 2. Solución aplicada (si existe) */}
                     {t.solucion_aplicada && (
-                      <div style={{ background: '#DCFCE7', borderRadius: '10px', padding: '14px', border: '1px solid #BBF7D0' }}>
-                        <div style={{ fontSize: '0.72rem', color: '#166534', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>✅ Solución Aplicada</div>
-                        <p style={{ margin: 0, fontSize: '0.88rem', color: '#15803D' }}>{t.solucion_aplicada}</p>
+                      <div style={{
+                        background: '#F0FDF4', borderRadius: '14px', padding: '16px 18px',
+                        border: '1px solid #86EFAC', borderLeft: '4px solid #16A34A'
+                      }}>
+                        <div style={{
+                          fontSize: '0.72rem', color: '#14532D', fontWeight: 800,
+                          textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '6px'
+                        }}>
+                          ✅ Solución Aplicada
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.92rem', color: '#14532D', fontWeight: 600, lineHeight: 1.5 }}>
+                          {t.solucion_aplicada}
+                        </p>
                       </div>
                     )}
 
-                    {/* Observaciones */}
+                    {/* 3. Resumen en 2 tarjetas limpias: Ubicación/Equipo y Responsables/Fechas */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+
+                      {/* Tarjeta A: Clasificación y Elemento */}
+                      <div style={{
+                        background: '#FFFFFF', borderRadius: '14px', padding: '16px 18px',
+                        border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '12px'
+                      }}>
+                        <div style={{
+                          fontSize: '0.72rem', fontWeight: 800, color: '#334155',
+                          textTransform: 'uppercase', letterSpacing: '0.6px',
+                          paddingBottom: '8px', borderBottom: '1px solid #F1F5F9'
+                        }}>
+                          📌 Clasificación y Elemento
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div>
+                            <div style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 600, marginBottom: '2px' }}>Categoría</div>
+                            <div style={{ fontSize: '0.88rem', color: '#0F172A', fontWeight: 700 }}>
+                              {t.categoria_nombre || (t.categoria_id ? `Categoría #${t.categoria_id}` : 'Sin categoría')}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 600, marginBottom: '2px' }}>Área / Ubicación</div>
+                            <div style={{ fontSize: '0.88rem', color: '#0F172A', fontWeight: 700 }}>
+                              {t.area_hallazgo || 'General'}
+                            </div>
+                          </div>
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <div style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 600, marginBottom: '4px' }}>Equipo / Activo</div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: '#F8FAFC', padding: '8px 12px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                              <span style={{ fontSize: '0.88rem', color: '#0F172A', fontWeight: 700 }}>
+                                {t.equipo_nombre ? `🔌 ${t.equipo_nombre}` : '🧱 Locativo (sin sticker)'}
+                              </span>
+                              {t.equipo_id && (
+                                <button
+                                  onClick={() => handleConsultarEquipo(t.equipo_id, false)}
+                                  style={{
+                                    fontSize: '0.73rem', padding: '4px 10px', borderRadius: '6px',
+                                    background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE',
+                                    cursor: 'pointer', fontWeight: 700, whiteSpace: 'nowrap'
+                                  }}
+                                >
+                                  Ver ficha →
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tarjeta B: Responsables y Tiempos */}
+                      <div style={{
+                        background: '#FFFFFF', borderRadius: '14px', padding: '16px 18px',
+                        border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '12px'
+                      }}>
+                        <div style={{
+                          fontSize: '0.72rem', fontWeight: 800, color: '#334155',
+                          textTransform: 'uppercase', letterSpacing: '0.6px',
+                          paddingBottom: '8px', borderBottom: '1px solid #F1F5F9'
+                        }}>
+                          👤 Asignación y Seguimiento
+                        </div>
+
+                        {/* Técnico destacado */}
+                        <div style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '9px 12px', borderRadius: '10px',
+                          background: isAssigned ? '#F0FDF4' : '#FFFBEB',
+                          border: `1px solid ${isAssigned ? '#BBF7D0' : '#FDE68A'}`
+                        }}>
+                          <div>
+                            <div style={{ fontSize: '0.68rem', fontWeight: 700, color: isAssigned ? '#166534' : '#92400E', textTransform: 'uppercase' }}>
+                              Técnico Responsable
+                            </div>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: isAssigned ? '#14532D' : '#B45309' }}>
+                              {isAssigned ? `👷 ${cleanName(t.tecnico_nombre)}` : '⏳ Sin asignar'}
+                            </div>
+                          </div>
+                          {t.fecha_programada && (
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '0.68rem', color: '#64748B', fontWeight: 600 }}>Programado</div>
+                              <div style={{ fontSize: '0.82rem', color: '#0F172A', fontWeight: 700 }}>{formatDate(t.fecha_programada)}</div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.82rem' }}>
+                          <div>
+                            <div style={{ fontSize: '0.68rem', color: '#64748B', fontWeight: 600 }}>Reportado por</div>
+                            <div style={{ color: '#0F172A', fontWeight: 700 }}>{cleanName(t.usuario_registro_nombre)}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.68rem', color: '#64748B', fontWeight: 600 }}>Asignado por</div>
+                            <div style={{ color: '#0F172A', fontWeight: 700 }}>{cleanName(t.responsable_asignacion_nombre)}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.68rem', color: '#64748B', fontWeight: 600 }}>Fecha Evidencia</div>
+                            <div style={{ color: '#0F172A', fontWeight: 700 }}>{formatDate(t.fecha_evidencia)}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.68rem', color: '#64748B', fontWeight: 600 }}>Finalizado</div>
+                            <div style={{ color: '#0F172A', fontWeight: 700 }}>{formatDate(t.fecha_real_finalizacion)}</div>
+                          </div>
+                        </div>
+
+                        {(t.tiempo_atencion_minutos > 0 || t.tiempo_ejecucion_minutos > 0) && (
+                          <div style={{ display: 'flex', gap: '10px', paddingTop: '6px', borderTop: '1px solid #F1F5F9', fontSize: '0.78rem' }}>
+                            <span style={{ color: '#475569' }}>⏱️ Atención: <strong style={{ color: '#0F172A' }}>{formatMinutes(t.tiempo_atencion_minutos)}</strong></span>
+                            <span style={{ color: '#475569' }}>🔧 Ejecución: <strong style={{ color: '#0F172A' }}>{formatMinutes(t.tiempo_ejecucion_minutos)}</strong></span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 4. Observaciones */}
                     {t.observaciones && (
-                      <div style={{ background: '#FAF6F0', borderRadius: '10px', padding: '12px 14px' }}>
-                        <div style={{ fontSize: '0.72rem', color: '#888', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Observaciones</div>
-                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#555' }}>{t.observaciones}</p>
+                      <div style={{
+                        background: '#FFFFFF', borderRadius: '14px', padding: '14px 18px',
+                        border: '1px solid #E2E8F0'
+                      }}>
+                        <div style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+                          📝 Observaciones
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.88rem', color: '#1E293B', lineHeight: 1.5 }}>{t.observaciones}</p>
                       </div>
                     )}
 
-                    {/* Evidencias fotográficas */}
+                    {/* 5. Evidencias fotográficas */}
                     {t.evidencias && (() => {
                       try {
-                        const fotos = JSON.parse(t.evidencias);
-                        if (!fotos || fotos.length === 0) return null;
+                        const raw = typeof t.evidencias === 'string' ? JSON.parse(t.evidencias) : t.evidencias;
+                        const fotos = (Array.isArray(raw) ? raw : []).filter(Boolean).map(f => {
+                          const s = String(f).trim();
+                          if (!s) return null;
+                          if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('data:') || s.startsWith('/')) return s;
+                          return `/${s}`;
+                        }).filter(Boolean);
+                        if (fotos.length === 0) return null;
                         return (
-                          <div style={{ marginTop: '4px' }}>
-                            <h5 style={{ margin: '0 0 8px', color: '#4A2518' }}>📷 Evidencias Fotográficas</h5>
-                            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px' }}>
+                          <div style={{
+                            background: '#FFFFFF', borderRadius: '14px', padding: '16px 18px',
+                            border: '1px solid #E2E8F0'
+                          }}>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
+                              📷 Evidencias Fotográficas ({fotos.length})
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
                               {fotos.map((f, i) => (
-                                <img key={i} src={f} alt={`Evidencia ${i}`} style={{ height: '120px', borderRadius: '8px', cursor: 'pointer', objectFit: 'cover' }} onClick={() => window.open(f, '_blank')} />
+                                <a
+                                  key={i}
+                                  href={f}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="Clic para abrir imagen completa"
+                                  style={{
+                                    display: 'block', height: '110px', borderRadius: '10px',
+                                    overflow: 'hidden', border: '1px solid #E2E8F0', background: '#F1F5F9',
+                                    position: 'relative'
+                                  }}
+                                >
+                                  <img
+                                    src={f}
+                                    alt={`Evidencia ${i + 1}`}
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      if (e.currentTarget.nextSibling) e.currentTarget.nextSibling.style.display = 'flex';
+                                    }}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                  />
+                                  <div style={{
+                                    display: 'none', width: '100%', height: '100%',
+                                    alignItems: 'center', justifyContent: 'center', flexDirection: 'column',
+                                    gap: '4px', color: '#64748B', fontSize: '0.72rem', fontWeight: 600, padding: '8px', textAlign: 'center'
+                                  }}>
+                                    <span style={{ fontSize: '1.3rem' }}>🖼️</span>
+                                    <span>Evidencia {i + 1}</span>
+                                  </div>
+                                </a>
                               ))}
                             </div>
                           </div>
@@ -2593,19 +3969,23 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                       } catch (e) { return null; }
                     })()}
 
-                    {/* Checklist */}
+                    {/* 6. Checklist */}
                     {t.checklist_tareas && (() => {
                       try {
                         const chk = parseChecklist(t.checklist_tareas);
                         if (!chk || chk.length === 0) return null;
                         return (
-                          <div style={{ background: '#F0F9FF', borderRadius: '10px', padding: '14px', border: '1px solid #BAE6FD' }}>
-                            <h5 style={{ margin: '0 0 10px', color: '#0369A1' }}>📋 Checklist de Tareas (Asignado)</h5>
+                          <div style={{ background: '#F0F9FF', borderRadius: '14px', padding: '16px 18px', border: '1px solid #BAE6FD' }}>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0369A1', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
+                              📋 Checklist de Tareas ({chk.filter(x => x.completada).length}/{chk.length})
+                            </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                               {chk.map((tarea, i) => (
-                                <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#0F172A' }}>
+                                <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#0F172A', fontWeight: 500 }}>
                                   <input type="checkbox" checked={tarea.completada} disabled />
-                                  {tarea.texto || tarea.tarea || (typeof tarea === 'string' ? tarea : '(Tarea sin texto)')}
+                                  <span style={{ textDecoration: tarea.completada ? 'line-through' : 'none', color: tarea.completada ? '#64748B' : '#0F172A' }}>
+                                    {tarea.texto || tarea.tarea || (typeof tarea === 'string' ? tarea : '(Tarea sin texto)')}
+                                  </span>
                                 </label>
                               ))}
                             </div>
@@ -2614,70 +3994,149 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                       } catch (e) { return null; }
                     })()}
 
-                    {/* Historial de auditoría */}
+                    {/* 7. Historial de Cambios */}
                     {ticketModal.historial.length > 0 && (
-                      <div>
-                        <h5 style={{ margin: '0 0 10px', color: '#4A2518' }}>📜 Historial de Cambios</h5>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{
+                        background: '#FFFFFF', borderRadius: '14px', padding: '16px 18px',
+                        border: '1px solid #E2E8F0'
+                      }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
+                          📜 Historial de Cambios
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderLeft: '2px solid #E2E8F0', marginLeft: '5px', paddingLeft: '14px' }}>
                           {ticketModal.historial.map(h => (
-                            <div key={h.id} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', fontSize: '0.8rem' }}>
-                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#D4A847', flexShrink: 0, marginTop: '5px' }} />
+                            <div key={h.id} style={{ position: 'relative', fontSize: '0.82rem', lineHeight: 1.4 }}>
+                              <div style={{
+                                position: 'absolute', left: '-20px', top: '4px',
+                                width: '10px', height: '10px', borderRadius: '50%',
+                                background: '#3D2314', border: '2px solid #FFFFFF'
+                              }} />
                               <div>
-                                <span style={{ fontWeight: 700, color: '#4A2518' }}>{h.accion}</span>
-                                {h.estado_nuevo && <span style={{ marginLeft: '6px', color: '#888' }}>→ {h.estado_nuevo}</span>}
-                                <span style={{ marginLeft: '8px', color: '#aaa' }}>· {h.user_nombre} · {formatDate(h.created_at)}</span>
+                                <span style={{ fontWeight: 800, color: '#0F172A' }}>{h.accion}</span>
+                                {h.estado_nuevo && (
+                                  <span style={{
+                                    marginLeft: '8px', fontSize: '0.73rem', fontWeight: 700,
+                                    background: '#F1F5F9', color: '#334155', padding: '2px 8px', borderRadius: '6px'
+                                  }}>
+                                    → {h.estado_nuevo}
+                                  </span>
+                                )}
+                                <span style={{ marginLeft: '8px', color: '#64748B', fontWeight: 500 }}>
+                                  · {cleanName(h.user_nombre)} · {formatDate(h.created_at)}
+                                </span>
                               </div>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
+                  </div>
 
-                    {/* Acciones */}
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', borderTop: '1px solid #F0EAE1', paddingTop: '14px' }}>
-                      <button onClick={() => handlePrintMantenimientoPDF(t)} style={{ ...btnPrimary, fontSize: '0.85rem', background: '#991B1B', padding: '10px 18px' }}>
-                        📄 Imprimir / Reporte PDF
-                      </button>
+                  {/* ── Barra inferior fija de acciones con alto contraste ── */}
+                  <div style={{
+                    padding: '14px 26px', background: '#FFFFFF', borderTop: '1px solid #E2E8F0',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    gap: '10px', flexWrap: 'wrap', flexShrink: 0
+                  }}>
+                    <button
+                      onClick={() => handlePrintMantenimientoPDF(t)}
+                      style={{
+                        background: '#FFFFFF', color: '#1E293B', border: '1.5px solid #CBD5E1',
+                        borderRadius: '10px', padding: '10px 16px', fontWeight: 700,
+                        fontSize: '0.83rem', cursor: 'pointer', display: 'inline-flex',
+                        alignItems: 'center', gap: '8px'
+                      }}
+                    >
+                      🖨️ Imprimir / PDF
+                    </button>
+
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                       {t.estado !== 'Finalizado' && t.estado !== 'Cancelado' && (
                         <>
+                          {(esJefe || esAdmin) && (
+                            <button
+                              onClick={() => { setAccionModal({ open: true, tipo: 'cancelar', ticketId: t.id }); setAccionData({}); }}
+                              style={{
+                                background: '#FEF2F2', color: '#B91C1C', border: '1.5px solid #FECACA',
+                                borderRadius: '10px', padding: '10px 16px', fontWeight: 700,
+                                fontSize: '0.83rem', cursor: 'pointer'
+                              }}
+                            >
+                              ✕ Cancelar Ticket
+                            </button>
+                          )}
+
+                          {(esJefe || esAdmin) && (t.estado === 'Pendiente' || t.estado === 'Asignado') && (
+                            <button
+                              onClick={() => {
+                                setAccionModal({ open: true, tipo: 'asignar', ticketId: t.id, prefijo: t.prefijo });
+                                if (t.estado === 'Asignado') {
+                                  const checkList = parseChecklist(t.checklist_tareas);
+                                  setAccionData({
+                                    tecnico_id: t.tecnico_id || '',
+                                    fecha_programada: t.fecha_programada || new Date().toISOString().split('T')[0],
+                                    prioridad: t.prioridad || '',
+                                    observaciones_asignacion: t.observaciones_asignacion || '',
+                                    categoria_id: t.categoria_id || '',
+                                    checklist_tareas: checkList
+                                  });
+                                } else {
+                                  setAccionData({
+                                    categoria_id: t.categoria_id || '',
+                                    fecha_programada: new Date().toISOString().split('T')[0]
+                                  });
+                                }
+                              }}
+                              style={{
+                                background: t.estado === 'Asignado' ? '#D97706' : '#3D2314',
+                                color: '#FFFFFF', border: 'none', borderRadius: '10px',
+                                padding: '10px 20px', fontWeight: 800, fontSize: '0.85rem',
+                                cursor: 'pointer', display: 'inline-flex', alignItems: 'center',
+                                gap: '8px', boxShadow: '0 4px 12px rgba(61, 35, 20, 0.25)'
+                              }}
+                            >
+                              {t.estado === 'Asignado' ? '🔄 Reasignar Técnico' : '👔 Asignar Técnico'}
+                            </button>
+                          )}
+
                           {t.estado === 'Asignado' && (
-                            <button onClick={() => { setTicketModal({ open: false, ticket: null, historial: [] }); iniciarYAbriModoVisita(t); }} style={{ ...btnPrimary, fontSize: '0.85rem', background: '#D97706', padding: '10px 18px' }}>
-                              🚀 Iniciar Trabajo (Modo Visita)
+                            <button
+                              onClick={() => { setTicketModal({ open: false, ticket: null, historial: [] }); iniciarYAbriModoVisita(t); }}
+                              style={{
+                                background: '#D97706', color: '#FFFFFF', border: 'none',
+                                borderRadius: '10px', padding: '10px 18px', fontWeight: 800,
+                                fontSize: '0.85rem', cursor: 'pointer'
+                              }}
+                            >
+                              🚀 Iniciar Trabajo
                             </button>
                           )}
+
                           {t.estado === 'En proceso' && (
-                            <button onClick={() => { setTicketModal({ open: false, ticket: null, historial: [] }); openModoVisita(t); }} style={{ ...btnPrimary, fontSize: '0.85rem', background: '#166534', padding: '10px 18px' }}>
-                              🛠️ Abrir / Continuar (Modo Visita)
+                            <button
+                              onClick={() => { setTicketModal({ open: false, ticket: null, historial: [] }); openModoVisita(t); }}
+                              style={{
+                                background: '#166534', color: '#FFFFFF', border: 'none',
+                                borderRadius: '10px', padding: '10px 18px', fontWeight: 800,
+                                fontSize: '0.85rem', cursor: 'pointer'
+                              }}
+                            >
+                              🛠️ Continuar en Modo Visita
                             </button>
                           )}
+
                           {t.estado === 'Por Aprobar' && (esJefe || esAdmin) && (
-                            <button onClick={() => { setTicketModal({ open: false, ticket: null, historial: [] }); setApprovalModalTicket(t); }} style={{ ...btnPrimary, fontSize: '0.85rem', background: '#4F46E5', padding: '10px 18px' }}>
+                            <button
+                              onClick={() => { setTicketModal({ open: false, ticket: null, historial: [] }); setApprovalModalTicket(t); }}
+                              style={{
+                                background: '#4F46E5', color: '#FFFFFF', border: 'none',
+                                borderRadius: '10px', padding: '10px 20px', fontWeight: 800,
+                                fontSize: '0.85rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.28)'
+                              }}
+                            >
                               🔍 Evaluar y Aprobar
                             </button>
                           )}
-                          {esJefe && (t.estado === 'Pendiente' || t.estado === 'Asignado') && (
-                            <button onClick={() => {
-                              setAccionModal({ open: true, tipo: 'asignar', ticketId: t.id, prefijo: t.prefijo });
-                              if (t.estado === 'Asignado') {
-                                const checkList = parseChecklist(t.checklist_tareas);
-                                setAccionData({
-                                  tecnico_id: t.tecnico_id || '',
-                                  fecha_programada: t.fecha_programada || '',
-                                  prioridad: t.prioridad || '',
-                                  observaciones_asignacion: t.observaciones_asignacion || '',
-                                  categoria_id: t.categoria_id || '',
-                                  checklist_tareas: checkList
-                                });
-                              } else {
-                                setAccionData({ categoria_id: t.categoria_id || '' });
-                              }
-                            }} style={{ ...btnPrimary, fontSize: '0.82rem', background: t.estado === 'Asignado' ? '#D97706' : undefined }}>
-                              {t.estado === 'Asignado' ? '🔄 Reasignar Técnico' : '👔 Asignar'}
-                            </button>
-                          )}
-                          <button onClick={() => { setAccionModal({ open: true, tipo: 'cancelar', ticketId: t.id }); setAccionData({}); }} style={{ ...btnSecondary, fontSize: '0.82rem', background: '#FEE2E2', color: '#991B1B' }}>
-                            ✕ Cancelar Ticket
-                          </button>
                         </>
                       )}
                     </div>
@@ -2692,7 +4151,7 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
       {/* ====== MODAL: CONFIRMACIÓN DE ACCIÓN ====== */}
       {accionModal.open && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.6)', backdropFilter: 'blur(6px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '440px', boxShadow: '0 20px 60px rgba(107,58,42,0.25)', overflow: 'hidden' }}>
+          <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: accionModal.tipo === 'asignar' ? '580px' : '440px', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(107,58,42,0.25)' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #F0EAE1' }}>
               <h4 style={{ margin: 0, color: '#4A2518', fontFamily: 'var(--font-display)' }}>
                 {accionModal.tipo === 'finalizar' ? '✅ Finalizar Ticket' : accionModal.tipo === 'cancelar' ? '✕ Cancelar Ticket' : accionModal.tipo === 'iniciar' ? '▶️ Iniciar Ejecución' : '👔 Asignar Ticket'}
@@ -2781,11 +4240,13 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
               {accionModal.tipo === 'asignar' && (
                 <>
                   <div>
-                    <label style={labelStyle}>Técnico *</label>
-                    <select required value={accionData.tecnico_id || ''} onChange={e => setAccionData(p => ({ ...p, tecnico_id: parseInt(e.target.value) }))} style={inputStyle}>
-                      <option value="">Seleccionar técnico...</option>
-                      {(accionModal.prefijo === 'ST' ? tecnicosST : tecnicosMT).map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
-                    </select>
+                    <label style={labelStyle}>Técnico * <span style={{ fontWeight: 500, color: '#9CA3AF' }}>(ordenados por menor carga)</span></label>
+                    <TecnicoPicker
+                      tecnicos={accionModal.prefijo === 'ST' ? tecnicosST : tecnicosMT}
+                      tickets={tickets}
+                      value={accionData.tecnico_id || ''}
+                      onChange={(id) => setAccionData(p => ({ ...p, tecnico_id: parseInt(id) }))}
+                    />
                   </div>
                   <div>
                     <label style={labelStyle}>Categoría del Soporte / Ticket</label>
@@ -2841,8 +4302,25 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
                 <p style={{ margin: 0, fontSize: '0.88rem', color: '#555' }}>¿Confirmas que vas a iniciar la ejecución de este ticket? Se registrará la hora de inicio automáticamente.</p>
               )}
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '4px' }}>
-                <button onClick={() => { setAccionModal({ open: false, tipo: '', ticketId: '' }); setAccionData({}); }} style={{ ...btnSecondary, padding: '10px 20px' }}>Cancelar</button>
-                <button onClick={ejecutarAccion} style={{ ...btnPrimary, padding: '10px 24px', background: accionModal.tipo === 'cancelar' ? '#991B1B' : accionModal.tipo === 'finalizar' ? '#166534' : '#6B3A2A' }}>
+                <button
+                  onClick={() => { setAccionModal({ open: false, tipo: '', ticketId: '' }); setAccionData({}); }}
+                  style={{
+                    background: '#F1F5F9', color: '#1E293B', border: '1px solid #CBD5E1',
+                    borderRadius: '10px', padding: '10px 20px', fontWeight: 700,
+                    fontSize: '0.85rem', cursor: 'pointer'
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={ejecutarAccion}
+                  style={{
+                    background: accionModal.tipo === 'cancelar' ? '#991B1B' : accionModal.tipo === 'finalizar' ? '#166534' : '#3D2314',
+                    color: '#FFFFFF', border: 'none', borderRadius: '10px',
+                    padding: '10px 24px', fontWeight: 800, fontSize: '0.85rem',
+                    cursor: 'pointer', boxShadow: '0 4px 12px rgba(61, 35, 20, 0.25)'
+                  }}
+                >
                   Confirmar
                 </button>
               </div>
@@ -3930,6 +5408,19 @@ Generado automáticamente por Crepes en Punto - Módulo de Mantenimiento el ${ne
             </div>
           </div>
         </div>
+      )}
+
+      {/* ====== CHECKLIST TEMPLATE MODAL ====== */}
+      {showTemplateModal && (
+        <ChecklistTemplateModal
+          isOpen={showTemplateModal}
+          onClose={() => setShowTemplateModal(false)}
+          templateForm={templateForm}
+          setTemplateForm={setTemplateForm}
+          editingTemplate={editingTemplate}
+          onSave={handleSaveTemplate}
+          saving={templateLoading}
+        />
       )}
 
       {/* Styles */}

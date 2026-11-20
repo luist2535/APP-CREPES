@@ -38,6 +38,9 @@ export async function GET(request) {
     const fecha_desde = searchParams.get('fecha_desde');
     const fecha_hasta = searchParams.get('fecha_hasta');
     const search = searchParams.get('search');
+    const isExport = searchParams.get('export') === 'true';
+    const vencidos = searchParams.get('vencidos') === 'true';
+    const misTickets = searchParams.get('mis_tickets') === 'true';
 
     let query = `
       SELECT m.*,
@@ -81,6 +84,12 @@ export async function GET(request) {
       }
     }
 
+    // Modo "Mis Tickets" - combina asignados como técnico + reportados por mí
+    if (misTickets && !esJefe) {
+      query += ' AND (m.tecnico_id = ? OR m.user_id_registro = ?)';
+      params.push(user.id, user.id);
+    }
+
     if (estado) { query += ' AND m.estado = ?'; params.push(estado); }
     if (prefijo) { query += ' AND m.prefijo = ?'; params.push(prefijo); }
     if (tipo) { query += ' AND m.tipo_mantenimiento = ?'; params.push(tipo); }
@@ -90,6 +99,7 @@ export async function GET(request) {
     if (equipo_id) { query += ' AND m.equipo_id = ?'; params.push(equipo_id); }
     if (fecha_desde) { query += ' AND DATE(m.fecha_registro) >= ?'; params.push(fecha_desde); }
     if (fecha_hasta) { query += ' AND DATE(m.fecha_registro) <= ?'; params.push(fecha_hasta); }
+    if (vencidos) { query += ' AND m.fecha_programada < DATE(\'now\') AND m.estado NOT IN (\'Finalizado\',\'Cancelado\')'; }
     if (search) {
       query += ' AND (m.id LIKE ? OR m.descripcion LIKE ? OR m.area_hallazgo LIKE ?)';
       const s = `%${search}%`;
@@ -97,6 +107,11 @@ export async function GET(request) {
     }
 
     query += ' ORDER BY m.fecha_registro DESC';
+
+    // Solo aplicar límite si NO es exportación (para rendimiento en UI)
+    if (!isExport) {
+      query += ' LIMIT 500';
+    }
 
     const mantenimientos = db.prepare(query).all(...params);
 
@@ -142,6 +157,37 @@ export async function GET(request) {
       WHERE c.activa = 1
       ORDER BY c.area_id, c.padre_id NULLS FIRST, c.nombre
     `).all();
+
+    // Modo "Mis Tickets": respuesta estructurada por secciones
+    if (misTickets) {
+      const asignados = mantenimientos.filter(m => m.tecnico_id === user.id);
+      const reportados = mantenimientos.filter(m => m.user_id_registro === user.id && m.tecnico_id !== user.id);
+
+      // Agrupar asignados por estado
+      const ESTADOS = ['Pendiente', 'Asignado', 'En proceso', 'Por Aprobar', 'Finalizado', 'Cancelado'];
+      const asignadosPorEstado = {};
+      ESTADOS.forEach(e => { asignadosPorEstado[e] = asignados.filter(m => m.estado === e); });
+
+      // Stats específicos
+      const statsMisTickets = {
+        asignados_total: asignados.length,
+        reportados_total: reportados.length,
+        por_aprobar: asignadosPorEstado['Por Aprobar']?.length || 0,
+        en_proceso: asignadosPorEstado['En proceso']?.length || 0,
+        asignados_pendientes: (asignadosPorEstado['Asignado']?.length || 0) + (asignadosPorEstado['Pendiente']?.length || 0),
+        finalizados_semana: asignados.filter(m => m.estado === 'Finalizado' && m.fecha_real_finalizacion && new Date(m.fecha_real_finalizacion) >= new Date(Date.now() - 7*24*60*60*1000)).length
+      };
+
+      return NextResponse.json({
+        asignados,
+        reportados,
+        asignadosPorEstado,
+        stats: statsMisTickets,
+        tecnicosMT,
+        tecnicosST,
+        categorias
+      });
+    }
 
     return NextResponse.json({ mantenimientos, stats, tecnicosMT, tecnicosST, categorias });
   } catch (error) {

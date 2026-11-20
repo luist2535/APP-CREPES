@@ -22,7 +22,7 @@ export async function GET(request) {
       FROM archivos_repositorio a
       LEFT JOIN users u ON a.user_id = u.id
       LEFT JOIN roles r ON u.rol_id = r.id
-      WHERE 1=1
+      WHERE (a.categoria IS NULL OR a.categoria != 'avatar_usuario')
     `;
     const params = [];
 
@@ -51,14 +51,19 @@ export async function GET(request) {
 
     const archivos = db.prepare(query).all(...params);
 
-    // Conteo por tipos para los badges del frontend
+    // Conteo por tipos para los badges del frontend (excluyendo fotos de perfil)
     const conteos = db.prepare(`
       SELECT tipo_archivo, COUNT(*) as count 
       FROM archivos_repositorio 
+      WHERE categoria IS NULL OR categoria != 'avatar_usuario'
       GROUP BY tipo_archivo
     `).all();
 
-    const totalCount = db.prepare('SELECT COUNT(*) as count FROM archivos_repositorio').get().count;
+    const totalCount = db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM archivos_repositorio
+      WHERE categoria IS NULL OR categoria != 'avatar_usuario'
+    `).get().count;
 
     const stats = {
       todos: totalCount,

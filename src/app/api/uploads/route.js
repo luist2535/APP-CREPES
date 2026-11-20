@@ -31,7 +31,7 @@ export async function POST(request) {
   try {
     const { getUserFromRequest } = require('@/lib/auth');
     const { getDb } = require('@/lib/db');
-    
+
     const user = getUserFromRequest(request);
     if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
@@ -52,16 +52,16 @@ export async function POST(request) {
 
     // ── Validación de tamaño ──
     if (buffer.length > MAX_FILE_SIZE) {
-      return NextResponse.json({ 
-        error: `El archivo excede el tamaño máximo permitido de ${Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB` 
+      return NextResponse.json({
+        error: `El archivo excede el tamaño máximo permitido de ${Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB`
       }, { status: 413 });
     }
 
     // ── Validación de extensión ──
     const extension = path.extname(file.name).toLowerCase().replace('.', '');
     if (!ALLOWED_EXTENSIONS.includes(extension)) {
-      return NextResponse.json({ 
-        error: `Tipo de archivo no permitido: .${extension}. Tipos aceptados: ${ALLOWED_EXTENSIONS.join(', ')}` 
+      return NextResponse.json({
+        error: `Tipo de archivo no permitido: .${extension}. Tipos aceptados: ${ALLOWED_EXTENSIONS.join(', ')}`
       }, { status: 400 });
     }
 
@@ -69,36 +69,39 @@ export async function POST(request) {
     const detectedType = detectFileType(buffer);
     const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
     const officeExtensions = ['xlsx', 'xls', 'docx', 'doc', 'pptx', 'ppt'];
-    
+
     // Verificar que el contenido coincida con la extensión declarada
     if (imageExtensions.includes(extension)) {
       if (detectedType && !['jpg', 'png', 'gif', 'webp'].includes(detectedType)) {
         console.warn(`[SECURITY] Upload rejected: extension .${extension} but detected type: ${detectedType}. User: ${user.id} (${user.nombre})`);
-        return NextResponse.json({ 
-          error: 'El contenido del archivo no coincide con su extensión. El archivo podría estar dañado o no ser una imagen válida.' 
+        return NextResponse.json({
+          error: 'El contenido del archivo no coincide con su extensión. El archivo podría estar dañado o no ser una imagen válida.'
         }, { status: 400 });
       }
     } else if (officeExtensions.includes(extension)) {
       if (detectedType && !['zip', 'ole'].includes(detectedType)) {
         console.warn(`[SECURITY] Upload rejected: extension .${extension} but detected type: ${detectedType}. User: ${user.id} (${user.nombre})`);
-        return NextResponse.json({ 
-          error: 'El contenido del archivo no coincide con su extensión. El archivo podría estar dañado.' 
+        return NextResponse.json({
+          error: 'El contenido del archivo no coincide con su extensión. El archivo podría estar dañado.'
         }, { status: 400 });
       }
     } else if (extension === 'pdf') {
       if (detectedType && detectedType !== 'pdf') {
         console.warn(`[SECURITY] Upload rejected: extension .pdf but detected type: ${detectedType}. User: ${user.id} (${user.nombre})`);
-        return NextResponse.json({ 
-          error: 'El archivo no parece ser un PDF válido.' 
+        return NextResponse.json({
+          error: 'El archivo no parece ser un PDF válido.'
         }, { status: 400 });
       }
     }
-    
+
     // Determinar tipo y extensión
     let tipoArchivo = 'otro';
     let subcarpeta = 'general';
 
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(extension)) {
+    if (categoria === 'avatar_usuario') {
+      tipoArchivo = 'avatar';
+      subcarpeta = 'avatars';
+    } else if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(extension)) {
       tipoArchivo = 'foto';
       subcarpeta = 'fotos';
     } else if (['xls', 'xlsx', 'csv'].includes(extension)) {
@@ -130,10 +133,23 @@ export async function POST(request) {
     await fs.writeFile(filePath, buffer);
     const fileUrl = `/archivos/${subcarpeta}/${filename}`;
 
+    // Si es foto de perfil (avatar_usuario), no la registramos en el Repositorio Central de Archivos
+    if (categoria === 'avatar_usuario') {
+      return NextResponse.json({
+        id: null,
+        url: fileUrl,
+        nombre: file.name,
+        tipo_archivo: tipoArchivo,
+        subcarpeta: subcarpeta,
+        etiqueta: etiqueta,
+        message: 'Foto de perfil guardada exitosamente'
+      });
+    }
+
     const db = getDb();
     try {
       db.prepare('ALTER TABLE archivos_repositorio ADD COLUMN tipo_documento TEXT').run();
-    } catch (e) {}
+    } catch (e) { }
 
     // 1. Registrar en la tabla maestra de archivos (Repositorio Documental)
     const result = db.prepare(`
@@ -142,15 +158,15 @@ export async function POST(request) {
         extension, tamano_bytes, categoria, referencia_id, user_id, observaciones, tipo_documento
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      file.name, 
-      filename, 
-      fileUrl, 
-      tipoArchivo, 
-      extension, 
-      buffer.length, 
-      categoria, 
-      referenciaId ? String(referenciaId) : null, 
-      user.id, 
+      file.name,
+      filename,
+      fileUrl,
+      tipoArchivo,
+      extension,
+      buffer.length,
+      categoria,
+      referenciaId ? String(referenciaId) : null,
+      user.id,
       observaciones,
       tipoDocumento
     );

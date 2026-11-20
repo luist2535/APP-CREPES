@@ -2079,3 +2079,9 @@ h4 { font-size: 1rem; font-weight: 600; line-height: 1.4; font-family: var(--fon
   .mobile-only-right-actions { display: none !important; }
   .header-brand-mobile-custom { display: none !important; }
 }
+
+/* Panel lateral (Mantenimiento) */
+@keyframes mtSlideIn {
+  from { transform: translateX(100%); opacity: 0.6; }
+  to { transform: translateX(0); opacity: 1; }
+}

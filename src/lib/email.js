@@ -7,12 +7,11 @@ const { decrypt } = require('./security');
  */
 async function sendNotificationEmail({ to, subject, html }) {
   // ======= INTERRUPTOR DE CORREOS =======
-  // Cambiar a "true" cuando quieran volver a activar los correos.
-  // Mientras esté en "false", el sistema simulará el envío para no causar demoras por el firewall.
-  const CORREOS_ACTIVADOS = false;
+  // Controlado por variable de entorno EMAIL_ENABLED (default: true para producción)
+  const CORREOS_ACTIVADOS = process.env.EMAIL_ENABLED !== 'false';
 
   if (!CORREOS_ACTIVADOS) {
-    console.log(`📨 [Correo Omitido] Envío desactivado temporalmente. Asunto: ${subject}`);
+    console.log(`📨 [Correo Omitido] Envío desactivado (EMAIL_ENABLED=false). Asunto: ${subject}`);
     return true;
   }
 
