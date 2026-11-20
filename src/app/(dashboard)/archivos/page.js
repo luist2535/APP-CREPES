@@ -427,9 +427,9 @@ export default function RepositorioArchivosPage() {
                     {/* Footer */}
                     <div className="rfc-footer">
                       <div className="rfc-user">
-                        <div className="rfc-avatar">{getUserInitials(arch.usuario_nombre)}</div>
+                        <div className="rfc-avatar">{getUserInitials(arch.usuario_nombre ? String(arch.usuario_nombre).replace(/\|/g, '').trim() : 'Sistema')}</div>
                         <div className="rfc-user-info">
-                          <span className="rfc-user-name">{arch.usuario_nombre || 'Sistema'}</span>
+                          <span className="rfc-user-name">{arch.usuario_nombre ? String(arch.usuario_nombre).replace(/\|/g, '').trim() : 'Sistema'}</span>
                           <span className="rfc-user-date">{formatDate(arch.created_at)}</span>
                         </div>
                       </div>
@@ -464,31 +464,82 @@ export default function RepositorioArchivosPage() {
               {archivos.slice(0, visibleCount).map((arch) => {
                 const tipoInfo = getTipoInfo(arch.tipo_archivo, arch.extension);
                 const showRealImage = isImageFile(arch);
+                const canPreview = arch.tipo_archivo === 'foto' || arch.tipo_archivo === 'pdf' || showRealImage;
+                const cleanUser = arch.usuario_nombre ? String(arch.usuario_nombre).replace(/\|/g, '').trim() : 'Sistema';
                 return (
-                  <div key={arch.id} className="repo-mobile-item" style={{ contentVisibility: 'auto', containIntrinsicSize: '84px' }}>
+                  <div
+                    key={arch.id}
+                    className="repo-mobile-item"
+                    onClick={() => canPreview ? setPreviewFile(arch) : null}
+                  >
                     <div className="rmi-thumb" style={{ backgroundColor: tipoInfo.bg }}>
                       {showRealImage ? (
-                        <img src={arch.ruta_archivo} alt="" className="rmi-thumb-img" loading="lazy" decoding="async" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                        <img
+                          src={arch.ruta_archivo}
+                          alt=""
+                          className="rmi-thumb-img"
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                        />
                       ) : null}
                       <div className="rmi-thumb-fallback" style={{ display: showRealImage ? 'none' : 'flex' }}>
                         {getFileIcon(arch.tipo_archivo)}
                       </div>
                     </div>
+
                     <div className="rmi-info">
-                      <h4 className="rmi-name">{arch.nombre_original}</h4>
+                      <div className="rmi-top-row">
+                        <h4 className="rmi-name" title={arch.nombre_original}>{arch.nombre_original}</h4>
+                        <span className="rmi-type-badge" style={{ backgroundColor: tipoInfo.badgeBg, color: tipoInfo.color }}>
+                          {tipoInfo.label}
+                        </span>
+                      </div>
+
                       <div className="rmi-meta">
                         <span className="rmi-cat">{getCategoriaLabel(arch.categoria)}</span>
                         <span className="rmi-size">{formatSize(arch.tamano_bytes)}</span>
                       </div>
-                      <div className="rmi-user-row">
-                        <div className="rmi-avatar">{getUserInitials(arch.usuario_nombre)}</div>
-                        <span className="rmi-user-name">{arch.usuario_nombre || 'Sistema'}</span>
-                        <span className="rmi-date">{formatDate(arch.created_at)}</span>
+
+                      <div className="rmi-bottom-row">
+                        <div className="rmi-user-row">
+                          <div className="rmi-avatar">{getUserInitials(cleanUser)}</div>
+                          <span className="rmi-user-name">{cleanUser}</span>
+                          <span className="rmi-date">· {formatDate(arch.created_at)}</span>
+                        </div>
+
+                        <div className="rmi-actions" onClick={(e) => e.stopPropagation()}>
+                          {canPreview && (
+                            <button
+                              type="button"
+                              className="rmi-act-btn"
+                              onClick={() => setPreviewFile(arch)}
+                              title="Previsualizar"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                          )}
+                          <a
+                            href={`${arch.ruta_archivo}${arch.ruta_archivo?.includes('?') ? '&' : '?'}download=1`}
+                            download={arch.nombre_original}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rmi-act-btn"
+                            title="Descargar"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                          </a>
+                          <button
+                            type="button"
+                            className="rmi-act-btn rmi-act-del"
+                            onClick={() => handleDelete(arch.id, arch.nombre_original)}
+                            title="Eliminar"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    <span className="rmi-type-badge" style={{ backgroundColor: tipoInfo.badgeBg, color: tipoInfo.color }}>
-                      {tipoInfo.label}
-                    </span>
                   </div>
                 );
               })}
@@ -648,6 +699,11 @@ export default function RepositorioArchivosPage() {
           max-width: 1400px;
           margin: 0 auto;
           width: 100%;
+          box-sizing: border-box;
+          overflow-x: hidden;
+        }
+        .repo-page * {
+          box-sizing: border-box;
         }
 
         /* ── Hero Header ── */
@@ -1088,10 +1144,13 @@ export default function RepositorioArchivosPage() {
           gap: 12px;
           background: #fff;
           border: 1.5px solid #E8E0D8;
-          border-radius: 12px;
+          border-radius: 14px;
           padding: 12px;
           transition: all 0.15s;
-          position: relative;
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.03);
         }
         .repo-mobile-item:not(:last-child) { margin-bottom: 10px; }
         .rmi-thumb {
@@ -1111,69 +1170,125 @@ export default function RepositorioArchivosPage() {
           align-items: center;
           justify-content: center;
         }
-        .rmi-thumb-fallback svg { width: 36px; height: 36px; }
-        .rmi-info { flex: 1; min-width: 0; }
+        .rmi-thumb-fallback svg { width: 34px; height: 34px; }
+        .rmi-info {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .rmi-top-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          min-width: 0;
+        }
         .rmi-name {
-          font-size: 0.82rem;
+          font-size: 0.85rem;
           font-weight: 700;
           color: #2C1810;
-          margin: 0 0 3px;
+          margin: 0;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          padding-right: 50px;
+          flex: 1;
+          min-width: 0;
+        }
+        .rmi-type-badge {
+          font-size: 0.6rem;
+          font-weight: 800;
+          text-transform: uppercase;
+          padding: 3px 7px;
+          border-radius: 5px;
+          letter-spacing: 0.3px;
+          flex-shrink: 0;
         }
         .rmi-meta {
           display: flex;
           gap: 8px;
           align-items: center;
-          margin-bottom: 4px;
+          flex-wrap: wrap;
         }
         .rmi-cat {
           font-size: 0.68rem;
           font-weight: 600;
-          color: #8D7B6E;
+          color: #6B5B52;
+          background: #F5F0E8;
+          padding: 2px 7px;
+          border-radius: 4px;
         }
         .rmi-size {
-          font-size: 0.68rem;
+          font-size: 0.7rem;
           color: #9E8E82;
+          font-weight: 600;
+        }
+        .rmi-bottom-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 6px;
+          margin-top: 2px;
         }
         .rmi-user-row {
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 5px;
+          min-width: 0;
+          flex: 1;
         }
         .rmi-avatar {
-          width: 18px;
-          height: 18px;
+          width: 20px;
+          height: 20px;
           border-radius: 50%;
           background: linear-gradient(135deg, #6B3A2A, #8B5E3C);
           color: #fff;
-          font-size: 0.45rem;
+          font-size: 0.5rem;
           font-weight: 800;
           display: flex;
           align-items: center;
           justify-content: center;
+          flex-shrink: 0;
         }
         .rmi-user-name {
-          font-size: 0.68rem;
-          font-weight: 600;
+          font-size: 0.7rem;
+          font-weight: 700;
           color: #3E2723;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
         .rmi-date {
-          font-size: 0.62rem;
+          font-size: 0.64rem;
           color: #9E8E82;
+          white-space: nowrap;
+          flex-shrink: 0;
         }
-        .rmi-type-badge {
-          position: absolute;
-          top: 10px;
-          right: 10px;
-          font-size: 0.6rem;
-          font-weight: 800;
-          text-transform: uppercase;
-          padding: 3px 8px;
-          border-radius: 4px;
-          letter-spacing: 0.3px;
+        .rmi-actions {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          flex-shrink: 0;
+        }
+        .rmi-act-btn {
+          width: 28px;
+          height: 28px;
+          border-radius: 7px;
+          border: 1px solid #E8E0D8;
+          background: #FAFAF8;
+          color: #5D4037;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          text-decoration: none;
+          padding: 0;
+        }
+        .rmi-act-del {
+          color: #B91C1C;
+          border-color: #FECACA;
+          background: #FEF2F2;
         }
 
         /* ── Modal ── */
@@ -1384,56 +1499,98 @@ export default function RepositorioArchivosPage() {
         }
 
         @media (max-width: 768px) {
-          .repo-page { padding: 14px; gap: 14px; }
+          .repo-page {
+            padding: 12px 12px 84px;
+            gap: 12px;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+          }
 
           .repo-hero {
             flex-direction: column;
             align-items: stretch;
-            padding: 20px;
-            text-align: center;
+            padding: 16px;
+            text-align: left;
+            gap: 12px;
           }
-          .repo-hero-title { font-size: 1.3rem; }
-          .repo-hero-sub { max-width: 100%; font-size: 0.82rem; }
+          .repo-hero-title { font-size: 1.18rem; }
+          .repo-hero-sub { max-width: 100%; font-size: 0.78rem; }
           .repo-btn-upload {
             width: 100%;
             justify-content: center;
-            padding: 14px;
+            padding: 12px;
+            font-size: 0.88rem;
           }
 
           .repo-stats-row {
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            width: 100%;
           }
-          .repo-stat-card { padding: 14px 12px; gap: 10px; }
-          .repo-stat-icon { width: 38px; height: 38px; font-size: 1.1rem; }
-          .repo-stat-number { font-size: 1.4rem; }
-          .repo-stat-label { font-size: 0.68rem; }
+          .repo-stats-row > .repo-stat-card:first-child {
+            grid-column: span 2;
+          }
+          .repo-stat-card {
+            padding: 12px;
+            gap: 10px;
+            align-items: center;
+            min-width: 0;
+          }
+          .repo-stat-icon { width: 36px; height: 36px; font-size: 1rem; border-radius: 10px; }
+          .repo-stat-number { font-size: 1.28rem; }
+          .repo-stat-label { font-size: 0.7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-          .repo-toolbar { padding: 10px 12px; }
-          .repo-filters-row { flex-direction: column; gap: 10px; }
+          .repo-toolbar {
+            padding: 10px;
+            width: 100%;
+            max-width: 100%;
+            overflow: hidden;
+          }
+          .repo-filters-row {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+            width: 100%;
+          }
           .repo-filter-pills {
+            display: flex;
+            width: 100%;
+            max-width: 100%;
             overflow-x: auto;
             flex-wrap: nowrap;
             -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
-            padding-bottom: 4px;
+            padding-bottom: 2px;
+            gap: 6px;
           }
           .repo-filter-pills::-webkit-scrollbar { display: none; }
-          .repo-pill { padding: 7px 12px; font-size: 0.75rem; }
-          .repo-search-box { min-width: 100%; }
+          .repo-pill { padding: 7px 12px; font-size: 0.74rem; flex-shrink: 0; }
+          .repo-search-box {
+            width: 100%;
+            min-width: 0;
+            max-width: 100%;
+          }
+          .repo-search-input {
+            font-size: 0.82rem;
+            padding: 9px 8px;
+          }
+          .repo-search-submit {
+            padding: 9px 14px;
+            font-size: 0.78rem;
+            flex-shrink: 0;
+          }
 
           .repo-grid-desktop { display: none; }
-          .repo-list-mobile { display: block; }
+          .repo-list-mobile {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 100%;
+          }
 
           .repo-modal { max-width: 100%; }
           .repo-modal-preview { max-height: 92vh; }
-        }
-
-        @media (max-width: 400px) {
-          .repo-stats-row { grid-template-columns: 1fr 1fr; }
-          .repo-stats-row > .repo-stat-card:last-child {
-            grid-column: span 2;
-          }
         }
       `}</style>
     </div>
