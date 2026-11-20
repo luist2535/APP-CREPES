@@ -26,8 +26,13 @@ export default function RepositorioArchivosPage() {
   // Mobile: show more filters
   const [showMoreFilters, setShowMoreFilters] = useState(false);
 
+  // Paginación / carga progresiva para evitar renderizar +300 imágenes pesadas a la vez
+  const PAGE_SIZE = 24;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
   const fetchArchivos = async () => {
     setLoading(true);
+    setVisibleCount(PAGE_SIZE);
     try {
       const queryParams = new URLSearchParams();
       if (filtroTipo !== 'todos') queryParams.append('tipo', filtroTipo);
@@ -382,11 +387,11 @@ export default function RepositorioArchivosPage() {
           <>
             {/* Desktop grid */}
             <div className="repo-grid-desktop">
-              {archivos.map((arch) => {
+              {archivos.slice(0, visibleCount).map((arch) => {
                 const tipoInfo = getTipoInfo(arch.tipo_archivo, arch.extension);
                 const showRealImage = isImageFile(arch);
                 return (
-                  <div key={arch.id} className="repo-file-card">
+                  <div key={arch.id} className="repo-file-card" style={{ contentVisibility: 'auto', containIntrinsicSize: '290px' }}>
                     {/* Thumbnail */}
                     <div className="rfc-thumb" style={{ backgroundColor: tipoInfo.bg }}>
                       {showRealImage ? (
@@ -394,6 +399,8 @@ export default function RepositorioArchivosPage() {
                           src={arch.ruta_archivo}
                           alt={arch.nombre_original}
                           className="rfc-thumb-img"
+                          loading="lazy"
+                          decoding="async"
                           onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
                         />
                       ) : null}
@@ -454,14 +461,14 @@ export default function RepositorioArchivosPage() {
 
             {/* Mobile list */}
             <div className="repo-list-mobile">
-              {archivos.map((arch) => {
+              {archivos.slice(0, visibleCount).map((arch) => {
                 const tipoInfo = getTipoInfo(arch.tipo_archivo, arch.extension);
                 const showRealImage = isImageFile(arch);
                 return (
-                  <div key={arch.id} className="repo-mobile-item">
+                  <div key={arch.id} className="repo-mobile-item" style={{ contentVisibility: 'auto', containIntrinsicSize: '84px' }}>
                     <div className="rmi-thumb" style={{ backgroundColor: tipoInfo.bg }}>
                       {showRealImage ? (
-                        <img src={arch.ruta_archivo} alt="" className="rmi-thumb-img" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                        <img src={arch.ruta_archivo} alt="" className="rmi-thumb-img" loading="lazy" decoding="async" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
                       ) : null}
                       <div className="rmi-thumb-fallback" style={{ display: showRealImage ? 'none' : 'flex' }}>
                         {getFileIcon(arch.tipo_archivo)}
@@ -485,6 +492,39 @@ export default function RepositorioArchivosPage() {
                   </div>
                 );
               })}
+            </div>
+
+            {/* Paginación progresiva */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '20px', padding: '12px' }}>
+              <span style={{ fontSize: '0.82rem', color: '#6B5B52', fontWeight: 600 }}>
+                Mostrando <strong>{Math.min(visibleCount, archivos.length)}</strong> de <strong>{archivos.length}</strong> archivos
+              </span>
+              {visibleCount < archivos.length && (
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                    style={{
+                      background: '#3D2314', color: '#fff', border: 'none', borderRadius: '12px',
+                      padding: '10px 22px', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(61,35,20,0.2)'
+                    }}
+                  >
+                    Cargar {Math.min(PAGE_SIZE, archivos.length - visibleCount)} más
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount(archivos.length)}
+                    style={{
+                      background: '#F5EDE4', color: '#3D2314', border: '1px solid #E5D8CC',
+                      borderRadius: '12px', padding: '10px 18px', fontWeight: 700,
+                      fontSize: '0.84rem', cursor: 'pointer'
+                    }}
+                  >
+                    Ver todos ({archivos.length})
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}
