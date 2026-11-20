@@ -128,6 +128,19 @@ export async function DELETE(request) {
     // 3. Eliminar de la tabla evidencias si existía ahí
     db.prepare('DELETE FROM evidencias WHERE ruta_archivo = ?').run(archivo.ruta_archivo);
 
+    try {
+      const { logAudit } = require('@/lib/audit');
+      logAudit({
+        usuario: user.nombre || 'Usuario',
+        rol: user.rol_nombre || 'Operación',
+        accion: 'Eliminar',
+        modulo: 'Archivos',
+        descripcion: `Eliminó archivo "${archivo.nombre_original}" del repositorio`,
+        registro_afectado: `FILE-${id}`,
+        request
+      });
+    } catch (e) {}
+
     return NextResponse.json({ success: true, message: 'Archivo eliminado correctamente' });
   } catch (error) {
     console.error('Error eliminando archivo:', error);

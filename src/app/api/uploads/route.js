@@ -179,6 +179,19 @@ export async function POST(request) {
       `).run(parseInt(visitaId), tipoArchivo, fileUrl, file.name, etiqueta);
     }
 
+    try {
+      const { logAudit } = require('@/lib/audit');
+      logAudit({
+        usuario: user.nombre || 'Usuario',
+        rol: user.rol_nombre || 'Operación',
+        accion: tipoArchivo === 'foto' ? 'Subir Foto' : 'Crear',
+        modulo: 'Archivos',
+        descripcion: `Subió archivo "${file.name}" (${categoria})`,
+        registro_afectado: `FILE-${result.lastInsertRowid}`,
+        request
+      });
+    } catch (e) {}
+
     return NextResponse.json({
       id: result.lastInsertRowid,
       url: fileUrl,

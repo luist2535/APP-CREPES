@@ -169,6 +169,20 @@ export async function PATCH(request, { params }) {
         VALUES (?, ?, 'ASIGNACION', ?, 'Asignado', ?)
       `).run(id, user.id, actual.estado, JSON.stringify({ tecnico_id, fecha_programada, prioridad, categoria_id: catId, checklist_count: checklist_tareas?.length || 0 }));
 
+      try {
+        const { logAudit } = require('@/lib/audit');
+        const tecObj = db.prepare('SELECT nombre FROM users WHERE id = ?').get(tecnico_id);
+        logAudit({
+          usuario: user.nombre || 'Jefe',
+          rol: user.rol_nombre || 'Jefe',
+          accion: 'Asignar',
+          modulo: 'Mantenimiento',
+          descripcion: `Asignó el ticket ${id} al técnico ${tecObj?.nombre || '#' + tecnico_id} para el ${fecha_programada}`,
+          registro_afectado: id,
+          request
+        });
+      } catch (e) {}
+
       // Integración con el Calendario
       try {
         // Eliminar evento anterior si es una reasignación
@@ -254,6 +268,19 @@ export async function PATCH(request, { params }) {
         VALUES (?, ?, 'INICIO', ?, 'En proceso')
       `).run(id, user.id, actual.estado);
 
+      try {
+        const { logAudit } = require('@/lib/audit');
+        logAudit({
+          usuario: user.nombre || 'Técnico',
+          rol: user.rol_nombre || 'Mantenimiento',
+          accion: 'Editar',
+          modulo: 'Mantenimiento',
+          descripcion: `Inició la ejecución del ticket ${id}`,
+          registro_afectado: id,
+          request
+        });
+      } catch (e) {}
+
       return NextResponse.json({ message: `Ticket ${id} iniciado` });
     }
 
@@ -304,6 +331,19 @@ export async function PATCH(request, { params }) {
         INSERT INTO historial_mantenimientos (mantenimiento_id, user_id, accion, estado_anterior, estado_nuevo, detalles_cambio)
         VALUES (?, ?, 'SOLUCION', ?, 'Por Aprobar', ?)
       `).run(id, user.id, actual.estado, JSON.stringify(detallesCambio));
+
+      try {
+        const { logAudit } = require('@/lib/audit');
+        logAudit({
+          usuario: user.nombre || 'Técnico',
+          rol: user.rol_nombre || 'Mantenimiento',
+          accion: 'Editar',
+          modulo: 'Mantenimiento',
+          descripcion: `Finalizó ejecución y envió a aprobación el ticket ${id}`,
+          registro_afectado: id,
+          request
+        });
+      } catch (e) {}
 
       return NextResponse.json({ message: 'Ticket enviado a revisión de Jefe de Mantenimiento (Por Aprobar)' });
 
@@ -371,6 +411,19 @@ export async function PATCH(request, { params }) {
         VALUES (?, ?, 'APROBACION', ?, 'Finalizado', ?)
       `).run(id, user.id, actual.estado, JSON.stringify({ firma_jefe: true, observaciones_aprobacion }));
 
+      try {
+        const { logAudit } = require('@/lib/audit');
+        logAudit({
+          usuario: user.nombre || 'Jefe',
+          rol: user.rol_nombre || 'Jefe',
+          accion: 'Aprobar',
+          modulo: 'Mantenimiento',
+          descripcion: `Aprobó y cerró el ticket ${id}`,
+          registro_afectado: id,
+          request
+        });
+      } catch (e) {}
+
       return NextResponse.json({ message: 'Ticket aprobado y finalizado exitosamente' });
 
       // --- NOTIFICACIÓN: Ticket aprobado ---
@@ -432,6 +485,19 @@ export async function PATCH(request, { params }) {
         VALUES (?, ?, 'DEVOLUCION', ?, 'En proceso', ?)
       `).run(id, user.id, actual.estado, JSON.stringify({ motivo_devolucion }));
 
+      try {
+        const { logAudit } = require('@/lib/audit');
+        logAudit({
+          usuario: user.nombre || 'Jefe',
+          rol: user.rol_nombre || 'Jefe',
+          accion: 'Rechazar',
+          modulo: 'Mantenimiento',
+          descripcion: `Devolvió el ticket ${id} al técnico: ${(motivo_devolucion || '').slice(0, 80)}`,
+          registro_afectado: id,
+          request
+        });
+      } catch (e) {}
+
       return NextResponse.json({ message: 'Ticket devuelto al técnico para continuar su gestión' });
 
       // --- NOTIFICACIÓN: Ticket devuelto ---
@@ -468,6 +534,19 @@ export async function PATCH(request, { params }) {
         INSERT INTO historial_mantenimientos (mantenimiento_id, user_id, accion, estado_anterior, estado_nuevo, detalles_cambio)
         VALUES (?, ?, 'CANCELACION', ?, 'Cancelado', ?)
       `).run(id, user.id, actual.estado, JSON.stringify({ motivo }));
+
+      try {
+        const { logAudit } = require('@/lib/audit');
+        logAudit({
+          usuario: user.nombre || 'Usuario',
+          rol: user.rol_nombre || 'Operación',
+          accion: 'Eliminar',
+          modulo: 'Mantenimiento',
+          descripcion: `Canceló el ticket ${id}: ${(motivo || 'Sin motivo').slice(0, 80)}`,
+          registro_afectado: id,
+          request
+        });
+      } catch (e) {}
 
       return NextResponse.json({ message: `Ticket ${id} cancelado` });
     }

@@ -295,6 +295,19 @@ export async function POST(request) {
       VALUES (?, ?, 'CREACION', 'Pendiente', ?)
     `).run(id, user.id, JSON.stringify({ tipo: tipo_mantenimiento, area: area_registro, prioridad: prioridad || 'Media', evidencias_adjuntas: fileUrls.length }));
 
+    try {
+      const { logAudit } = require('@/lib/audit');
+      logAudit({
+        usuario: user.nombre || 'Usuario',
+        rol: user.rol_nombre || 'Operación',
+        accion: 'Crear',
+        modulo: 'Mantenimiento',
+        descripcion: `Registró ticket ${id} (${tipo_mantenimiento} - ${area_registro}): ${(descripcion || '').slice(0, 90)}`,
+        registro_afectado: id,
+        request
+      });
+    } catch (e) {}
+
     const nuevo = db.prepare('SELECT * FROM mantenimientos WHERE id = ?').get(id);
     return NextResponse.json({ mantenimiento: nuevo, message: `Ticket ${id} creado exitosamente` }, { status: 201 });
   } catch (error) {

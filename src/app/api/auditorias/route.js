@@ -2,9 +2,12 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(request) {
   const user = getUserFromRequest(request);
-  if (!user || user.rol_id !== 1) { // Solo admins
+  if (!user || parseInt(user.rol_id) !== 1) { // Solo admins
     return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 });
   }
 
@@ -12,21 +15,32 @@ export async function GET(request) {
     const db = getDb();
     const logs = db.prepare(`
       SELECT * FROM audit_logs 
-      ORDER BY fecha DESC 
+      ORDER BY id DESC 
       LIMIT 1000
     `).all();
 
     // Map the ID field to match what the frontend expects (string format LOG-XXX)
-    // and format the date properly for JS to parse.
     const formattedLogs = logs.map(log => ({
       ...log,
-      id: "LOG-" + log.id.toString().padStart(4, '0')
+      rawId: log.id,
+      id: "LOG-" + log.id.toString().padStart(4, '0'),
+      usuario: log.usuario ? String(log.usuario).replace(/\|/g, '').trim() : 'Sistema'
     }));
 
-    return NextResponse.json({
-      success: true,
-      logs: formattedLogs
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        logs: formattedLogs,
+        serverTime: new Date().toISOString()
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      }
+    );
   } catch (error) {
     console.error('Error fetching audit logs:', error);
     return NextResponse.json(
