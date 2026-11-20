@@ -178,6 +178,14 @@ export default function RepositorioArchivosPage() {
     </svg>
   );
 
+  const FileIconPhoto = () => (
+    <svg width="52" height="52" viewBox="0 0 64 64" fill="none">
+      <rect x="6" y="10" width="52" height="44" rx="8" fill="#FFF3E0" stroke="#FB8C00" strokeWidth="2"/>
+      <circle cx="22" cy="24" r="5" fill="#FB8C00"/>
+      <path d="M10 48L23 34L32 42L42 30L54 48H10Z" fill="#FFA726"/>
+    </svg>
+  );
+
   const FileIconGeneric = () => (
     <svg width="52" height="52" viewBox="0 0 64 64" fill="none">
       <path d="M12 8C12 5.79 13.79 4 16 4H40L52 16V52C52 54.21 50.21 56 48 56H16C13.79 56 12 54.21 12 52V8Z" fill="#F5F5F5" stroke="#BDBDBD" strokeWidth="2"/>
@@ -193,7 +201,7 @@ export default function RepositorioArchivosPage() {
       case 'excel': return <FileIconExcel />;
       case 'pdf': return <FileIconPdf />;
       case 'documento': return <FileIconDoc />;
-      case 'foto': return <FileIconFolder />;
+      case 'foto': return <FileIconPhoto />;
       default: return <FileIconGeneric />;
     }
   };
@@ -262,6 +270,13 @@ export default function RepositorioArchivosPage() {
     if (arch.tipo_archivo === 'foto') return true;
     const ext = (arch.extension || '').toLowerCase();
     return ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'].includes(ext);
+  };
+
+  const resolveImageUrl = (ruta) => {
+    if (!ruta) return '';
+    const s = String(ruta).trim();
+    if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('data:') || s.startsWith('/')) return s;
+    return `/${s}`;
   };
 
   return (
@@ -396,7 +411,7 @@ export default function RepositorioArchivosPage() {
                     <div className="rfc-thumb" style={{ backgroundColor: tipoInfo.bg }}>
                       {showRealImage ? (
                         <img
-                          src={arch.ruta_archivo}
+                          src={resolveImageUrl(arch.ruta_archivo)}
                           alt={arch.nombre_original}
                           className="rfc-thumb-img"
                           loading="lazy"
@@ -475,7 +490,7 @@ export default function RepositorioArchivosPage() {
                     <div className="rmi-thumb" style={{ backgroundColor: tipoInfo.bg }}>
                       {showRealImage ? (
                         <img
-                          src={arch.ruta_archivo}
+                          src={resolveImageUrl(arch.ruta_archivo)}
                           alt=""
                           className="rmi-thumb-img"
                           loading="lazy"
@@ -630,6 +645,7 @@ export default function RepositorioArchivosPage() {
                   placeholder="Ej: ID de Equipo (EQ-1001), Nombre de PDV..."
                   value={referenciaId}
                   onChange={(e) => setReferenciaId(e.target.value)}
+
                   disabled={uploading}
                 />
               </div>
@@ -1154,16 +1170,17 @@ export default function RepositorioArchivosPage() {
         }
         .repo-mobile-item:not(:last-child) { margin-bottom: 10px; }
         .rmi-thumb {
-          width: 56px;
-          height: 56px;
-          border-radius: 10px;
+          width: 60px;
+          height: 60px;
+          border-radius: 11px;
           overflow: hidden;
           flex-shrink: 0;
           display: flex;
           align-items: center;
           justify-content: center;
+          border: 1px solid #EFE6DC;
         }
-        .rmi-thumb-img { width: 100%; height: 100%; object-fit: cover; }
+        .rmi-thumb-img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .rmi-thumb-fallback {
           width: 100%; height: 100%;
           display: flex;
