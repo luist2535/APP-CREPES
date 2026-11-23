@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
-const { getDb } = require('@/lib/db');
 const { getUserFromRequest } = require('@/lib/auth');
+const { buildCalidadAnalytics } = require('@/lib/calidadAnalytics');
 const ExcelJS = require('exceljs');
+
+export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/reportes/calidad-comportamiento/export
@@ -22,270 +24,40 @@ export async function GET(request) {
     const subareaFiltro = searchParams.get('subarea') || 'all';
     const itemFiltro = searchParams.get('item') || 'all';
 
-    const db = getDb();
-
-    // Palabras clave para categorizar preguntas
-    const SECTION_KEYWORDS = [
-      { keywords: ['almacen', 'almacén', 'bodega', 'estante'], seccion: 'Almacén' },
-      { keywords: ['materia prima', 'materias primas', 'insumo', 'ingrediente', 'fecha vencimiento', 'rotulado'], seccion: 'Materias primas' },
-      { keywords: ['recibo', 'recepcion', 'recepción', 'descargue', 'proveedor'], seccion: 'Recibo y Despacho' },
-      { keywords: ['oficina', 'escritorio', 'administrativo', 'archivo'], seccion: 'Oficina' },
-      { keywords: ['parqueadero', 'estacionamiento', 'bahia', 'acceso externo'], seccion: 'Parqueadero' },
-      { keywords: ['cocina', 'estufa', 'plancha', 'freidora', 'campana', 'caliente', 'preparacion'], seccion: 'Cocina' },
-      { keywords: ['comedor', 'mesa', 'silla', 'barra', 'salon', 'salón', 'atencion'], seccion: 'Comedor y Salón' },
-      { keywords: ['baño', 'baños', 'sanitario', 'lavamanos', 'jabon', 'toalla'], seccion: 'Baños y Vestidores' },
-      { keywords: ['cuarto frio', 'cuarto frío', 'congelacion', 'congelador', 'refrigerador', 'cava', 'temperatura'], seccion: 'Cuartos Fríos y Refrigeración' },
-      { keywords: ['manipulador', 'personal', 'uniforme', 'uñas', 'gorro', 'peto', 'higiene manos'], seccion: 'Personal Manipulador' },
-      { keywords: ['equipo', 'utensilio', 'licuadora', 'cutter', 'maquina'], seccion: 'Equipos y Utensilios' },
-      { keywords: ['instalacion', 'edificacion', 'techo', 'pared', 'piso', 'tuberias', 'drenaje'], seccion: 'Instalaciones y Locativo' },
-      { keywords: ['basura', 'residuo', 'caneca', 'punto ecologico', 'plagas'], seccion: 'Saneamiento y Residuos' }
-    ];
-
-    function categorizarPregunta(texto) {
-      if (!texto) return 'Área General / Operativa';
-      const norm = texto.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-      for (const sk of SECTION_KEYWORDS) {
-        for (const kw of sk.keywords) {
-          const normKw = kw.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-          if (norm.includes(normKw)) return sk.seccion;
-        }
-      }
-      return 'Área General / Operativa';
-    }
-
-    // 1. Obtener visitas
-    let query = `
-      SELECT v.id, v.pdv_id, p.nombre as pdv_nombre, p.ciudad_id, c.nombre as ciudad_nombre,
-             v.fecha, v.plantilla_id, pl.nombre as plantilla_nombre, pl.campos as plantilla_campos,
-             v.datos_formulario, v.estado
-      FROM visitas v
-      JOIN pdv p ON p.id = v.pdv_id
-      LEFT JOIN ciudades c ON c.id = p.ciudad_id
-      LEFT JOIN plantillas pl ON pl.id = v.plantilla_id
-      WHERE (v.area_id = 4 OR pl.nombre LIKE '%BPM%' OR pl.nombre LIKE '%Calidad%' OR pl.nombre LIKE '%Inspección%' OR pl.nombre LIKE '%Check list%')
-        AND v.datos_formulario IS NOT NULL AND v.datos_formulario != '{}'
-    `;
-
-    const queryParams = [];
-    if (pdvId && pdvId !== 'all') { query += ` AND v.pdv_id = ?`; queryParams.push(parseInt(pdvId)); }
-    if (ciudadId && ciudadId !== 'all') { query += ` AND p.ciudad_id = ?`; queryParams.push(parseInt(ciudadId)); }
-    if (fechaInicio && fechaInicio !== 'undefined' && fechaInicio !== 'null') { query += ` AND v.fecha >= ?`; queryParams.push(fechaInicio); }
-    if (fechaFin && fechaFin !== 'undefined' && fechaFin !== 'null') { query += ` AND v.fecha <= ?`; queryParams.push(fechaFin); }
-    query += ` ORDER BY v.fecha ASC, v.id ASC`;
-
-    const visitasRows = db.prepare(query).all(...queryParams);
-
-    // 2. Procesar datos
-    const rawHistorial = [];
-    const previousScoresMap = {};
-    const allAreasSet = new Set();
-    const allSubareasSet = new Set();
-    const allItemsSet = new Set();
-
-    for (const v of visitasRows) {
-      let answers = {};
-      try { answers = typeof v.datos_formulario === 'string' ? JSON.parse(v.datos_formulario) : (v.datos_formulario || {}); }
-      catch (e) { continue; }
-
-      let templateConfig = [];
-      try { templateConfig = typeof v.plantilla_campos === 'string' ? JSON.parse(v.plantilla_campos) : (v.plantilla_campos || []); }
-      catch (e) { templateConfig = []; }
-
-      const rawPlantillaNombre = v.plantilla_nombre || 'Área General';
-      const areaName = rawPlantillaNombre.replace(/Verificaci[oó]n (de )?L&D /i, '').replace(/Lista de chequeo /i, '').trim();
-
-      const visitItems = [];
-
-      if (Array.isArray(templateConfig) && templateConfig.length > 0) {
-        const rootItem = templateConfig[0];
-        if (rootItem && rootItem.tipo === 'matrix') {
-          // Matrix: keys like "ItemName__sec_N__ColumnName" or "ItemName__sec_N"
-          Object.entries(answers).forEach(([key, val]) => {
-            if (val === 'SI' || val === 'NO' || val === 'NA' || typeof val === 'boolean') {
-              if (key.includes('__sec_')) {
-                const parts = key.split('__');
-                if (parts.length >= 3) {
-                  // Matrix with column: ItemName__sec_N__ColumnName
-                  visitItems.push({ areaName, secName: parts[2].trim(), itemName: parts[0].trim(), val });
-                } else if (parts.length === 2) {
-                  // Matrix without column or simple_checklist: ItemName__sec_N
-                  visitItems.push({ areaName, secName: parts[1].trim(), itemName: parts[0].trim(), val });
-                }
-              }
-            }
-          });
-        } else if (rootItem && rootItem.secciones && Array.isArray(rootItem.secciones)) {
-          rootItem.secciones.forEach((sec, secIdx) => {
-            const secName = sec.nombre || `Sección ${secIdx + 1}`;
-            if (Array.isArray(sec.filas)) {
-              sec.filas.forEach((filaTexto, rowIdx) => {
-                const qKey = `q_${secIdx}_${rowIdx}`;
-                const val = answers[qKey];
-                if (val !== undefined) visitItems.push({ areaName, secName, itemName: filaTexto.trim() || `Pregunta ${rowIdx + 1}`, val });
-              });
-            }
-          });
-        } else {
-          templateConfig.forEach((item, itemIdx) => {
-            if (item.tipo === 'checkbox' || item.tipo === 'radio' || item.tipo === 'select' || item.label) {
-              const secName = item.seccion || categorizarPregunta(item.label || item.nombre);
-              const itemName = item.label || item.nombre || `Pregunta ${itemIdx + 1}`;
-              const val = answers[item.nombre || `item_${itemIdx}`];
-              if (val !== undefined) visitItems.push({ areaName, secName, itemName, val });
-            }
-          });
-        }
-      }
-
-      if (visitItems.length === 0 && Object.keys(answers).length > 0) {
-        Object.entries(answers).forEach(([key, val]) => {
-          if (val === 'SI' || val === 'NO' || val === 'NA' || typeof val === 'boolean') {
-            let secName, itemName = key;
-            if (key.includes('__sec_')) {
-              const parts = key.split('__');
-              if (parts.length >= 3) {
-                itemName = parts[0].trim();
-                secName = parts[2].trim();
-              } else if (parts.length === 2) {
-                itemName = parts[0].trim();
-                secName = parts[1].trim();
-              }
-            } else {
-              secName = categorizarPregunta(key);
-            }
-            visitItems.push({ areaName, secName, itemName, val });
-          }
-        });
-      }
-
-      const agrupacionStats = {};
-      visitItems.forEach(item => {
-        const { areaName, secName, itemName, val } = item;
-        allAreasSet.add(areaName);
-        if (areaFiltro === 'all' || areaName === areaFiltro) {
-          allSubareasSet.add(secName);
-          if (subareaFiltro === 'all' || secName === subareaFiltro) allItemsSet.add(itemName);
-        }
-        if (areaFiltro !== 'all' && areaName !== areaFiltro) return;
-        if (subareaFiltro !== 'all' && secName !== subareaFiltro) return;
-        if (itemFiltro !== 'all' && itemName !== itemFiltro) return;
-
-        let agrupacion_nombre = areaName;
-        if (areaFiltro !== 'all') agrupacion_nombre = secName;
-        if (subareaFiltro !== 'all') agrupacion_nombre = itemName;
-
-        if (!agrupacionStats[agrupacion_nombre]) agrupacionStats[agrupacion_nombre] = { si: 0, no: 0, na: 0 };
-        if (val === 'SI' || val === true || val === 1 || val === 'Cumple') agrupacionStats[agrupacion_nombre].si++;
-        else if (val === 'NO' || val === false || val === 0 || val === 'No Cumple') agrupacionStats[agrupacion_nombre].no++;
-        else if (val === 'NA' || val === 'N/A' || val === 'No Aplica') agrupacionStats[agrupacion_nombre].na++;
-      });
-
-      Object.entries(agrupacionStats).forEach(([agrupName, counts]) => {
-        const totalEval = counts.si + counts.no;
-        if (totalEval === 0 && counts.na === 0) return;
-        const puntaje = totalEval > 0 ? Math.round((counts.si / totalEval) * 100 * 10) / 10 : 100;
-        const pdvSecKey = `${v.pdv_id}_${agrupName}`;
-        const puntajeAnterior = previousScoresMap[pdvSecKey] !== undefined ? previousScoresMap[pdvSecKey] : null;
-        const diferencia = puntajeAnterior !== null ? Math.round((puntaje - puntajeAnterior) * 10) / 10 : 0;
-        const alertaDisminucion = puntajeAnterior !== null && diferencia < 0;
-        previousScoresMap[pdvSecKey] = puntaje;
-
-        rawHistorial.push({
-          visita_id: v.id, pdv_id: v.pdv_id, pdv_nombre: v.pdv_nombre || `PDV #${v.pdv_id}`,
-          ciudad_id: v.ciudad_id || 1, ciudad_nombre: v.ciudad_nombre || 'Sin ciudad',
-          fecha: v.fecha, plantilla_id: v.plantilla_id, plantilla_nombre: v.plantilla_nombre || 'Inspección Calidad',
-          seccion_nombre: agrupName, puntaje, puntaje_anterior: puntajeAnterior, diferencia,
-          alerta_disminucion: alertaDisminucion ? 1 : 0,
-          preguntas_si: counts.si, preguntas_no: counts.no, preguntas_na: counts.na
-        });
-      });
-    }
-
-    // 3. Calcular métricas agregadas
-    const rankingPdvMap = {};
-    const seccionEvolMap = {};
-    const timelineMap = {};
-
-    rawHistorial.forEach(item => {
-      if (!rankingPdvMap[item.pdv_id]) {
-        rankingPdvMap[item.pdv_id] = { pdv_id: item.pdv_id, pdv_nombre: item.pdv_nombre, ciudad_nombre: item.ciudad_nombre, total_evaluaciones: 0, suma_puntajes: 0, secciones_en_alerta: 0, secciones_conteo: {} };
-      }
-      rankingPdvMap[item.pdv_id].total_evaluaciones++;
-      rankingPdvMap[item.pdv_id].suma_puntajes += item.puntaje;
-      if (item.alerta_disminucion) rankingPdvMap[item.pdv_id].secciones_en_alerta++;
-      rankingPdvMap[item.pdv_id].secciones_conteo[item.seccion_nombre] = item.puntaje;
-
-      if (!seccionEvolMap[item.seccion_nombre]) {
-        seccionEvolMap[item.seccion_nombre] = { seccion_nombre: item.seccion_nombre, visitas_evaluadas: 0, suma_puntajes: 0, caidas_recientes: 0, pdv_scores: {} };
-      }
-      seccionEvolMap[item.seccion_nombre].visitas_evaluadas++;
-      seccionEvolMap[item.seccion_nombre].suma_puntajes += item.puntaje;
-      if (item.alerta_disminucion) seccionEvolMap[item.seccion_nombre].caidas_recientes++;
-      if (!seccionEvolMap[item.seccion_nombre].pdv_scores[item.pdv_nombre]) {
-        seccionEvolMap[item.seccion_nombre].pdv_scores[item.pdv_nombre] = [];
-      }
-      seccionEvolMap[item.seccion_nombre].pdv_scores[item.pdv_nombre].push(item.puntaje);
-
-      const mesKey = item.fecha ? item.fecha.substring(0, 7) : 'Sin fecha';
-      if (!timelineMap[mesKey]) timelineMap[mesKey] = { mes: mesKey, secciones: {} };
-      if (!timelineMap[mesKey].secciones[item.seccion_nombre]) timelineMap[mesKey].secciones[item.seccion_nombre] = { suma: 0, count: 0 };
-      timelineMap[mesKey].secciones[item.seccion_nombre].suma += item.puntaje;
-      timelineMap[mesKey].secciones[item.seccion_nombre].count++;
+    const {
+      rawHistorial,
+      timelineMap,
+      rankingPdv,
+      evolucionPorSeccion,
+      evaluaciones_por_periodo,
+      topHallazgos,
+      allAreasSet,
+      allSubareasSet,
+      allItemsSet,
+      summary
+    } = buildCalidadAnalytics({
+      pdvId,
+      ciudadId,
+      fechaInicio,
+      fechaFin,
+      areaFiltro,
+      subareaFiltro,
+      itemFiltro,
+      syncDb: false
     });
 
-    const rankingPdv = Object.values(rankingPdvMap).map(p => {
-      const allPdvItems = rawHistorial.filter(h => h.pdv_id === p.pdv_id);
-      const monthsMap = {};
-      allPdvItems.forEach(h => { const m = h.fecha ? h.fecha.substring(0, 7) : 'Sin fecha'; if (!monthsMap[m]) monthsMap[m] = []; monthsMap[m].push(h.puntaje); });
-      const sortedMonths = Object.keys(monthsMap).sort().reverse();
-      let puntaje_mes_actual = 0, puntaje_mes_anterior = 0;
-      if (sortedMonths.length > 0) { const currScores = monthsMap[sortedMonths[0]]; puntaje_mes_actual = Math.round((currScores.reduce((a,b)=>a+b,0) / currScores.length) * 10) / 10; }
-      if (sortedMonths.length > 1) { const prevScores = monthsMap[sortedMonths[1]]; puntaje_mes_anterior = Math.round((prevScores.reduce((a,b)=>a+b,0) / prevScores.length) * 10) / 10; }
-      else { puntaje_mes_anterior = puntaje_mes_actual; }
-      const diferencia_puntos = Math.round((puntaje_mes_actual - puntaje_mes_anterior) * 10) / 10;
-      const variacion_porcentual = puntaje_mes_anterior > 0 ? Math.round(((puntaje_mes_actual - puntaje_mes_anterior) / puntaje_mes_anterior) * 100 * 10) / 10 : 0;
-      let tendencia = 'Se mantuvo';
-      if (diferencia_puntos > 0.1) tendencia = 'Mejoró';
-      else if (diferencia_puntos < -0.1) tendencia = 'Disminuyó';
-      return { ...p, puntaje_promedio: p.total_evaluaciones > 0 ? Math.round((p.suma_puntajes / p.total_evaluaciones) * 10) / 10 : 0, puntaje_mes_anterior, puntaje_mes_actual, diferencia_puntos, variacion_porcentual, tendencia };
-    }).sort((a, b) => b.puntaje_mes_actual - a.puntaje_mes_actual);
-
-    const evolucionPorSeccion = Object.values(seccionEvolMap).map(s => {
-      const puntaje_promedio = s.visitas_evaluadas > 0 ? Math.round((s.suma_puntajes / s.visitas_evaluadas) * 10) / 10 : 0;
-      let mejor_pdv = { nombre: '-', puntaje: 0 }, peor_pdv = { nombre: '-', puntaje: 100 };
-      Object.entries(s.pdv_scores).forEach(([pNombre, scores]) => {
-        const avg = Math.round((scores.reduce((a,b)=>a+b,0) / scores.length) * 10) / 10;
-        if (avg >= mejor_pdv.puntaje) mejor_pdv = { nombre: pNombre, puntaje: avg };
-        if (avg <= peor_pdv.puntaje) peor_pdv = { nombre: pNombre, puntaje: avg };
-      });
-      return { seccion_nombre: s.seccion_nombre, puntaje_promedio, visitas_evaluadas: s.visitas_evaluadas, caidas_recientes: s.caidas_recientes, mejor_pdv, peor_pdv };
-    }).sort((a, b) => a.puntaje_promedio - b.puntaje_promedio);
-
-    const totalAlertas = rawHistorial.filter(h => h.alerta_disminucion).length;
-    const promedioGeneral = rawHistorial.length > 0 ? Math.round((rawHistorial.reduce((acc, curr) => acc + curr.puntaje, 0) / rawHistorial.length) * 10) / 10 : 0;
-
-    // Global mes actual vs anterior
-    const allMonthsMap = {};
-    rawHistorial.forEach(h => { const m = h.fecha ? h.fecha.substring(0, 7) : 'Sin fecha'; if (!allMonthsMap[m]) allMonthsMap[m] = []; allMonthsMap[m].push(h.puntaje); });
-    const globalSortedMonths = Object.keys(allMonthsMap).sort().reverse();
-    let global_mes_actual = promedioGeneral, global_mes_anterior = promedioGeneral;
-    let mes_actual_label = 'Mes Actual', mes_anterior_label = 'Mes Anterior';
-    if (globalSortedMonths.length > 0) { mes_actual_label = globalSortedMonths[0]; const scores = allMonthsMap[globalSortedMonths[0]]; global_mes_actual = Math.round((scores.reduce((a,b)=>a+b,0) / scores.length) * 10) / 10; }
-    if (globalSortedMonths.length > 1) { mes_anterior_label = globalSortedMonths[1]; const scores = allMonthsMap[globalSortedMonths[1]]; global_mes_anterior = Math.round((scores.reduce((a,b)=>a+b,0) / scores.length) * 10) / 10; }
-
-    // Periodos para comparador
-    const periodosMap = {};
-    rawHistorial.forEach(h => { const m = h.fecha ? h.fecha.substring(0, 7) : 'Sin fecha'; if (!periodosMap[m]) periodosMap[m] = { periodo: m, total: 0, suma: 0, subareas: {} }; periodosMap[m].total++; periodosMap[m].suma += h.puntaje; if (!periodosMap[m].subareas[h.seccion_nombre]) periodosMap[m].subareas[h.seccion_nombre] = { suma: 0, count: 0 }; periodosMap[m].subareas[h.seccion_nombre].suma += h.puntaje; periodosMap[m].subareas[h.seccion_nombre].count++; });
-    const evaluaciones_por_periodo = Object.values(periodosMap).map(p => {
-      const desglose = Object.entries(p.subareas).map(([sec, st]) => ({ seccion_nombre: sec, puntaje: Math.round((st.suma / st.count) * 10) / 10, evaluaciones: st.count })).sort((a,b) => a.seccion_nombre.localeCompare(b.seccion_nombre));
-      return { periodo: p.periodo, puntaje_promedio: p.total > 0 ? Math.round((p.suma / p.total) * 10) / 10 : 0, total_evaluaciones: p.total, desglose_subareas: desglose };
-    }).sort((a,b) => b.periodo.localeCompare(a.periodo));
+    const totalAlertas = summary.alertas_activas;
+    const promedioGeneral = summary.promedio_general;
+    const global_mes_actual = summary.puntaje_mes_actual;
+    const global_mes_anterior = summary.puntaje_mes_anterior;
+    const mes_actual_label = summary.mes_actual_label;
+    const mes_anterior_label = summary.mes_anterior_label;
 
     // ========================================
     // VARIABLES PARA EXCEL
     // ========================================
-    const seccionesOrdenadas = [...evolucionPorSeccion].sort((a,b) => b.puntaje_promedio - a.puntaje_promedio);
-    const timelineData = Object.values(timelineMap).sort((a,b) => a.mes.localeCompare(b.mes));
+    const seccionesOrdenadas = [...evolucionPorSeccion].sort((a, b) => b.puntaje_promedio - a.puntaje_promedio);
+    const timelineData = Object.values(timelineMap).sort((a, b) => a.mes.localeCompare(b.mes));
     const uniqueSections = [...new Set(timelineData.flatMap(t => Object.keys(t.secciones)))].sort();
 
     // ========================================
@@ -599,14 +371,14 @@ export async function GET(request) {
     // ========================================
     const wsSecciones = wb.addWorksheet('Comportamiento por Sección', { views: [{ state: 'frozen', xSplit: 0, ySplit: 3 }] });
     wsSecciones.columns = [
-      { width: 45 }, { width: 18 }, { width: 15 }, { width: 15 }, { width: 38 }, { width: 38 }
+      { width: 42 }, { width: 18 }, { width: 20 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 16 }, { width: 34 }, { width: 34 }
     ];
 
-    wsSecciones.mergeCells('A1:F1');
-    wsSecciones.getCell('A1').value = '🔬 ANÁLISIS DETALLADO POR SECCIÓN / SUB-ÁREA';
+    wsSecciones.mergeCells('A1:I1');
+    wsSecciones.getCell('A1').value = '🔬 ANÁLISIS DETALLADO POR SECCIÓN / SUB-ÁREA (CONCEPTO SANITARIO Y CONFORMIDAD)';
     wsSecciones.getCell('A1').style = titleStyle;
 
-    const secHeaders = ['Sección / Sub-Área', 'Puntaje Promedio (%)', 'Visitas Evaluadas', 'Caídas Recientes', 'Mejor PDV (Puntaje)', 'Peor PDV (Puntaje)'];
+    const secHeaders = ['Sección / Sub-Área', 'Puntaje Promedio (%)', 'Concepto Sanitario', 'Visitas Eval.', 'Conformes (SÍ)', 'Hallazgos (NO)', 'Caídas Recientes', 'Mejor PDV (Puntaje)', 'Peor PDV (Puntaje)'];
     secHeaders.forEach((h, i) => {
       const cell = wsSecciones.getCell(3, i + 1);
       cell.value = h;
@@ -620,15 +392,29 @@ export async function GET(request) {
       wsSecciones.getCell(r, 2).value = s.puntaje_promedio;
       wsSecciones.getCell(r, 2).style = numberStyle;
       applyScoreStyle(wsSecciones.getCell(r, 2), s.puntaje_promedio);
-      wsSecciones.getCell(r, 3).value = s.visitas_evaluadas;
-      wsSecciones.getCell(r, 3).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'center' } };
-      wsSecciones.getCell(r, 4).value = s.caidas_recientes;
+
+      const cellConcepto = wsSecciones.getCell(r, 3);
+      cellConcepto.value = s.concepto_sanitario || (s.puntaje_promedio >= 90 ? 'Favorable' : s.puntaje_promedio >= 75 ? 'Condicionado' : 'Crítico');
+      cellConcepto.style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'center' } };
+      applyScoreStyle(cellConcepto, s.puntaje_promedio);
+
+      wsSecciones.getCell(r, 4).value = s.visitas_evaluadas;
       wsSecciones.getCell(r, 4).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'center' } };
-      if (s.caidas_recientes > 0) { wsSecciones.getCell(r, 4).fill = badFill; wsSecciones.getCell(r, 4).font = badFont; }
-      wsSecciones.getCell(r, 5).value = `${s.mejor_pdv.nombre} (${s.mejor_pdv.puntaje}%)`;
-      wsSecciones.getCell(r, 5).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'left' } };
-      wsSecciones.getCell(r, 6).value = `${s.peor_pdv.nombre} (${s.peor_pdv.puntaje}%)`;
-      wsSecciones.getCell(r, 6).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'left' } };
+
+      wsSecciones.getCell(r, 5).value = s.total_si || 0;
+      wsSecciones.getCell(r, 5).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'center' }, font: goodFont };
+
+      wsSecciones.getCell(r, 6).value = s.total_no || 0;
+      wsSecciones.getCell(r, 6).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'center' }, font: (s.total_no > 0 ? badFont : dataStyle.font) };
+
+      wsSecciones.getCell(r, 7).value = s.caidas_recientes;
+      wsSecciones.getCell(r, 7).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'center' } };
+      if (s.caidas_recientes > 0) { wsSecciones.getCell(r, 7).fill = badFill; wsSecciones.getCell(r, 7).font = badFont; }
+
+      wsSecciones.getCell(r, 8).value = `${s.mejor_pdv.nombre} (${s.mejor_pdv.puntaje}%)`;
+      wsSecciones.getCell(r, 8).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'left' } };
+      wsSecciones.getCell(r, 9).value = `${s.peor_pdv.nombre} (${s.peor_pdv.puntaje}%)`;
+      wsSecciones.getCell(r, 9).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'left' } };
     });
 
     // Data Bars en Puntaje Promedio
@@ -645,22 +431,73 @@ export async function GET(request) {
       });
     }
 
-    wsSecciones.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3 + seccionesOrdenadas.length, column: 6 } };
+    wsSecciones.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3 + seccionesOrdenadas.length, column: 9 } };
 
     // ========================================
-    // HOJA 4: HISTORIAL Y ALERTAS
+    // HOJA 4: PARETO DE HALLAZGOS CRÍTICOS (NO CONFORMIDADES)
+    // ========================================
+    const wsPareto = wb.addWorksheet('Top Hallazgos Críticos', { views: [{ state: 'frozen', xSplit: 0, ySplit: 3 }] });
+    wsPareto.columns = [
+      { width: 8 }, { width: 24 }, { width: 26 }, { width: 42 }, { width: 16 }, { width: 16 }, { width: 18 }, { width: 28 }, { width: 55 }
+    ];
+
+    wsPareto.mergeCells('A1:I1');
+    wsPareto.getCell('A1').value = '🚨 PARETO DE NO CONFORMIDADES Y HALLAZGOS RECURRENTES (PLAN DE ACCIÓN CALIDAD)';
+    wsPareto.getCell('A1').style = titleStyle;
+
+    const paretoHeaders = ['#', 'Área / Formato', 'Sub-Área / Sección', 'Ítem / Aspecto Evaluado', 'Incumplimientos (NO)', 'Veces Evaluado', '% Incumplimiento', 'PDVs Afectados', 'Observaciones Recientes del Auditor'];
+    paretoHeaders.forEach((h, i) => {
+      const cell = wsPareto.getCell(3, i + 1);
+      cell.value = h;
+      cell.style = headerStyle;
+    });
+
+    (topHallazgos || []).forEach((h, idx) => {
+      const r = 4 + idx;
+      wsPareto.getCell(r, 1).value = idx + 1;
+      wsPareto.getCell(r, 2).value = h.area_nombre;
+      wsPareto.getCell(r, 3).value = h.subarea_nombre;
+      wsPareto.getCell(r, 4).value = h.item_nombre;
+      wsPareto.getCell(r, 5).value = h.total_fallos;
+      wsPareto.getCell(r, 6).value = h.total_evaluaciones;
+      wsPareto.getCell(r, 7).value = h.tasa_fallo;
+      wsPareto.getCell(r, 8).value = (h.pdvs_afectados || []).join(', ');
+      wsPareto.getCell(r, 9).value = (h.observaciones_recientes || []).join(' | ') || 'Sin observación escrita';
+
+      [1, 2, 3, 4, 5, 6, 7, 8, 9].forEach(c => {
+        const cell = wsPareto.getCell(r, c);
+        cell.style = { ...dataStyle, alignment: { vertical: 'middle', horizontal: [1, 5, 6, 7].includes(c) ? 'center' : 'left', wrapText: c === 9 } };
+      });
+      wsPareto.getCell(r, 5).fill = badFill;
+      wsPareto.getCell(r, 5).font = badFont;
+      wsPareto.getCell(r, 7).numFmt = '0.0"%"';
+      if (h.tasa_fallo >= 50) {
+        wsPareto.getCell(r, 7).fill = badFill;
+        wsPareto.getCell(r, 7).font = badFont;
+      } else if (h.tasa_fallo >= 25) {
+        wsPareto.getCell(r, 7).fill = warningFill;
+        wsPareto.getCell(r, 7).font = warningFont;
+      }
+    });
+
+    if ((topHallazgos || []).length > 0) {
+      wsPareto.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3 + topHallazgos.length, column: 9 } };
+    }
+
+    // ========================================
+    // HOJA 5: HISTORIAL Y ALERTAS
     // ========================================
     const wsHistorial = wb.addWorksheet('Historial y Alertas', { views: [{ state: 'frozen', xSplit: 0, ySplit: 3 }] });
     wsHistorial.columns = [
-      { width: 10 }, { width: 14 }, { width: 32 }, { width: 15 }, { width: 38 }, { width: 38 },
-      { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 15 }, { width: 15 }
+      { width: 10 }, { width: 14 }, { width: 30 }, { width: 15 }, { width: 34 }, { width: 32 },
+      { width: 14 }, { width: 18 }, { width: 14 }, { width: 12 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 55 }
     ];
 
-    wsHistorial.mergeCells('A1:L1');
-    wsHistorial.getCell('A1').value = '📜 TRAZABILIDAD LONGITUDINAL Y ALERTAS DE DISMINUCIÓN';
+    wsHistorial.mergeCells('A1:N1');
+    wsHistorial.getCell('A1').value = '📜 TRAZABILIDAD LONGITUDINAL, CONCEPTO SANITARIO Y DETALLE DE HALLAZGOS';
     wsHistorial.getCell('A1').style = titleStyle;
 
-    const histHeaders = ['Visita ID', 'Fecha', 'Punto de Venta', 'Ciudad', 'Plantilla', 'Sección', 'Puntaje (%)', 'Anterior (%)', 'Variación', 'SI', 'NO', 'N/A'];
+    const histHeaders = ['Visita ID', 'Fecha', 'Punto de Venta', 'Ciudad', 'Plantilla', 'Sección', 'Puntaje (%)', 'Concepto Sanitario', 'Anterior (%)', 'Variación', 'SI', 'NO', 'N/A', 'Hallazgos y Observaciones Registradas'];
     histHeaders.forEach((h, i) => {
       const cell = wsHistorial.getCell(3, i + 1);
       cell.value = h;
@@ -677,33 +514,36 @@ export async function GET(request) {
       wsHistorial.getCell(r, 5).value = h.plantilla_nombre;
       wsHistorial.getCell(r, 6).value = h.seccion_nombre;
       wsHistorial.getCell(r, 7).value = h.puntaje;
-      wsHistorial.getCell(r, 8).value = h.puntaje_anterior !== null ? h.puntaje_anterior : 'Primera';
-      wsHistorial.getCell(r, 9).value = h.puntaje_anterior !== null ? h.diferencia : '—';
-      wsHistorial.getCell(r, 10).value = h.preguntas_si;
-      wsHistorial.getCell(r, 11).value = h.preguntas_no;
-      wsHistorial.getCell(r, 12).value = h.preguntas_na;
+      wsHistorial.getCell(r, 8).value = h.concepto_sanitario || (h.puntaje >= 90 ? 'Favorable' : h.puntaje >= 75 ? 'Condicionado' : 'Crítico');
+      wsHistorial.getCell(r, 9).value = h.puntaje_anterior !== null ? h.puntaje_anterior : 'Primera';
+      wsHistorial.getCell(r, 10).value = h.puntaje_anterior !== null ? h.diferencia : '—';
+      wsHistorial.getCell(r, 11).value = h.preguntas_si;
+      wsHistorial.getCell(r, 12).value = h.preguntas_no;
+      wsHistorial.getCell(r, 13).value = h.preguntas_na;
+      wsHistorial.getCell(r, 14).value = h.hallazgos_resumen || (h.preguntas_no > 0 ? `${h.preguntas_no} hallazgo(s) sin observación` : '100% Conforme');
 
-      [1,2,3,4,5,6,7,8,9,10,11,12].forEach(c => {
+      [1,2,3,4,5,6,7,8,9,10,11,12,13,14].forEach(c => {
         const cell = wsHistorial.getCell(r, c);
-        cell.style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: c <= 6 ? 'left' : 'center' } };
-        if (c === 7 || c === 8) cell.numFmt = '0.0"%"';
+        cell.style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: (c <= 6 || c === 14) ? 'left' : 'center' } };
+        if (c === 7 || c === 9) cell.numFmt = '0.0"%"';
       });
 
       // Highlight alertas
       if (h.alerta_disminucion) {
-        [1,2,3,4,5,6,7,8,9,10,11,12].forEach(c => {
+        [1,2,3,4,5,6,7,8,9,10,11,12,13,14].forEach(c => {
           const cell = wsHistorial.getCell(r, c);
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF0F0' } };
         });
-        wsHistorial.getCell(r, 9).fill = badFill;
-        wsHistorial.getCell(r, 9).font = badFont;
+        wsHistorial.getCell(r, 10).fill = badFill;
+        wsHistorial.getCell(r, 10).font = badFont;
       }
 
-      // Color puntaje
+      // Color puntaje y concepto
       applyScoreStyle(wsHistorial.getCell(r, 7), h.puntaje);
+      applyScoreStyle(wsHistorial.getCell(r, 8), h.puntaje);
     });
 
-    wsHistorial.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3 + historialOrdenado.length, column: 12 } };
+    wsHistorial.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3 + historialOrdenado.length, column: 14 } };
 
     // ========================================
     // HOJA 5: COMPARADOR DE PERIODOS
