@@ -114,16 +114,15 @@ export default function DashboardPage() {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
       const isHoy = i === 0;
-      const seed = (d.getFullYear() * 372 + (d.getMonth() + 1) * 31 + d.getDate());
       arr.push({
         fecha: d.toLocaleDateString('sv-SE'),
         dia: isHoy ? 'Hoy' : DIAS_MAP[d.getDay()],
         diaCompleto: `${isHoy ? 'Hoy' : DIAS_MAP[d.getDay()]}, ${d.getDate()} de ${MESES_MAP[d.getMonth()]}`,
         fechaCorta: `${d.getDate()} ${MESES_MAP[d.getMonth()]}`,
-        operando: isHoy ? (green || 19) : Math.max(1, (green || 19) + (((seed * 7) % 5) - 2)),
-        alertas: isHoy ? (yellow || 1) : Math.max(0, (yellow || 1) + Math.abs((seed * 3) % 4)),
-        fuera: isHoy ? (red || 0) : Math.max(0, Math.min(2, (seed * 5) % 3)),
-        visitas: isHoy ? (visitas || 0) : Math.abs((seed * 11) % 4),
+        operando: green || 0,
+        alertas: yellow || 0,
+        fuera: red || 0,
+        visitas: isHoy ? (visitas || 0) : 0,
       });
     }
     return arr;

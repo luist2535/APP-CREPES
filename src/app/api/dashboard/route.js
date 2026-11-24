@@ -58,9 +58,10 @@ export async function GET(request) {
       SELECT COUNT(*) as count FROM visitas WHERE estado = 'pendiente'
     `).get().count;
 
-    // Agenda de hoy
+    // Agenda de hoy (filtrada por PDV y ocultando visitas sorpresa de Calidad para rol 17)
     const localToday = new Date().toLocaleDateString('sv-SE');
-    const agendaHoy = db.prepare(`
+    const rolInt = parseInt(user.rol_id);
+    let agendaQuery = `
       SELECT e.*, p.nombre as pdv_nombre, c.nombre as ciudad_nombre,
              a.nombre as area_nombre, a.color as area_color
       FROM eventos_calendario e
@@ -68,8 +69,16 @@ export async function GET(request) {
       JOIN ciudades c ON p.ciudad_id = c.id
       LEFT JOIN areas a ON e.area_id = a.id
       WHERE e.estado != 'cancelado' AND e.fecha = ?
-      ORDER BY e.hora_inicio ASC
-    `).all(localToday);
+    `;
+    const agendaParams = [localToday];
+    if (rolInt === 17) {
+      const dbUser = db.prepare('SELECT pdv_id FROM users WHERE id = ?').get(user.id);
+      const activePdvId = dbUser ? dbUser.pdv_id : -1;
+      agendaQuery += ' AND e.pdv_id = ? AND (e.area_id IS NULL OR e.area_id != 4)';
+      agendaParams.push(activePdvId);
+    }
+    agendaQuery += ' ORDER BY e.hora_inicio ASC';
+    const agendaHoy = db.prepare(agendaQuery).all(...agendaParams);
 
     // Últimas actividades
     const ultimasActividades = db.prepare(`
@@ -126,8 +135,8 @@ export async function GET(request) {
       });
     } catch (e) {}
 
-    const countGreen = pdvPorEstado.filter(e => e.color === 'green').reduce((s, i) => s + i.count, 0) || 19;
-    const countYellow = pdvPorEstado.filter(e => e.color === 'yellow').reduce((s, i) => s + i.count, 0) || 1;
+    const countGreen = pdvPorEstado.filter(e => e.color === 'green').reduce((s, i) => s + i.count, 0) || 0;
+    const countYellow = pdvPorEstado.filter(e => e.color === 'yellow').reduce((s, i) => s + i.count, 0) || 0;
     const countRed = pdvPorEstado.filter(e => e.color === 'red').reduce((s, i) => s + i.count, 0) || 0;
 
     const serie30 = [];
@@ -146,27 +155,12 @@ export async function GET(request) {
       let operandoVal = countGreen;
       let alertasVal = countYellow;
       let fueraVal = countRed;
-      let visitasVal = visitasPorFecha[iso] || 0;
+      const visitasVal = visitasPorFecha[iso] || 0;
 
-      if (!isHoy) {
-        if (cambiosPorFecha[iso]) {
-          if (cambiosPorFecha[iso].green) operandoVal = cambiosPorFecha[iso].green;
-          if (cambiosPorFecha[iso].yellow) alertasVal = cambiosPorFecha[iso].yellow;
-          if (cambiosPorFecha[iso].red) fueraVal = cambiosPorFecha[iso].red;
-        } else {
-          // Si no hay registros antiguos para este día, generar tendencia armónica suave realista
-          const seed = (d.getFullYear() * 372 + (d.getMonth() + 1) * 31 + d.getDate());
-          const deltaGreen = ((seed * 7) % 5) - 2;
-          const deltaYellow = Math.abs((seed * 3) % 4);
-          const deltaRed = Math.max(0, Math.min(2, ((seed * 5) % 3)));
-
-          operandoVal = Math.max(1, countGreen + deltaGreen);
-          alertasVal = Math.max(0, countYellow + deltaYellow);
-          fueraVal = Math.max(0, countRed + deltaRed);
-          if (visitasVal === 0) {
-            visitasVal = Math.abs((seed * 11) % 4);
-          }
-        }
+      if (!isHoy && cambiosPorFecha[iso]) {
+        if (cambiosPorFecha[iso].green !== undefined) operandoVal = cambiosPorFecha[iso].green;
+        if (cambiosPorFecha[iso].yellow !== undefined) alertasVal = cambiosPorFecha[iso].yellow;
+        if (cambiosPorFecha[iso].red !== undefined) fueraVal = cambiosPorFecha[iso].red;
       }
 
       serie30.push({

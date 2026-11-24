@@ -269,11 +269,21 @@ export default function DashboardLayout({ children }) {
           data.user.nombre = (data.user.nombre || '').replace(/\|/g, '').trim();
           setUser(data.user);
           localStorage.setItem('user', JSON.stringify(data.user));
-          // Fetch notifications
+          // Fetch notifications filtering out already-read ones per user ID/email in localStorage
+          const readKey = `crepes_notifs_read_ids_${data.user.id || data.user.email || 'user'}`;
           const loadNotifs = () => {
             fetch(`/api/notifications?_t=${Date.now()}`, { cache: 'no-store' })
               .then(r => r.json())
-              .then(nData => setNotifications(nData.notifications || []))
+              .then(nData => {
+                const list = nData.notifications || [];
+                let readSet = new Set();
+                try {
+                  const saved = JSON.parse(localStorage.getItem(readKey) || '[]');
+                  if (Array.isArray(saved)) readSet = new Set(saved);
+                } catch (e) {}
+                const unread = list.filter(n => !readSet.has(String(n.id || n.created_at)));
+                setNotifications(unread);
+              })
               .catch(() => {});
           };
           loadNotifs();
@@ -515,7 +525,12 @@ export default function DashboardLayout({ children }) {
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
             </svg>
           )
-        },
+        }
+      ]
+    },
+    {
+      title: 'ÁREAS Y CALIDAD',
+      items: [
         {
           name: 'Mantenimiento MT/ST',
           path: '/mantenimiento',
@@ -523,44 +538,6 @@ export default function DashboardLayout({ children }) {
           icon: (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-            </svg>
-          )
-        }
-      ]
-    },
-    {
-      title: 'OPERACIONES',
-      items: [
-        {
-          name: 'Mantenimiento',
-          path: '/equipos',
-          accessPath: '/equipos',
-          icon: (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-            </svg>
-          )
-        },
-        {
-          name: 'Sistemas',
-          path: '/solicitudes',
-          accessPath: '/solicitudes',
-          icon: (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-              <line x1="8" y1="21" x2="16" y2="21" />
-              <line x1="12" y1="17" x2="12" y2="21" />
-            </svg>
-          )
-        },
-        {
-          name: 'Calidad',
-          path: '/visitas',
-          accessPath: '/visitas',
-          icon: (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              <polyline points="9 11 11 13 15 9" />
             </svg>
           )
         },
@@ -578,7 +555,6 @@ export default function DashboardLayout({ children }) {
             </svg>
           )
         },
-
         {
           name: 'Modificar Ítems / Checklists',
           path: '/visitas?tab=templates',
@@ -897,7 +873,15 @@ export default function DashboardLayout({ children }) {
                     <div style={{ padding: '14px 16px', borderBottom: '1px solid #F0EAE1', background: '#FDFAF7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2C1810' }}>Notificaciones</div>
                       <button
-                        onClick={() => setNotifications([])}
+                        onClick={() => {
+                          try {
+                            const readKey = `crepes_notifs_read_ids_${user?.id || user?.email || 'user'}`;
+                            const prev = JSON.parse(localStorage.getItem(readKey) || '[]');
+                            const nextIds = Array.from(new Set([...(Array.isArray(prev) ? prev : []), ...notifications.map(n => String(n.id || n.created_at))]));
+                            localStorage.setItem(readKey, JSON.stringify(nextIds.slice(-200)));
+                          } catch (e) {}
+                          setNotifications([]);
+                        }}
                         style={{
                           fontSize: '0.65rem', color: '#6B3A2A', fontWeight: 600,
                           background: 'none', border: 'none', padding: '8px 12px',
@@ -1093,7 +1077,15 @@ export default function DashboardLayout({ children }) {
                     <div style={{ padding: '14px 16px', borderBottom: '1px solid #F0EAE1', background: '#FDFAF7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2C1810' }}>Notificaciones</div>
                       <button
-                        onClick={() => setNotifications([])}
+                        onClick={() => {
+                          try {
+                            const readKey = `crepes_notifs_read_ids_${user?.id || user?.email || 'user'}`;
+                            const prev = JSON.parse(localStorage.getItem(readKey) || '[]');
+                            const nextIds = Array.from(new Set([...(Array.isArray(prev) ? prev : []), ...notifications.map(n => String(n.id || n.created_at))]));
+                            localStorage.setItem(readKey, JSON.stringify(nextIds.slice(-200)));
+                          } catch (e) {}
+                          setNotifications([]);
+                        }}
                         style={{
                           fontSize: '0.65rem', color: '#6B3A2A', fontWeight: 600,
                           background: 'none', border: 'none', padding: '8px 12px',
