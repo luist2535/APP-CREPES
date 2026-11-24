@@ -27,9 +27,19 @@ export default function DashboardLayout({ children }) {
   const [avatarError, setAvatarError] = useState('');
   const [avatarSuccess, setAvatarSuccess] = useState('');
   const [isDraggingAvatar, setIsDraggingAvatar] = useState(false);
+  const [currentSearch, setCurrentSearch] = useState('');
+  const [activeSidebarItem, setActiveSidebarItem] = useState('');
   const fileInputRef = useRef(null);
   const router = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setCurrentSearch(window.location.search || '');
+      const savedItem = sessionStorage.getItem('crepes_active_sidebar_item');
+      if (savedItem) setActiveSidebarItem(savedItem);
+    }
+  }, [pathname]);
 
   const handleAvatarFileChange = (e) => {
     const file = e.target.files && e.target.files[0];
@@ -256,6 +266,7 @@ export default function DashboardLayout({ children }) {
         }
         const data = await res.json();
         if (data.user) {
+          data.user.nombre = (data.user.nombre || '').replace(/\|/g, '').trim();
           setUser(data.user);
           localStorage.setItem('user', JSON.stringify(data.user));
           // Fetch notifications
@@ -725,15 +736,60 @@ export default function DashboardLayout({ children }) {
                 </div>
               )}
               {section.items.map((item) => {
-                const isActive = pathname === item.path.split('?')[0];
+                const [itemBase, itemQuery] = item.path.split('?');
+                const isSameBase = pathname === itemBase;
+                let isActive = false;
+
+                if (isSameBase) {
+                  const currentParams = new URLSearchParams(currentSearch);
+                  const currentTab = currentParams.get('tab');
+                  const itemParams = new URLSearchParams(itemQuery || '');
+                  const itemTab = itemParams.get('tab');
+
+                  let queryMatches = false;
+                  if (itemTab) {
+                    if (itemBase === '/admin' && itemTab === 'usuarios') {
+                      queryMatches = !currentTab || currentTab === 'usuarios';
+                    } else {
+                      queryMatches = currentTab === itemTab;
+                    }
+                  } else {
+                    queryMatches = !currentTab;
+                  }
+
+                  if (queryMatches) {
+                    // Evitar que se iluminen dos ítems con la misma ruta base (ej. Modo Visita vs Calidad, Equipos vs Mantenimiento)
+                    const duplicateItems = filteredSections
+                      .flatMap(s => s.items)
+                      .filter(i => i.path === item.path);
+
+                    if (duplicateItems.length > 1) {
+                      if (activeSidebarItem && duplicateItems.some(i => i.name === activeSidebarItem)) {
+                        isActive = activeSidebarItem === item.name;
+                      } else {
+                        isActive = duplicateItems[0].name === item.name;
+                      }
+                    } else {
+                      isActive = true;
+                    }
+                  }
+                }
+
                 return (
                   <Link
-                    key={item.path}
+                    key={`${section.title || 'top'}-${item.name}`}
                     href={item.path}
                     className={`sidebar-link ${isActive ? 'active' : ''}`}
-                    onClick={() => {
+                    onClick={(e) => {
                       setSidebarOpen(false);
-                      if (item.path.includes('?tab=')) {
+                      setActiveSidebarItem(item.name);
+                      if (typeof window !== 'undefined') {
+                        sessionStorage.setItem('crepes_active_sidebar_item', item.name);
+                      }
+                      const nextQuery = itemQuery ? `?${itemQuery}` : '';
+                      setCurrentSearch(nextQuery);
+                      if (item.path.includes('?tab=') || (pathname === itemBase && currentSearch !== nextQuery)) {
+                        e.preventDefault();
                         window.location.href = item.path;
                       }
                     }}
