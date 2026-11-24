@@ -348,13 +348,323 @@ export default function ReportesPage() {
     const secciones = calidadData.evolucion_por_seccion || [];
     const hallazgos = calidadData.top_hallazgos || [];
     const ranking = calidadData.ranking_pdv || [];
-    const historial = (calidadData.historial || []).slice(0, 40);
+    const evolucionTemporal = calidadData.evolucion_temporal || [];
+    const evaluacionesPeriodo = calidadData.evaluaciones_por_periodo || [];
+    const historialFull = calidadData.historial || [];
+    const historial = historialFull.slice(0, 60);
 
     const esc = (str) => String(str ?? '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+
+    // 1. Gráfica SVG de Barras Verticales: Puntaje Promedio por Sub-Área
+    const buildBarChartSvg = () => {
+      if (!secciones.length) return '';
+      const width = 1000;
+      const height = 290;
+      const padL = 52;
+      const padR = 24;
+      const padT = 26;
+      const padB = 82;
+      const chartW = width - padL - padR;
+      const chartH = height - padT - padB;
+      const n = Math.min(secciones.length, 22);
+      const step = chartW / Math.max(n, 1);
+      const barW = Math.min(48, Math.max(16, step * 0.58));
+
+      const gridLines = [0, 25, 50, 75, 90, 100].map(val => {
+        const y = padT + chartH - (val / 100) * chartH;
+        const isTarget = val === 90;
+        return `
+          <line x1="${padL}" y1="${y}" x2="${width - padR}" y2="${y}" stroke="${isTarget ? '#16A34A' : '#E2E8F0'}" stroke-width="${isTarget ? '1.5' : '1'}" stroke-dasharray="${isTarget ? '5 3' : '3 3'}" />
+          <text x="${padL - 8}" y="${y + 4}" text-anchor="end" font-size="10" fill="${isTarget ? '#15803D' : '#64748B'}" font-weight="${isTarget ? '800' : '600'}">${val}%</text>
+        `;
+      }).join('');
+
+      const bars = secciones.slice(0, n).map((s, i) => {
+        const pct = Math.max(0, Math.min(100, s.puntaje_promedio || 0));
+        const bH = (pct / 100) * chartH;
+        const x = padL + i * step + (step - barW) / 2;
+        const y = padT + chartH - bH;
+        const col = pct >= 90 ? '#16A34A' : pct >= 75 ? '#F59E0B' : '#DC2626';
+        const lbl = String(s.seccion_nombre || '').length > 18 ? String(s.seccion_nombre).slice(0, 17) + '…' : String(s.seccion_nombre || '');
+        const cx = x + barW / 2;
+        return `
+          <rect x="${x}" y="${y}" width="${barW}" height="${Math.max(bH, 2)}" rx="5" fill="${col}" />
+          <text x="${cx}" y="${Math.max(14, y - 6)}" text-anchor="middle" font-size="10" font-weight="800" fill="${col}">${pct}%</text>
+          <text x="${cx}" y="${padT + chartH + 14}" text-anchor="end" font-size="9.5" font-weight="600" fill="#334155" transform="rotate(-32 ${cx} ${padT + chartH + 14})">${esc(lbl)}</text>
+        `;
+      }).join('');
+
+      return `
+        <div style="border:1px solid #E2E8F0;border-radius:12px;padding:14px 16px;background:#FFFFFF;margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <strong style="font-size:12.5px;color:#14532D;">📊 Gráfica de Barras — Puntaje Promedio por Sub-Área (%)</strong>
+            <div style="display:flex;gap:12px;font-size:10.5px;font-weight:700;">
+              <span style="color:#16A34A;">● ≥90% Favorable</span>
+              <span style="color:#D97706;">● 75–89% Condicionado</span>
+              <span style="color:#DC2626;">● &lt;75% Crítico</span>
+              <span style="color:#15803D;">--- Meta 90%</span>
+            </div>
+          </div>
+          <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto;display:block;">
+            ${gridLines}
+            <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + chartH}" stroke="#94A3B8" stroke-width="1.2" />
+            <line x1="${padL}" y1="${padT + chartH}" x2="${width - padR}" y2="${padT + chartH}" stroke="#94A3B8" stroke-width="1.2" />
+            ${bars}
+          </svg>
+        </div>
+      `;
+    };
+
+    // 2. Gráfica SVG de Líneas: Evolución Temporal Mensual por Sección
+    const buildTemporalLineSvg = () => {
+      if (!evolucionTemporal.length) return '';
+      const seriesKeys = Object.keys(evolucionTemporal[0] || {}).filter(k => k !== 'mes');
+      if (!seriesKeys.length) return '';
+      const colors = ['#16A34A', '#0891B2', '#7C3AED', '#EA580C', '#DB2777', '#65A30D', '#0D9488', '#4F46E5', '#DC2626', '#2563EB'];
+      const width = 1000;
+      const height = 260;
+      const padL = 52;
+      const padR = 30;
+      const padT = 24;
+      const padB = 42;
+      const chartW = width - padL - padR;
+      const chartH = height - padT - padB;
+      const mCount = evolucionTemporal.length;
+      const getX = (i) => mCount === 1 ? padL + chartW / 2 : padL + (i / (mCount - 1)) * chartW;
+      const getY = (val) => padT + chartH - (Math.max(0, Math.min(100, Number(val) || 0)) / 100) * chartH;
+
+      const gridLines = [0, 25, 50, 75, 100].map(val => {
+        const y = getY(val);
+        return `
+          <line x1="${padL}" y1="${y}" x2="${width - padR}" y2="${y}" stroke="#E2E8F0" stroke-width="1" stroke-dasharray="3 3" />
+          <text x="${padL - 8}" y="${y + 4}" text-anchor="end" font-size="10" fill="#64748B" font-weight="600">${val}%</text>
+        `;
+      }).join('');
+
+      const xLabels = evolucionTemporal.map((t, i) => `
+        <text x="${getX(i)}" y="${padT + chartH + 20}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#334155">${esc(t.mes)}</text>
+      `).join('');
+
+      const linesSvg = seriesKeys.map((sec, sIdx) => {
+        const col = colors[sIdx % colors.length];
+        const pts = [];
+        evolucionTemporal.forEach((t, i) => {
+          if (t[sec] !== undefined && t[sec] !== null) {
+            pts.push({ x: getX(i), y: getY(t[sec]), val: t[sec] });
+          }
+        });
+        if (!pts.length) return '';
+        const pathD = pts.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+        const circles = pts.map(p => `
+          <circle cx="${p.x}" cy="${p.y}" r="4.5" fill="#FFF" stroke="${col}" stroke-width="2.5" />
+          <text x="${p.x}" y="${p.y - 8}" text-anchor="middle" font-size="9.5" font-weight="800" fill="${col}">${p.val}%</text>
+        `).join('');
+        return `<path d="${pathD}" fill="none" stroke="${col}" stroke-width="2.5" />${circles}`;
+      }).join('');
+
+      const legendHtml = seriesKeys.map((sec, sIdx) => {
+        const col = colors[sIdx % colors.length];
+        return `<span style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:#334155;"><span style="width:12px;height:4px;background:${col};display:inline-block;border-radius:2px;"></span>${esc(sec)}</span>`;
+      }).join('');
+
+      return `
+        <div style="border:1px solid #BAE6FD;border-radius:12px;padding:14px 16px;background:#FFFFFF;margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+            <strong style="font-size:12.5px;color:#0369A1;">📈 Gráfica de Tendencia Mensual por Sub-Área (%)</strong>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">${legendHtml}</div>
+          </div>
+          <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto;display:block;">
+            ${gridLines}
+            <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + chartH}" stroke="#94A3B8" stroke-width="1.2" />
+            <line x1="${padL}" y1="${padT + chartH}" x2="${width - padR}" y2="${padT + chartH}" stroke="#94A3B8" stroke-width="1.2" />
+            ${xLabels}
+            ${linesSvg}
+          </svg>
+        </div>
+      `;
+    };
+
+    // 3. Gráfica SVG Horizontal de Pareto de Hallazgos Críticos
+    const buildParetoChartSvg = () => {
+      if (!hallazgos.length) return '';
+      const top = hallazgos.slice(0, 10);
+      return `
+        <div style="border:1px solid #FECACA;border-radius:12px;padding:14px 16px;background:#FFF5F5;margin-bottom:14px;">
+          <strong style="font-size:12.5px;color:#991B1B;display:block;margin-bottom:10px;">📊 Gráfica de Pareto — Top Ítems con Mayor % de Incumplimiento (NO)</strong>
+          <div style="display:flex;flex-direction:column;gap:7px;">
+            ${top.map((h, i) => {
+              const pct = Math.max(0, Math.min(100, h.tasa_fallo || 0));
+              const col = pct >= 50 ? '#DC2626' : pct >= 25 ? '#D97706' : '#475569';
+              return `
+                <div style="display:grid;grid-template-columns:280px 1fr 120px;align-items:center;gap:10px;font-size:11px;">
+                  <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;color:#1E293B;" title="${esc(h.subarea_nombre)} › ${esc(h.item_nombre)}">
+                    <span style="color:#991B1B;font-weight:800;">#${i + 1}</span> [${esc(h.subarea_nombre)}] ${esc(h.item_nombre)}
+                  </div>
+                  <div style="height:12px;background:#FEE2E2;border-radius:99px;overflow:hidden;">
+                    <div style="width:${Math.max(pct, 3)}%;height:100%;background:${col};border-radius:99px;"></div>
+                  </div>
+                  <div style="text-align:right;font-weight:800;color:${col};">
+                    ${pct}% (${h.total_fallos}/${h.total_evaluaciones} NO)
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    };
+
+    // 4. Comparador de Periodos (Periodo A vs Periodo B)
+    const buildComparadorHtml = () => {
+      if (!evaluacionesPeriodo.length) return '';
+      const objA = evaluacionesPeriodo.find(p => p.periodo === compPeriodoA) || evaluacionesPeriodo[0];
+      const objB = evaluacionesPeriodo.find(p => p.periodo === compPeriodoB) || evaluacionesPeriodo[1] || evaluacionesPeriodo[0];
+      if (!objA || !objB) return '';
+      const secs = Array.from(new Set([
+        ...(objA.desglose_subareas || []).map(s => s.seccion_nombre),
+        ...(objB.desglose_subareas || []).map(s => s.seccion_nombre)
+      ])).sort();
+
+      return `
+        <div class="section-block">
+          <div class="section-heading" style="color:#1E40AF;">
+            <span>⚖️ 5. Comparador Histórico de Periodos: ${esc(objA.periodo)} (${objA.puntaje_promedio}%) vs ${esc(objB.periodo)} (${objB.puntaje_promedio}%)</span>
+            <span style="font-size:11px;color:#64748B;font-weight:600;">Diferencia global: ${Math.round((objA.puntaje_promedio - objB.puntaje_promedio) * 10) / 10} pts</span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="background:#1E40AF;border-color:#1E3A8A;">Sub-Área / Sección Evaluada</th>
+                <th style="background:#1E40AF;border-color:#1E3A8A;text-align:center;">Periodo A (${esc(objA.periodo)})</th>
+                <th style="background:#1E40AF;border-color:#1E3A8A;text-align:center;">Periodo B (${esc(objB.periodo)})</th>
+                <th style="background:#1E40AF;border-color:#1E3A8A;text-align:center;">Diferencia (Pts)</th>
+                <th style="background:#1E40AF;border-color:#1E3A8A;text-align:center;">Variación (%)</th>
+                <th style="background:#1E40AF;border-color:#1E3A8A;text-align:center;">Tendencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${secs.map(sec => {
+                const stA = (objA.desglose_subareas || []).find(s => s.seccion_nombre === sec);
+                const stB = (objB.desglose_subareas || []).find(s => s.seccion_nombre === sec);
+                const scoreA = stA ? stA.puntaje : null;
+                const scoreB = stB ? stB.puntaje : null;
+                const d = (scoreA !== null && scoreB !== null) ? Math.round((scoreA - scoreB) * 10) / 10 : null;
+                const vPct = (scoreB !== null && scoreB > 0 && d !== null) ? Math.round((d / scoreB) * 100 * 10) / 10 : null;
+                const tCol = d === null ? '#64748B' : d > 0.1 ? '#15803D' : d < -0.1 ? '#DC2626' : '#854D0E';
+                const tBg = d === null ? '#F1F5F9' : d > 0.1 ? '#DCFCE7' : d < -0.1 ? '#FEE2E2' : '#FEF3C7';
+                const tLbl = d === null ? 'Sin datos' : d > 0.1 ? 'Mejoró 📈' : d < -0.1 ? 'Disminuyó 📉' : 'Se mantuvo ➖';
+                return `<tr>
+                  <td><strong>${esc(sec)}</strong></td>
+                  <td style="text-align:center;font-weight:800;color:${scoreA !== null ? (scoreA >= 90 ? '#15803D' : scoreA >= 75 ? '#D97706' : '#DC2626') : '#94A3B8'};">${scoreA !== null ? `${scoreA}%` : 'N/A'}</td>
+                  <td style="text-align:center;font-weight:700;color:#475569;">${scoreB !== null ? `${scoreB}%` : 'N/A'}</td>
+                  <td style="text-align:center;font-weight:800;color:${tCol};">${d !== null ? `${d > 0 ? '+' : ''}${d} pts` : '—'}</td>
+                  <td style="text-align:center;font-weight:700;color:${tCol};">${vPct !== null ? `${vPct > 0 ? '+' : ''}${vPct}%` : '—'}</td>
+                  <td style="text-align:center;"><span class="pill" style="background:${tBg};color:${tCol};">${tLbl}</span></td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    };
+
+    // 5. Evolución Temporal Mensual (Gráfica + Tabla)
+    const buildTemporalSectionHtml = () => {
+      if (!evolucionTemporal.length) return '';
+      const seriesKeys = Object.keys(evolucionTemporal[0] || {}).filter(k => k !== 'mes');
+      return `
+        <div class="section-block">
+          <div class="section-heading" style="color:#0369A1;">
+            <span>📈 4. Evolución Temporal Mensual por Sub-Área (${esc(areaLabel)})</span>
+            <span style="font-size:11px;color:#64748B;font-weight:600;">${evolucionTemporal.length} mes(es) analizado(s)</span>
+          </div>
+          ${buildTemporalLineSvg()}
+          <table>
+            <thead>
+              <tr>
+                <th style="background:#0369A1;border-color:#075985;">Mes</th>
+                ${seriesKeys.map(sec => `<th style="background:#0369A1;border-color:#075985;text-align:center;">${esc(sec)}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${evolucionTemporal.map(t => `<tr>
+                <td><strong>${esc(t.mes)}</strong></td>
+                ${seriesKeys.map(sec => {
+                  const val = t[sec];
+                  if (val === undefined || val === null) return `<td style="text-align:center;color:#94A3B8;">—</td>`;
+                  const col = val >= 90 ? '#15803D' : val >= 75 ? '#D97706' : '#DC2626';
+                  return `<td style="text-align:center;font-weight:800;color:${col};">${val}%</td>`;
+                }).join('')}
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    };
+
+    // 6. Evolución Longitudinal por Sub-Área (Gráfica SVG + Tabla)
+    const buildLongitudinalSectionHtml = () => {
+      const targetSec = calidadSubArea !== 'all'
+        ? calidadSubArea
+        : (longitudinalSeccionSelected && (calidadData.secciones_disponibles || []).includes(longitudinalSeccionSelected)
+          ? longitudinalSeccionSelected
+          : (secciones[0]?.seccion_nombre || ''));
+      if (!targetSec) return '';
+      const filteredHist = historialFull.filter(h => h.seccion_nombre === targetSec);
+      if (!filteredHist.length) return '';
+      const chron = filteredHist.slice().reverse();
+      const avgSec = Math.round((filteredHist.reduce((a, c) => a + (c.puntaje || 0), 0) / filteredHist.length) * 10) / 10;
+      const alertasSec = filteredHist.filter(h => h.alerta_disminucion).length;
+
+      const width = 1000;
+      const height = 220;
+      const padL = 52;
+      const padR = 30;
+      const padT = 24;
+      const padB = 44;
+      const chartW = width - padL - padR;
+      const chartH = height - padT - padB;
+      const count = chron.length;
+      const getX = (i) => count === 1 ? padL + chartW / 2 : padL + (i / (count - 1)) * chartW;
+      const getY = (val) => padT + chartH - (Math.max(0, Math.min(100, Number(val) || 0)) / 100) * chartH;
+
+      const pathD = chron.map((h, idx) => `${idx === 0 ? 'M' : 'L'} ${getX(idx)} ${getY(h.puntaje)}`).join(' ');
+      const pointsSvg = chron.map((h, idx) => {
+        const x = getX(idx);
+        const y = getY(h.puntaje);
+        const col = h.alerta_disminucion ? '#DC2626' : '#7C3AED';
+        return `
+          <circle cx="${x}" cy="${y}" r="5" fill="#FFF" stroke="${col}" stroke-width="2.5" />
+          <text x="${x}" y="${y - 8}" text-anchor="middle" font-size="9.5" font-weight="800" fill="${col}">${h.puntaje}%</text>
+          <text x="${x}" y="${padT + chartH + 16}" text-anchor="middle" font-size="9" font-weight="600" fill="#475569">${esc(h.fecha)}</text>
+        `;
+      }).join('');
+
+      return `
+        <div class="section-block">
+          <div class="section-heading" style="color:#5B21B6;">
+            <span>📊 6. Evolución Longitudinal de Sub-Área: ${esc(targetSec)}</span>
+            <span style="font-size:11px;color:#64748B;font-weight:600;">Promedio histórico: ${avgSec}% · ${filteredHist.length} evaluación(es) · ${alertasSec} alerta(s)</span>
+          </div>
+          <div style="border:1px solid #DDD6FE;border-radius:12px;padding:14px 16px;background:#FFFFFF;margin-bottom:12px;">
+            <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto;display:block;">
+              ${[0, 25, 50, 75, 100].map(val => {
+                const y = getY(val);
+                return `<line x1="${padL}" y1="${y}" x2="${width - padR}" y2="${y}" stroke="#E2E8F0" stroke-width="1" stroke-dasharray="3 3" /><text x="${padL - 8}" y="${y + 4}" text-anchor="end" font-size="10" fill="#64748B">${val}%</text>`;
+              }).join('')}
+              <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + chartH}" stroke="#94A3B8" stroke-width="1.2" />
+              <line x1="${padL}" y1="${padT + chartH}" x2="${width - padR}" y2="${padT + chartH}" stroke="#94A3B8" stroke-width="1.2" />
+              <path d="${pathD}" fill="none" stroke="#7C3AED" stroke-width="2.5" />
+              ${pointsSvg}
+            </svg>
+          </div>
+        </div>
+      `;
+    };
 
     const reportHtml = `<!DOCTYPE html>
 <html lang="es">
@@ -668,12 +978,13 @@ export default function ReportesPage() {
       </div>
     </div>
 
-    <!-- Tabla 1: Desempeño por Sub-Área / Sección -->
+    <!-- Tabla 1 + Gráfica de Barras: Desempeño por Sub-Área / Sección -->
     <div class="section-block">
       <div class="section-heading">
         <span>📊 1. Comportamiento y Desempeño por Sub-Área (${esc(areaLabel)})</span>
         <span style="font-size:11px;color:#64748B;font-weight:600;">${secciones.length} sección(es) analizada(s)</span>
       </div>
+      ${buildBarChartSvg()}
       <table>
         <thead>
           <tr>
@@ -713,12 +1024,13 @@ export default function ReportesPage() {
       </table>
     </div>
 
-    <!-- Tabla 2: Top Hallazgos Críticos (Pareto) -->
+    <!-- Tabla 2 + Gráfica de Pareto: Top Hallazgos Críticos -->
     <div class="section-block">
       <div class="section-heading" style="color:#991B1B;">
         <span>🚨 2. Pareto de Hallazgos Críticos y No Conformidades (${esc(areaLabel)})</span>
         <span style="font-size:11px;color:#64748B;font-weight:600;">Top ${Math.min(hallazgos.length, 20)} incumplimientos recurrentes</span>
       </div>
+      ${buildParetoChartSvg()}
       ${hallazgos.length === 0 ? `<div style="padding:14px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;color:#166534;font-weight:700;text-align:center;">🎉 No se registran incumplimientos (NO) en el área seleccionada.</div>` : `
       <table>
         <thead>
@@ -789,10 +1101,16 @@ export default function ReportesPage() {
       </table>
     </div>
 
-    <!-- Tabla 4: Trazabilidad de Inspecciones -->
+    ${buildTemporalSectionHtml()}
+
+    ${buildComparadorHtml()}
+
+    ${buildLongitudinalSectionHtml()}
+
+    <!-- Tabla 7: Trazabilidad de Inspecciones -->
     <div class="section-block">
       <div class="section-heading">
-        <span>📜 4. Detalle de Inspecciones y Hallazgos por Sección (${esc(areaLabel)})</span>
+        <span>📜 7. Trazabilidad Longitudinal de Inspecciones y Hallazgos (${esc(areaLabel)})</span>
         <span style="font-size:11px;color:#64748B;font-weight:600;">Últimas ${historial.length} evaluaciones registradas</span>
       </div>
       <table>
