@@ -127,6 +127,9 @@ function AdminContent() {
   const [smtpSuccess, setSmtpSuccess] = useState('');
   const [smtpError, setSmtpError] = useState('');
   const [smtpLoading, setSmtpLoading] = useState(false);
+  const [testEmailTarget, setTestEmailTarget] = useState('luistapias432@gmail.com');
+  const [testEmailLoading, setTestEmailLoading] = useState(false);
+  const [testEmailResult, setTestEmailResult] = useState(null);
 
   // Form Fields - User
   const [userName, setUserName] = useState('');
@@ -402,6 +405,40 @@ function AdminContent() {
       setSmtpError(err.message);
     } finally {
       setSmtpLoading(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    if (!testEmailTarget) {
+      setTestEmailResult({ ok: false, msg: 'Por favor ingresa un correo destinatario.' });
+      return;
+    }
+    setTestEmailLoading(true);
+    setTestEmailResult(null);
+
+    try {
+      const res = await fetch('/api/admin/email-settings/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: testEmailTarget,
+          smtp_host: smtpHost,
+          smtp_port: smtpPort,
+          smtp_user: smtpUser,
+          smtp_pass: smtpPass
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setTestEmailResult({ ok: false, msg: data.error || 'Error al conectar con el servidor de correo.' });
+      } else {
+        setTestEmailResult({ ok: true, msg: data.message });
+      }
+    } catch (err) {
+      setTestEmailResult({ ok: false, msg: 'Error de conexión: ' + err.message });
+    } finally {
+      setTestEmailLoading(false);
     }
   };
 
@@ -1547,6 +1584,61 @@ function AdminContent() {
                 {smtpLoading ? 'Guardando...' : 'Guardar Configuración 💾'}
               </button>
             </form>
+          </div>
+
+          {/* Tarjeta de Prueba de Envío en Vivo */}
+          <div className="card" style={{ maxWidth: '650px', margin: '0 auto', width: '100%', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+            <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              🧪 Probar Envío de Correo en Vivo
+            </h3>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary, #64748B)', marginBottom: '16px' }}>
+              Envía un correo de verificación en tiempo real para confirmar que las credenciales SMTP funcionan y que los correos llegan correctamente a tu bandeja de entrada.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" htmlFor="test-email-target">Enviar correo de prueba a:</label>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <input
+                    id="test-email-target"
+                    type="email"
+                    className="form-input"
+                    placeholder="tucorreo@gmail.com"
+                    value={testEmailTarget}
+                    onChange={(e) => setTestEmailTarget(e.target.value)}
+                    style={{ flex: '1 1 240px' }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleTestEmail}
+                    disabled={testEmailLoading}
+                    style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    {testEmailLoading ? 'Enviando...' : '📨 Enviar Prueba'}
+                  </button>
+                </div>
+              </div>
+
+              {testEmailResult && (
+                <div
+                  style={{
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    lineHeight: '1.5',
+                    background: testEmailResult.ok ? '#F0FDF4' : '#FEF2F2',
+                    border: `1px solid ${testEmailResult.ok ? '#86EFAC' : '#FECACA'}`,
+                    color: testEmailResult.ok ? '#166534' : '#991B1B'
+                  }}
+                >
+                  <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                    {testEmailResult.ok ? '✅ Correo Enviado con Éxito' : '⚠️ Aviso de Envío'}
+                  </div>
+                  <div>{testEmailResult.msg}</div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
