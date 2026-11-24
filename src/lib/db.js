@@ -72,6 +72,8 @@ function getDb() {
     try { db.exec('ALTER TABLE mantenimientos ADD COLUMN pdv_id INTEGER'); } catch (e) {}
     try { db.exec('ALTER TABLE mantenimientos ADD COLUMN categoria_id INTEGER'); } catch (e) {}
     try { db.exec('ALTER TABLE archivos_repositorio ADD COLUMN tipo_documento TEXT'); } catch (e) {}
+    try { db.exec("UPDATE users SET nombre = TRIM(REPLACE(nombre, '|', '')) WHERE nombre LIKE '%|%'"); } catch (e) {}
+    try { db.exec("UPDATE audit_logs SET usuario = TRIM(REPLACE(usuario, '|', '')) WHERE usuario LIKE '%|%'"); } catch (e) {}
 
     // ── Tablas de seguridad ──
 

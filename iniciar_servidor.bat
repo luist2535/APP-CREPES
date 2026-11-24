@@ -236,7 +236,8 @@ if %errorlevel% neq 0 (
 
 echo        [1/3] Descargando cambios desde GitHub...
 echo.
-call git pull origin main
+git config core.askForYesNo false >nul 2>&1
+call git -c gc.auto=0 -c core.askForYesNo=false pull origin main
 if errorlevel 1 (
     echo.
     echo        [ERROR] No se pudieron descargar los cambios.

@@ -200,7 +200,7 @@ export async function PATCH(request, { params }) {
         }
 
         if (pdv_id) {
-          const area_id = actual.prefijo === 'ST' ? 1 : 2; // 1: Sistemas, 2: Mantenimiento
+          const area_id = actual.prefijo === 'ST' ? 7 : 3; // 7: Sistemas, 3: Mantenimiento
           db.prepare(`
             INSERT INTO eventos_calendario (
               pdv_id, user_id, area_id, titulo, descripcion, fecha, hora_inicio, hora_fin, tipo_evento, estado
@@ -217,44 +217,46 @@ export async function PATCH(request, { params }) {
         console.error('Error al crear evento en calendario:', calErr);
       }
 
+      // --- NOTIFICACIÓN: Ticket asignado (en segundo plano, sin bloquear respuesta) ---
+      (async () => {
+        try {
+          const { sendNotificationEmail, templateAsignacion } = await getEmailUtils();
+          const tecnico = db.prepare('SELECT id, nombre, email FROM users WHERE id = ?').get(tecnico_id);
+          const jefe = db.prepare('SELECT id, nombre, email FROM users WHERE id = ?').get(user.id);
+          const ticketData = { ...actual, id, tecnico_id, fecha_programada, prioridad: prioridad || actual.prioridad, observaciones_asignacion };
+
+          if (tecnico) {
+            await notificarSiHabilitado(db, sendNotificationEmail, templateAsignacion, {
+              mantenimientoId: id,
+              tipo: 'asignacion',
+              destinatarioId: tecnico.id,
+              email: tecnico.email,
+              nombre: tecnico.nombre,
+              subject: `📋 Nuevo ticket asignado: ${id}`,
+              ticket: ticketData,
+              tecnico: tecnico.nombre,
+              asignadoPor: user.nombre
+            });
+          }
+          if (jefe && jefe.id !== tecnico_id) {
+            await notificarSiHabilitado(db, sendNotificationEmail, templateAsignacion, {
+              mantenimientoId: id,
+              tipo: 'asignacion_jefe',
+              destinatarioId: jefe.id,
+              email: jefe.email,
+              nombre: jefe.nombre,
+              subject: `📋 Ticket asignado a ${tecnico?.nombre}: ${id}`,
+              ticket: ticketData,
+              tecnico: tecnico?.nombre,
+              asignadoPor: user.nombre
+            });
+          }
+        } catch (e) {
+          console.error('Error en notificación de asignación:', e.message);
+        }
+      })();
+
       return NextResponse.json({ message: 'Ticket asignado exitosamente y evento creado en calendario' });
-
-      // --- NOTIFICACIÓN: Ticket asignado ---
-      try {
-        const { sendNotificationEmail, templateAsignacion } = await getEmailUtils();
-        const tecnico = db.prepare('SELECT id, nombre, email FROM users WHERE id = ?').get(tecnico_id);
-        const jefe = db.prepare('SELECT id, nombre, email FROM users WHERE id = ?').get(user.id);
-        const ticketData = { ...actual, id, tecnico_id, fecha_programada, prioridad: prioridad || actual.prioridad, observaciones_asignacion };
-
-        if (tecnico) {
-          await notificarSiHabilitado(db, sendNotificationEmail, templateAsignacion, {
-            mantenimientoId: id,
-            tipo: 'asignacion',
-            destinatarioId: tecnico.id,
-            email: tecnico.email,
-            nombre: tecnico.nombre,
-            subject: `📋 Nuevo ticket asignado: ${id}`,
-            ticket: ticketData,
-            tecnico: tecnico.nombre,
-            asignadoPor: user.nombre
-          });
-        }
-        if (jefe && jefe.id !== tecnico_id) {
-          await notificarSiHabilitado(db, sendNotificationEmail, templateAsignacion, {
-            mantenimientoId: id,
-            tipo: 'asignacion_jefe',
-            destinatarioId: jefe.id,
-            email: jefe.email,
-            nombre: jefe.nombre,
-            subject: `📋 Ticket asignado a ${tecnico?.nombre}: ${id}`,
-            ticket: ticketData,
-            tecnico: tecnico?.nombre,
-            asignadoPor: user.nombre
-          });
-        }
-      } catch (e) {
-        console.error('Error en notificación de asignación:', e.message);
-      }
     }
 
     // ===== INICIAR EJECUCIÓN =====
@@ -345,49 +347,51 @@ export async function PATCH(request, { params }) {
         });
       } catch (e) {}
 
-      return NextResponse.json({ message: 'Ticket enviado a revisión de Jefe de Mantenimiento (Por Aprobar)' });
-
       // --- NOTIFICACIÓN: Ticket enviado a aprobación (Por Aprobar) ---
-      try {
-        const { sendNotificationEmail, templateParaAprobacion } = await getEmailUtils();
-        const tecnico = db.prepare('SELECT id, nombre, email FROM users WHERE id = ?').get(actual.tecnico_id);
-        const jefeMantenimiento = db.prepare(`
-          SELECT u.id, u.nombre, u.email FROM users u
-          JOIN roles r ON u.rol_id = r.id
-          WHERE u.activo = 1 AND (r.nombre LIKE '%Jefe%Mantenimiento%' OR u.rol_id = 4)
-        `).get();
-        const creador = db.prepare('SELECT id, nombre, email FROM users WHERE id = ?').get(actual.user_id_registro);
-        const ticketData = { ...actual, id, solucion_aplicada: body.solucion_aplicada, fecha_real_finalizacion: new Date().toISOString() };
+      (async () => {
+        try {
+          const { sendNotificationEmail, templateParaAprobacion } = await getEmailUtils();
+          const tecnico = db.prepare('SELECT id, nombre, email FROM users WHERE id = ?').get(actual.tecnico_id);
+          const jefeMantenimiento = db.prepare(`
+            SELECT u.id, u.nombre, u.email FROM users u
+            JOIN roles r ON u.rol_id = r.id
+            WHERE u.activo = 1 AND (r.nombre LIKE '%Jefe%Mantenimiento%' OR u.rol_id = 4)
+          `).get();
+          const creador = db.prepare('SELECT id, nombre, email, rol_id FROM users WHERE id = ?').get(actual.user_id_registro);
+          const ticketData = { ...actual, id, solucion_aplicada: body.solucion_aplicada, fecha_real_finalizacion: new Date().toISOString() };
 
-        if (jefeMantenimiento) {
-          await notificarSiHabilitado(db, sendNotificationEmail, templateParaAprobacion, {
-            mantenimientoId: id,
-            tipo: 'aprobacion_pendiente',
-            destinatarioId: jefeMantenimiento.id,
-            email: jefeMantenimiento.email,
-            nombre: jefeMantenimiento.nombre,
-            subject: `🔍 Ticket pendiente de aprobación: ${id}`,
-            ticket: ticketData,
-            tecnico: tecnico?.nombre || '—',
-            jefe: jefeMantenimiento.nombre
-          });
+          if (jefeMantenimiento) {
+            await notificarSiHabilitado(db, sendNotificationEmail, templateParaAprobacion, {
+              mantenimientoId: id,
+              tipo: 'aprobacion_pendiente',
+              destinatarioId: jefeMantenimiento.id,
+              email: jefeMantenimiento.email,
+              nombre: jefeMantenimiento.nombre,
+              subject: `🔍 Ticket pendiente de aprobación: ${id}`,
+              ticket: ticketData,
+              tecnico: tecnico?.nombre || '—',
+              jefe: jefeMantenimiento.nombre
+            });
+          }
+          if (creador && creador.id !== jefeMantenimiento?.id) {
+            await notificarSiHabilitado(db, sendNotificationEmail, templateParaAprobacion, {
+              mantenimientoId: id,
+              tipo: 'aprobacion_pendiente_creador',
+              destinatarioId: creador.id,
+              email: creador.email,
+              nombre: creador.nombre,
+              subject: `🔍 Tu ticket enviado a aprobación: ${id}`,
+              ticket: ticketData,
+              tecnico: tecnico?.nombre || '—',
+              jefe: jefeMantenimiento?.nombre || 'Jefe de Mantenimiento'
+            });
+          }
+        } catch (e) {
+          console.error('Error en notificación de aprobación pendiente:', e.message);
         }
-        if (creador && creador.id !== jefeMantenimiento?.id) {
-          await notificarSiHabilitado(db, sendNotificationEmail, templateParaAprobacion, {
-            mantenimientoId: id,
-            tipo: 'aprobacion_pendiente_creador',
-            destinatarioId: creador.id,
-            email: creador.email,
-            nombre: creador.nombre,
-            subject: `🔍 Tu ticket enviado a aprobación: ${id}`,
-            ticket: ticketData,
-            tecnico: tecnico?.nombre || '—',
-            jefe: jefeMantenimiento?.nombre || 'Jefe de Mantenimiento'
-          });
-        }
-      } catch (e) {
-        console.error('Error en notificación de aprobación pendiente:', e.message);
-      }
+      })();
+
+      return NextResponse.json({ message: 'Ticket enviado a revisión de Jefe de Mantenimiento (Por Aprobar)' });
     }
 
     // ===== APROBAR (JEFE DE MANTENIMIENTO) =====
@@ -424,46 +428,48 @@ export async function PATCH(request, { params }) {
         });
       } catch (e) {}
 
-      return NextResponse.json({ message: 'Ticket aprobado y finalizado exitosamente' });
-
       // --- NOTIFICACIÓN: Ticket aprobado ---
-      try {
-        const { sendNotificationEmail, templateAprobado } = await getEmailUtils();
-        const tecnico = db.prepare('SELECT id, nombre, email FROM users WHERE id = ?').get(actual.tecnico_id);
-        const creador = db.prepare('SELECT id, nombre, email FROM users WHERE id = ?').get(actual.user_id_registro);
-        const ticketData = { ...actual, id, estado: 'Finalizado', firma_jefe: true, observaciones_aprobacion: body.observaciones_aprobacion, fecha_aprobacion: new Date().toISOString() };
+      (async () => {
+        try {
+          const { sendNotificationEmail, templateAprobado } = await getEmailUtils();
+          const tecnico = db.prepare('SELECT id, nombre, email FROM users WHERE id = ?').get(actual.tecnico_id);
+          const creador = db.prepare('SELECT id, nombre, email FROM users WHERE id = ?').get(actual.user_id_registro);
+          const ticketData = { ...actual, id, estado: 'Finalizado', firma_jefe: true, observaciones_aprobacion: body.observaciones_aprobacion, fecha_aprobacion: new Date().toISOString() };
 
-        if (tecnico) {
-          await notificarSiHabilitado(db, sendNotificationEmail, templateAprobado, {
-            mantenimientoId: id,
-            tipo: 'aprobado',
-            destinatarioId: tecnico.id,
-            email: tecnico.email,
-            nombre: tecnico.nombre,
-            subject: `✅ Ticket aprobado y finalizado: ${id}`,
-            ticket: ticketData,
-            tecnico: tecnico.nombre,
-            creador: creador?.nombre || '—',
-            aprobadoPor: user.nombre
-          });
+          if (tecnico) {
+            await notificarSiHabilitado(db, sendNotificationEmail, templateAprobado, {
+              mantenimientoId: id,
+              tipo: 'aprobado',
+              destinatarioId: tecnico.id,
+              email: tecnico.email,
+              nombre: tecnico.nombre,
+              subject: `✅ Ticket aprobado y finalizado: ${id}`,
+              ticket: ticketData,
+              tecnico: tecnico.nombre,
+              creador: creador?.nombre || '—',
+              aprobadoPor: user.nombre
+            });
+          }
+          if (creador && creador.id !== tecnico?.id) {
+            await notificarSiHabilitado(db, sendNotificationEmail, templateAprobado, {
+              mantenimientoId: id,
+              tipo: 'aprobado_creador',
+              destinatarioId: creador.id,
+              email: creador.email,
+              nombre: creador.nombre,
+              subject: `✅ Tu ticket ha sido aprobado: ${id}`,
+              ticket: ticketData,
+              tecnico: tecnico?.nombre || '—',
+              creador: creador.nombre,
+              aprobadoPor: user.nombre
+            });
+          }
+        } catch (e) {
+          console.error('Error en notificación de aprobación:', e.message);
         }
-        if (creador && creador.id !== tecnico?.id) {
-          await notificarSiHabilitado(db, sendNotificationEmail, templateAprobado, {
-            mantenimientoId: id,
-            tipo: 'aprobado_creador',
-            destinatarioId: creador.id,
-            email: creador.email,
-            nombre: creador.nombre,
-            subject: `✅ Tu ticket ha sido aprobado: ${id}`,
-            ticket: ticketData,
-            tecnico: tecnico?.nombre || '—',
-            creador: creador.nombre,
-            aprobadoPor: user.nombre
-          });
-        }
-      } catch (e) {
-        console.error('Error en notificación de aprobación:', e.message);
-      }
+      })();
+
+      return NextResponse.json({ message: 'Ticket aprobado y finalizado exitosamente' });
     }
 
     // ===== DEVOLVER AL TÉCNICO (RECHAZO DE CIERRE) =====
@@ -498,31 +504,33 @@ export async function PATCH(request, { params }) {
         });
       } catch (e) {}
 
-      return NextResponse.json({ message: 'Ticket devuelto al técnico para continuar su gestión' });
-
       // --- NOTIFICACIÓN: Ticket devuelto ---
-      try {
-        const { sendNotificationEmail, templateDevuelto } = await getEmailUtils();
-        const tecnico = db.prepare('SELECT id, nombre, email FROM users WHERE id = ?').get(actual.tecnico_id);
-        const ticketData = { ...actual, id, estado: 'En proceso', observaciones_aprobacion: body.motivo_devolucion };
+      (async () => {
+        try {
+          const { sendNotificationEmail, templateDevuelto } = await getEmailUtils();
+          const tecnico = db.prepare('SELECT id, nombre, email FROM users WHERE id = ?').get(actual.tecnico_id);
+          const ticketData = { ...actual, id, estado: 'En proceso', observaciones_aprobacion: body.motivo_devolucion };
 
-        if (tecnico) {
-          await notificarSiHabilitado(db, sendNotificationEmail, templateDevuelto, {
-            mantenimientoId: id,
-            tipo: 'devuelto',
-            destinatarioId: tecnico.id,
-            email: tecnico.email,
-            nombre: tecnico.nombre,
-            subject: `🔄 Ticket devuelto para corrección: ${id}`,
-            ticket: ticketData,
-            tecnico: tecnico.nombre,
-            jefe: user.nombre,
-            motivo: body.motivo_devolucion
-          });
+          if (tecnico) {
+            await notificarSiHabilitado(db, sendNotificationEmail, templateDevuelto, {
+              mantenimientoId: id,
+              tipo: 'devuelto',
+              destinatarioId: tecnico.id,
+              email: tecnico.email,
+              nombre: tecnico.nombre,
+              subject: `🔄 Ticket devuelto para corrección: ${id}`,
+              ticket: ticketData,
+              tecnico: tecnico.nombre,
+              jefe: user.nombre,
+              motivo: body.motivo_devolucion
+            });
+          }
+        } catch (e) {
+          console.error('Error en notificación de devolución:', e.message);
         }
-      } catch (e) {
-        console.error('Error en notificación de devolución:', e.message);
-      }
+      })();
+
+      return NextResponse.json({ message: 'Ticket devuelto al técnico para continuar su gestión' });
     }
 
     // ===== CANCELAR =====

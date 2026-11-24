@@ -42,7 +42,7 @@ export async function GET(request) {
     const params = [];
 
     // No area filtering: all roles should see all visits on the calendar to avoid overlap conflicts
-    // However, if the user is a PDV (Rol 17), they must ONLY see events for their store
+    // However, if the user is a PDV (Rol 17), they must ONLY see events for their store AND NEVER see surprise Calidad visits (area_id = 4)
     const { getUserAssignedCityId } = require('@/lib/auth');
     const assignedCityId = getUserAssignedCityId(user, db);
 
@@ -50,7 +50,7 @@ export async function GET(request) {
     if (rolInt === 17) {
       const dbUser = db.prepare('SELECT pdv_id FROM users WHERE id = ?').get(user.id);
       const activePdvId = dbUser ? dbUser.pdv_id : null;
-      query += ' AND e.pdv_id = ?';
+      query += ' AND e.pdv_id = ? AND e.area_id != 4';
       params.push(activePdvId);
     } else {
       if (assignedCityId) {
@@ -244,8 +244,59 @@ export async function POST(request) {
 
     // ==========================================
     // F1: Send email notification asynchronously
+    // REGLA DE NEGOCIO: NUNCA notificar al Punto de Venta (PDV) cuando sea visita de Calidad (area_id = 4)
+    // Sí notificar cuando sea de Mantenimiento (area_id = 3) o Sistemas (area_id = 7)
     // ==========================================
-    // Email sending has been temporarily disabled per user request
+    try {
+      const areaInt = parseInt(area_id);
+      // Notificar al técnico / auxiliar responsable asignado
+      if (responsableUser && responsableUser.email) {
+        sendNotificationEmail({
+          to: responsableUser.email,
+          subject: `📅 Nueva visita asignada (${areaInfo?.nombre || 'Operación'}): ${pdvInfo?.pdv_nombre || ''}`,
+          html: `
+            <div style="font-family:sans-serif;color:#2C1810;max-width:560px">
+              <h2 style="color:#3D2314;margin-bottom:8px">📅 Nueva visita programada</h2>
+              <p>Hola <strong>${responsableUser.nombre}</strong>, se te ha asignado una visita en el calendario:</p>
+              <div style="background:#FAF6F0;border:1px solid #E5D8CC;border-radius:10px;padding:14px;margin:14px 0">
+                <p style="margin:4px 0"><strong>📍 Punto de Venta:</strong> ${pdvInfo?.pdv_nombre || 'PDV'} (${pdvInfo?.ciudad_nombre || ''})</p>
+                <p style="margin:4px 0"><strong>🗂️ Área:</strong> ${areaInfo?.nombre || ''}</p>
+                <p style="margin:4px 0"><strong>📌 Título:</strong> ${titulo}</p>
+                <p style="margin:4px 0"><strong>📅 Fecha y Hora:</strong> ${fecha} de ${hora_inicio} a ${hora_fin}</p>
+                ${descripcion ? `<p style="margin:4px 0"><strong>📝 Descripción:</strong> ${descripcion}</p>` : ''}
+              </div>
+            </div>
+          `
+        }).catch(() => {});
+      }
+
+      // Notificar al usuario del Punto de Venta ÚNICAMENTE si es Mantenimiento (3) o Sistemas (7) — NUNCA Calidad (4)
+      if (areaInt !== 4 && (areaInt === 3 || areaInt === 7)) {
+        const pdvUsers = db.prepare('SELECT id, nombre, email FROM users WHERE pdv_id = ? AND rol_id = 17 AND activo = 1').all(parseInt(pdv_id));
+        for (const pu of pdvUsers) {
+          if (pu.email) {
+            sendNotificationEmail({
+              to: pu.email,
+              subject: `🛠️ Visita de ${areaInfo?.nombre || 'Mantenimiento'} programada para tu PDV (${fecha})`,
+              html: `
+                <div style="font-family:sans-serif;color:#2C1810;max-width:560px">
+                  <h2 style="color:#3D2314;margin-bottom:8px">🛠️ Visita Técnica Programada</h2>
+                  <p>Hola <strong>${pu.nombre}</strong>, se ha programado una visita de <strong>${areaInfo?.nombre || 'Soporte'}</strong> en tu Punto de Venta:</p>
+                  <div style="background:#FAF6F0;border:1px solid #E5D8CC;border-radius:10px;padding:14px;margin:14px 0">
+                    <p style="margin:4px 0"><strong>📌 Motivo:</strong> ${titulo}</p>
+                    <p style="margin:4px 0"><strong>📅 Fecha:</strong> ${fecha}</p>
+                    <p style="margin:4px 0"><strong>⏰ Horario estimado:</strong> ${hora_inicio} a ${hora_fin}</p>
+                    <p style="margin:4px 0"><strong>👷 Responsable:</strong> ${responsableUser?.nombre || user.nombre}</p>
+                  </div>
+                </div>
+              `
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch (mailErr) {
+      console.warn('Error no bloqueante al enviar correo de calendario:', mailErr.message);
+    }
 
     return NextResponse.json({ 
       evento: createdEvent, 

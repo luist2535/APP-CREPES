@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 if not "%1"=="run" (
     start "Actualizador Automático de Crepes en Punto (Git)" cmd /k "%~f0" run
     exit /b
@@ -19,12 +20,13 @@ echo.
 where git >nul 2>nul
 if %errorlevel% neq 0 goto git_missing
 
-:: 1. Verificar conexión y descargar cambios de Git
+:: 1. Verificar conexión y descargar cambios de Git (sin trabarse pidiendo y/n en Windows)
 echo [1/3] Descargando últimas modificaciones desde GitHub (git pull)...
 git status >nul 2>&1
 if %errorlevel% neq 0 goto not_git_repo
 
-call git pull origin main
+git config core.askForYesNo false >nul 2>&1
+call git -c gc.auto=0 -c core.askForYesNo=false pull origin main
 if errorlevel 1 goto pull_error
 echo Cambios descargados correctamente.
 echo.

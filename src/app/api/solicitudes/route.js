@@ -92,7 +92,29 @@ export async function POST(request) {
     if (parseInt(area_id) === 7) jefeRolId = 9; // Sistemas -> Jefe Sistemas
 
     if (jefeRolId) {
-      // Email sending disabled per user request
+      try {
+        const jefes = db.prepare('SELECT id, nombre, email, recibir_correos FROM users WHERE rol_id = ? AND activo = 1').all(jefeRolId);
+        for (const j of jefes) {
+          if (j.email && j.recibir_correos !== 0) {
+            sendNotificationEmail({
+              to: j.email,
+              subject: `🚨 Nueva solicitud de soporte (${areaInfo?.nombre || 'Técnico'}) — ${pdvInfo?.nombre || 'PDV'}`,
+              html: `
+                <div style="font-family:sans-serif;color:#2C1810;max-width:560px">
+                  <h2 style="color:#3D2314;margin-bottom:8px">🚨 Nueva Solicitud de Soporte Técnico</h2>
+                  <p>Hola <strong>${j.nombre}</strong>, el Punto de Venta <strong>${pdvInfo?.nombre || 'PDV'}</strong> ha registrado una solicitud:</p>
+                  <div style="background:#FAF6F0;border:1px solid #E5D8CC;border-radius:10px;padding:14px;margin:14px 0">
+                    <p style="margin:4px 0"><strong>🗂️ Área:</strong> ${areaInfo?.nombre || ''}</p>
+                    <p style="margin:4px 0"><strong>📌 Título:</strong> ${titulo}</p>
+                    <p style="margin:4px 0"><strong>⚡ Urgencia:</strong> ${urgencia}</p>
+                    <p style="margin:4px 0"><strong>📝 Descripción:</strong> ${descripcion}</p>
+                  </div>
+                </div>
+              `
+            }).catch(() => {});
+          }
+        }
+      } catch (e) {}
     }
 
     const ticketCode = 'TK-' + String(solicitudId).padStart(5, '0');

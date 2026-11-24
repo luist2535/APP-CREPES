@@ -259,10 +259,16 @@ export default function DashboardLayout({ children }) {
           setUser(data.user);
           localStorage.setItem('user', JSON.stringify(data.user));
           // Fetch notifications
-          fetch('/api/notifications')
-            .then(r => r.json())
-            .then(nData => setNotifications(nData.notifications || []))
-            .catch(console.error);
+          const loadNotifs = () => {
+            fetch(`/api/notifications?_t=${Date.now()}`, { cache: 'no-store' })
+              .then(r => r.json())
+              .then(nData => setNotifications(nData.notifications || []))
+              .catch(() => {});
+          };
+          loadNotifs();
+          const notifInterval = setInterval(loadNotifs, 25000);
+          window.__crepesNotifInterval && clearInterval(window.__crepesNotifInterval);
+          window.__crepesNotifInterval = notifInterval;
         } else {
           router.push('/');
         }
@@ -760,7 +766,7 @@ export default function DashboardLayout({ children }) {
               <div className="avatar-edit-badge" title="Cambiar foto">📷</div>
             </div>
             <div className="sidebar-user-info">
-              <div className="sidebar-user-name" title={user.nombre}>{user.nombre}</div>
+              <div className="sidebar-user-name" title={(user.nombre || '').replace(/\|/g, '').trim()}>{(user.nombre || '').replace(/\|/g, '').trim()}</div>
               <div className="sidebar-user-role">{user.rol_nombre || 'Usuario'}</div>
             </div>
             <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', padding: '3px 6px', background: 'rgba(255,255,255,0.08)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }} title="Cambiar foto">
@@ -858,14 +864,26 @@ export default function DashboardLayout({ children }) {
                           const timeString = new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
                           return (
-                            <div key={idx} className="notif-item" style={{ padding: '12px 16px', borderBottom: '1px solid #F9F7F5', cursor: 'pointer', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                            <div
+                              key={idx}
+                              className="notif-item"
+                              onClick={() => {
+                                setNotifMenuOpen(false);
+                                if (notif.link) router.push(notif.link);
+                              }}
+                              style={{ padding: '12px 16px', borderBottom: '1px solid #F9F7F5', cursor: 'pointer', display: 'flex', gap: '12px', alignItems: 'flex-start' }}
+                            >
                               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: bgColor, marginTop: '6px', flexShrink: 0 }}></div>
                               <div>
                                 <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2C1810', marginBottom: '2px' }}>
-                                  Cambio de estado: {notif.ciudad_nombre}
+                                  {notif.titulo || `Cambio de estado: ${notif.ciudad_nombre}`}
                                 </div>
                                 <div style={{ fontSize: '0.7rem', color: '#6B5B52' }}>
-                                  El PDV <strong>{notif.pdv_nombre}</strong> pasó a estado <span style={{ color: bgColor, fontWeight: 700 }}>{notif.estado_nombre}</span>. (Por {notif.usuario})
+                                  {notif.mensaje ? (
+                                    <>{notif.mensaje} — <strong>{notif.pdv_nombre}</strong> (Por {notif.usuario})</>
+                                  ) : (
+                                    <>El PDV <strong>{notif.pdv_nombre}</strong> pasó a estado <span style={{ color: bgColor, fontWeight: 700 }}>{notif.estado_nombre}</span>. (Por {notif.usuario})</>
+                                  )}
                                 </div>
                                 <div style={{ fontSize: '0.65rem', color: '#9CA3AF', marginTop: '4px' }}>Hoy a las {timeString}</div>
                               </div>
@@ -910,7 +928,7 @@ export default function DashboardLayout({ children }) {
                   )}
                 </div>
                 <div className="header-admin-info" style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                  <span className="header-admin-name" style={{ fontSize: '0.78rem', fontWeight: 600, color: '#2C1810', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.nombre}</span>
+                  <span className="header-admin-name" style={{ fontSize: '0.78rem', fontWeight: 600, color: '#2C1810', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(user.nombre || '').replace(/\|/g, '').trim()}</span>
                   <span className="header-admin-email" style={{ fontSize: '0.62rem', color: '#9CA3AF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email || user.correo || 'admin@crepes.com'}</span>
                 </div>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
@@ -932,7 +950,7 @@ export default function DashboardLayout({ children }) {
                   }}>
                     {/* User info header */}
                     <div style={{ padding: '14px 16px', borderBottom: '1px solid #F0EAE1', background: '#FDFAF7' }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2C1810' }}>{user.nombre}</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2C1810' }}>{(user.nombre || '').replace(/\|/g, '').trim()}</div>
                       <div style={{ fontSize: '0.72rem', color: '#9CA3AF', marginTop: '2px' }}>{user.rol_nombre || 'Administrador'}</div>
                     </div>
                     {/* Options */}
@@ -1039,11 +1057,25 @@ export default function DashboardLayout({ children }) {
                           const bgColor = isCritical ? '#EF4444' : isWarning ? '#EAB308' : '#22C55E';
                           const timeString = new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                           return (
-                            <div key={idx} className="notif-item" style={{ padding: '12px 16px', borderBottom: '1px solid #F9F7F5', cursor: 'pointer', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                            <div
+                              key={idx}
+                              className="notif-item"
+                              onClick={() => {
+                                setNotifMenuOpen(false);
+                                if (notif.link) router.push(notif.link);
+                              }}
+                              style={{ padding: '12px 16px', borderBottom: '1px solid #F9F7F5', cursor: 'pointer', display: 'flex', gap: '12px', alignItems: 'flex-start' }}
+                            >
                               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: bgColor, marginTop: '6px', flexShrink: 0 }}></div>
                               <div>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2C1810', marginBottom: '2px' }}>Cambio de estado: {notif.ciudad_nombre}</div>
-                                <div style={{ fontSize: '0.7rem', color: '#6B5B52' }}>El PDV <strong>{notif.pdv_nombre}</strong> pasó a <span style={{ color: bgColor, fontWeight: 700 }}>{notif.estado_nombre}</span>.</div>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2C1810', marginBottom: '2px' }}>{notif.titulo || `Cambio de estado: ${notif.ciudad_nombre}`}</div>
+                                <div style={{ fontSize: '0.7rem', color: '#6B5B52' }}>
+                                  {notif.mensaje ? (
+                                    <>{notif.mensaje} — <strong>{notif.pdv_nombre}</strong></>
+                                  ) : (
+                                    <>El PDV <strong>{notif.pdv_nombre}</strong> pasó a <span style={{ color: bgColor, fontWeight: 700 }}>{notif.estado_nombre}</span>.</>
+                                  )}
+                                </div>
                                 <div style={{ fontSize: '0.65rem', color: '#9CA3AF', marginTop: '4px' }}>Hoy a las {timeString}</div>
                               </div>
                             </div>
@@ -1102,7 +1134,7 @@ export default function DashboardLayout({ children }) {
                       zIndex: 9999, overflow: 'hidden', animation: 'dropDown 0.15s ease', cursor: 'default'
                     }} onClick={(e) => e.stopPropagation()}>
                       <div style={{ padding: '12px 16px', borderBottom: '1px solid #F0EAE1', background: '#FDFAF7' }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2C1810' }}>{user?.nombre || 'Administrador'}</div>
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#2C1810' }}>{(user?.nombre || 'Administrador').replace(/\|/g, '').trim()}</div>
                         <div style={{ fontSize: '0.72rem', color: '#9CA3AF', marginTop: '2px' }}>{user?.rol_nombre || 'Administrador'}</div>
                       </div>
                       <div style={{ padding: '6px' }}>
