@@ -779,8 +779,9 @@ export default function DashboardLayout({ children }) {
                   <Link
                     key={`${section.title || 'top'}-${item.name}`}
                     href={item.path}
+                    scroll={false}
                     className={`sidebar-link ${isActive ? 'active' : ''}`}
-                    onClick={(e) => {
+                    onClick={() => {
                       setSidebarOpen(false);
                       setActiveSidebarItem(item.name);
                       if (typeof window !== 'undefined') {
@@ -788,9 +789,11 @@ export default function DashboardLayout({ children }) {
                       }
                       const nextQuery = itemQuery ? `?${itemQuery}` : '';
                       setCurrentSearch(nextQuery);
-                      if (item.path.includes('?tab=') || (pathname === itemBase && currentSearch !== nextQuery)) {
-                        e.preventDefault();
-                        window.location.href = item.path;
+                      if (typeof window !== 'undefined') {
+                        const nextTab = new URLSearchParams(itemQuery || '').get('tab') || null;
+                        window.dispatchEvent(new CustomEvent('crepes-sidebar-nav', {
+                          detail: { path: item.path, base: itemBase, tab: nextTab, name: item.name }
+                        }));
                       }
                     }}
                     style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', padding: 'var(--spacing-sm) var(--spacing-md)', borderRadius: 'var(--radius-md)', color: isActive ? 'var(--color-text-on-dark)' : 'rgba(255,255,255,0.7)', transition: 'all 0.2s' }}

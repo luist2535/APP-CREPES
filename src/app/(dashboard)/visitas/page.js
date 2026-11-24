@@ -2534,6 +2534,25 @@ export default function VisitasPage() {
         }
       } catch (e) { }
     }
+
+    const handleSidebarNav = (e) => {
+      if (e.detail && e.detail.base === '/visitas') {
+        if (e.detail.tab) {
+          setActiveTab(e.detail.tab);
+        } else {
+          try {
+            const u = JSON.parse(localStorage.getItem('user') || '{}');
+            if (isUserAuxiliar(u.rol_id)) setActiveTab('pending_tasks');
+            else if (isUserJefe(u.rol_id)) setActiveTab('awaiting_approval');
+            else setActiveTab('list');
+          } catch (err) {
+            setActiveTab('list');
+          }
+        }
+      }
+    };
+    window.addEventListener('crepes-sidebar-nav', handleSidebarNav);
+    return () => window.removeEventListener('crepes-sidebar-nav', handleSidebarNav);
   }, []);
 
   useEffect(() => {

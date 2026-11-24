@@ -11,8 +11,20 @@ function AdminContent() {
   useEffect(() => {
     if (tabParam) {
       setActiveTab(tabParam);
+    } else {
+      setActiveTab('usuarios');
     }
   }, [tabParam]);
+
+  useEffect(() => {
+    const handleSidebarNav = (e) => {
+      if (e.detail && e.detail.base === '/admin') {
+        setActiveTab(e.detail.tab || 'usuarios');
+      }
+    };
+    window.addEventListener('crepes-sidebar-nav', handleSidebarNav);
+    return () => window.removeEventListener('crepes-sidebar-nav', handleSidebarNav);
+  }, []);
 
   // Mockup redesign states
   const [activeActionMenuUserId, setActiveActionMenuUserId] = useState(null);
