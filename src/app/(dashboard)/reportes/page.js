@@ -253,7 +253,7 @@ export default function ReportesPage() {
     } finally {
       setCalidadLoading(false);
     }
-  }, [calidadPdv, calidadCiudad, calidadFechaInicio, calidadFechaFin, calidadSeccion]);
+  }, [calidadPdv, calidadCiudad, calidadFechaInicio, calidadFechaFin, calidadSeccion, calidadSubArea, calidadItem]);
 
   useEffect(() => {
     if (reporteTab === 'calidad') {
@@ -325,38 +325,546 @@ export default function ReportesPage() {
   };
 
   const handlePrintEjecutivo = async () => {
-    if (calidadData) {
-      try {
-        const dateStr = new Date().toISOString().split('T')[0];
-        const rankingStr = (calidadData.ranking_pdv || []).map((p, i) => `${i + 1}. ${p.pdv_nombre} (${p.ciudad_nombre || ''}) - Promedio: ${p.puntaje_promedio}%`).join('\n');
-        const content = `REPORTE PDF EJECUTIVO - ANALÍTICA DE CALIDAD & L&D
-==================================================
-Ciudad: ${calidadCiudad === 'all' ? 'Todas' : calidadCiudad}
-Periodo de Análisis: ${calidadFechaInicio} al ${calidadFechaFin}
-Sección: ${calidadSeccion === 'all' ? 'Todas' : calidadSeccion}
-Fecha del Reporte: ${dateStr}
-Total PDVs Evaluados: ${calidadData.ranking_pdv?.length || 0}
-Promedio General: ${calidadData.kpis?.promedio_general || 0}%
+    if (!calidadData) return;
 
-RANKING DE PUNTOS DE VENTA:
-${rankingStr || 'Sin registros evaluados en el periodo.'}
-==================================================
-Impreso y registrado en el repositorio el ${new Date().toLocaleString('es-ES')}
-`;
-        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-        const fileName = `Reporte_Ejecutivo_Impreso_${dateStr}.txt`;
-        const file = new File([blob], fileName, { type: 'text/plain' });
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('categoria', 'analisis_calidad');
-        formData.append('tipo_documento', 'Reporte PDF Ejecutivo Impreso (Soporte)');
-        formData.append('observaciones', `Copia automática del reporte ejecutivo al imprimir en PDF (${dateStr})`);
-        await fetch('/api/uploads', { method: 'POST', body: formData });
-      } catch (err) {
-        console.warn('Error respaldando reporte ejecutivo en repositorio:', err);
-      }
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const pdvObj = pdvsList.find(p => String(p.id) === String(calidadPdv));
+    const pdvLabel = calidadPdv === 'all' ? 'Todos los Puntos de Venta' : (pdvObj?.nombre || `PDV #${calidadPdv}`);
+    const areaLabel = calidadSeccion === 'all' ? 'Todas las Áreas de Calidad (BPM y L&D)' : calidadSeccion;
+    const subAreaLabel = calidadSubArea === 'all' ? 'Todas las Sub-Áreas / Secciones' : calidadSubArea;
+    const itemLabel = calidadItem === 'all' ? 'Todos los Ítems Evaluados' : calidadItem;
+
+    const sum = calidadData.summary || {};
+    const promedio = sum.promedio_general || 0;
+    const concepto = promedio >= 90 ? 'FAVORABLE' : promedio >= 75 ? 'CONDICIONADO' : 'CRÍTICO';
+    const conceptoColor = promedio >= 90 ? '#15803D' : promedio >= 75 ? '#B45309' : '#DC2626';
+    const conceptoBg = promedio >= 90 ? '#DCFCE7' : promedio >= 75 ? '#FEF3C7' : '#FEE2E2';
+
+    const diff = sum.diferencia_puntos || 0;
+    const tendenciaTexto = diff > 0.1 ? `Mejoró (+${diff} pts)` : diff < -0.1 ? `Disminuyó (${diff} pts)` : 'Se mantuvo estable';
+    const tendenciaColor = diff > 0.1 ? '#15803D' : diff < -0.1 ? '#DC2626' : '#854D0E';
+
+    const secciones = calidadData.evolucion_por_seccion || [];
+    const hallazgos = calidadData.top_hallazgos || [];
+    const ranking = calidadData.ranking_pdv || [];
+    const historial = (calidadData.historial || []).slice(0, 40);
+
+    const esc = (str) => String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    const reportHtml = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Informe Ejecutivo de Calidad — ${esc(areaLabel)} (${dateStr})</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body {
+      font-family: 'Outfit', 'Segoe UI', Tahoma, sans-serif;
+      color: #1E293B;
+      background: #F8FAFC;
+      margin: 0;
+      padding: 24px;
+      font-size: 12px;
     }
-    window.print();
+    .page-sheet {
+      max-width: 1120px;
+      margin: 0 auto;
+      background: #FFFFFF;
+      border-radius: 16px;
+      padding: 28px 32px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    }
+    .no-print-bar {
+      max-width: 1120px;
+      margin: 0 auto 16px auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #14532D;
+      color: #FFF;
+      padding: 12px 20px;
+      border-radius: 12px;
+    }
+    .btn-action {
+      background: #FFF;
+      color: #14532D;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+    }
+    .header-banner {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 3px solid #166534;
+      padding-bottom: 16px;
+      margin-bottom: 18px;
+      gap: 16px;
+    }
+    .brand-tag {
+      display: inline-block;
+      background: #DCFCE7;
+      color: #166534;
+      font-weight: 800;
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 99px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .report-title {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 800;
+      color: #14532D;
+    }
+    .report-subtitle {
+      margin: 4px 0 0 0;
+      color: #475569;
+      font-size: 13px;
+    }
+    .filters-box {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      background: #F0FDF4;
+      border: 1px solid #BBF7D0;
+      border-radius: 12px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+    }
+    .filter-item .lbl {
+      font-size: 10px;
+      font-weight: 800;
+      color: #166534;
+      text-transform: uppercase;
+    }
+    .filter-item .val {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #0F172A;
+      margin-top: 2px;
+    }
+    .kpi-row-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .kpi-row-5 {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+    .kpi-card {
+      border: 1px solid #E2E8F0;
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: #FFF;
+    }
+    .kpi-card .k-title {
+      font-size: 10.5px;
+      font-weight: 800;
+      color: #64748B;
+      text-transform: uppercase;
+    }
+    .kpi-card .k-num {
+      font-size: 24px;
+      font-weight: 800;
+      margin: 6px 0 4px 0;
+    }
+    .kpi-card .k-sub {
+      font-size: 11px;
+      color: #475569;
+    }
+    .section-block {
+      margin-top: 24px;
+      page-break-inside: avoid;
+    }
+    .section-heading {
+      font-size: 15px;
+      font-weight: 800;
+      color: #14532D;
+      margin: 0 0 10px 0;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #E2E8F0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11.5px;
+    }
+    th {
+      background: #166534;
+      color: #FFFFFF;
+      font-weight: 700;
+      text-align: left;
+      padding: 8px 10px;
+      border: 1px solid #14532D;
+    }
+    td {
+      padding: 7px 10px;
+      border-bottom: 1px solid #E2E8F0;
+      vertical-align: middle;
+    }
+    tr:nth-child(even) td {
+      background: #F8FAFC;
+    }
+    .bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .bar-bg {
+      flex: 1;
+      height: 10px;
+      background: #E2E8F0;
+      border-radius: 99px;
+      overflow: hidden;
+      min-width: 80px;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 99px;
+    }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-weight: 700;
+      font-size: 10.5px;
+    }
+    .footer-sign {
+      margin-top: 32px;
+      padding-top: 14px;
+      border-top: 1px solid #CBD5E1;
+      display: flex;
+      justify-content: space-between;
+      color: #64748B;
+      font-size: 11px;
+    }
+    @media print {
+      body { background: #FFF; padding: 0; }
+      .page-sheet { box-shadow: none; padding: 10px; max-width: 100%; }
+      .no-print-bar { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print-bar">
+    <div>
+      <strong>📄 Vista Previa del Informe Ejecutivo — ${esc(areaLabel)}</strong>
+      <span style="margin-left:10px;font-size:12px;opacity:0.9;">(${esc(subAreaLabel)})</span>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn-action" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
+      <button class="btn-action" style="background:rgba(255,255,255,0.2);color:#FFF;" onclick="window.close()">✕ Cerrar</button>
+    </div>
+  </div>
+
+  <div class="page-sheet">
+    <div class="header-banner">
+      <div>
+        <span class="brand-tag">Crepes &amp; Waffles · Aseguramiento de Calidad &amp; L&amp;D</span>
+        <h1 class="report-title">INFORME EJECUTIVO DE COMPORTAMIENTO Y EVOLUCIÓN</h1>
+        <p class="report-subtitle">
+          Área Seleccionada: <strong>${esc(areaLabel)}</strong>
+          ${calidadSubArea !== 'all' ? ` › Sub-Área: <strong>${esc(subAreaLabel)}</strong>` : ''}
+          ${calidadItem !== 'all' ? ` › Ítem: <strong>${esc(itemLabel)}</strong>` : ''}
+        </p>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:11px;color:#64748B;font-weight:700;">CONCEPTO SANITARIO DEL FILTRO</div>
+        <div style="margin-top:4px;display:inline-block;padding:6px 14px;border-radius:99px;background:${conceptoBg};color:${conceptoColor};font-weight:800;font-size:14px;">
+          ${promedio}% · ${concepto}
+        </div>
+        <div style="font-size:10.5px;color:#64748B;margin-top:4px;">Generado: ${now.toLocaleString('es-CO')}</div>
+      </div>
+    </div>
+
+    <div class="filters-box">
+      <div class="filter-item">
+        <div class="lbl">📅 Periodo Analizado</div>
+        <div class="val">${esc(calidadFechaInicio)} al ${esc(calidadFechaFin)}</div>
+      </div>
+      <div class="filter-item">
+        <div class="lbl">🏪 Punto de Venta</div>
+        <div class="val">${esc(pdvLabel)}</div>
+      </div>
+      <div class="filter-item">
+        <div class="lbl">🗂️ Área Evaluada</div>
+        <div class="val">${esc(areaLabel)}</div>
+      </div>
+      <div class="filter-item">
+        <div class="lbl">🔬 Sub-Área / Sección</div>
+        <div class="val">${esc(subAreaLabel)}</div>
+      </div>
+      <div class="filter-item">
+        <div class="lbl">📝 Ítem / Aspecto</div>
+        <div class="val">${esc(itemLabel)}</div>
+      </div>
+    </div>
+
+    <!-- 3 Tarjetas de Comparativa Mensual -->
+    <div class="kpi-row-3">
+      <div class="kpi-card" style="border-top:4px solid #64748B;">
+        <div class="k-title">📅 Evaluación Mes Anterior</div>
+        <div class="k-num" style="color:#334155;">${sum.puntaje_mes_anterior || 0}%</div>
+        <div class="k-sub">Periodo base: <strong>${esc(sum.mes_anterior_label || 'Mes Anterior')}</strong></div>
+      </div>
+      <div class="kpi-card" style="border-top:4px solid #2563EB;">
+        <div class="k-title">⭐ Evaluación Mes Actual</div>
+        <div class="k-num" style="color:${conceptoColor};">${sum.puntaje_mes_actual || 0}%</div>
+        <div class="k-sub">Periodo actual: <strong>${esc(sum.mes_actual_label || 'Mes Actual')}</strong></div>
+      </div>
+      <div class="kpi-card" style="border-top:4px solid ${tendenciaColor};">
+        <div class="k-title">⚖️ Variación entre Periodos</div>
+        <div class="k-num" style="color:${tendenciaColor};font-size:20px;">${tendenciaTexto}</div>
+        <div class="k-sub">Variación relativa: <strong>${sum.variacion_porcentual > 0 ? '+' : ''}${sum.variacion_porcentual || 0}%</strong></div>
+      </div>
+    </div>
+
+    <!-- 5 KPIs Operativos -->
+    <div class="kpi-row-5">
+      <div class="kpi-card">
+        <div class="k-title">Promedio General</div>
+        <div class="k-num" style="color:${conceptoColor};font-size:20px;">${promedio}%</div>
+        <div class="k-sub">Concepto: <strong>${concepto}</strong></div>
+      </div>
+      <div class="kpi-card">
+        <div class="k-title">Puntos Evaluados</div>
+        <div class="k-num" style="color:#0F172A;font-size:20px;">${(sum.total_items_evaluados || 0).toLocaleString('es-CO')}</div>
+        <div class="k-sub"><span style="color:#15803D;font-weight:700;">✓ ${sum.total_conformes_si || 0} SÍ</span> · <span style="color:#DC2626;font-weight:700;">✕ ${sum.total_hallazgos_no || 0} NO</span></div>
+      </div>
+      <div class="kpi-card">
+        <div class="k-title">Tasa Incumplimiento</div>
+        <div class="k-num" style="color:${(sum.tasa_incumplimiento_global || 0) > 10 ? '#DC2626' : '#15803D'};font-size:20px;">${sum.tasa_incumplimiento_global || 0}%</div>
+        <div class="k-sub">Sobre total de puntos</div>
+      </div>
+      <div class="kpi-card">
+        <div class="k-title">Sub-Áreas Evaluadas</div>
+        <div class="k-num" style="color:#1E293B;font-size:20px;">${sum.secciones_evaluadas || 0}</div>
+        <div class="k-sub">En ${sum.total_visitas || 0} inspecciones</div>
+      </div>
+      <div class="kpi-card">
+        <div class="k-title">Alertas de Caída</div>
+        <div class="k-num" style="color:#DC2626;font-size:20px;">${sum.alertas_activas || 0}</div>
+        <div class="k-sub">Disminuciones detectadas</div>
+      </div>
+    </div>
+
+    <!-- Tabla 1: Desempeño por Sub-Área / Sección -->
+    <div class="section-block">
+      <div class="section-heading">
+        <span>📊 1. Comportamiento y Desempeño por Sub-Área (${esc(areaLabel)})</span>
+        <span style="font-size:11px;color:#64748B;font-weight:600;">${secciones.length} sección(es) analizada(s)</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Sección / Sub-Área</th>
+            <th style="width:210px;">Puntaje Promedio</th>
+            <th style="text-align:center;">Concepto Sanitario</th>
+            <th style="text-align:center;">Inspecciones</th>
+            <th style="text-align:center;">Conformes / Hallazgos</th>
+            <th style="text-align:center;">Alertas</th>
+            <th>Mejor PDV</th>
+            <th>PDV Crítico / Menor</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${secciones.length === 0 ? `<tr><td colspan="8" style="text-align:center;padding:16px;color:#64748B;">Sin secciones registradas para este filtro.</td></tr>` : secciones.map(sec => {
+            const pct = sec.puntaje_promedio || 0;
+            const col = pct >= 90 ? '#16A34A' : pct >= 75 ? '#D97706' : '#DC2626';
+            const bg = pct >= 90 ? '#DCFCE7' : pct >= 75 ? '#FEF3C7' : '#FEE2E2';
+            const conc = sec.concepto_sanitario || (pct >= 90 ? 'Favorable' : pct >= 75 ? 'Condicionado' : 'Crítico');
+            return `<tr>
+              <td><strong>${esc(sec.seccion_nombre)}</strong></td>
+              <td>
+                <div class="bar-wrap">
+                  <div class="bar-bg"><div class="bar-fill" style="width:${Math.min(pct, 100)}%;background:${col};"></div></div>
+                  <strong style="color:${col};min-width:42px;">${pct}%</strong>
+                </div>
+              </td>
+              <td style="text-align:center;"><span class="pill" style="background:${bg};color:${col};">${esc(conc)}</span></td>
+              <td style="text-align:center;font-weight:700;">${sec.visitas_evaluadas || 0}</td>
+              <td style="text-align:center;font-weight:700;"><span style="color:#15803D;">✓ ${sec.total_si || 0} SÍ</span> / <span style="color:#DC2626;">✕ ${sec.total_no || 0} NO</span></td>
+              <td style="text-align:center;">${sec.caidas_recientes > 0 ? `<span class="pill" style="background:#FEE2E2;color:#991B1B;">🔻 ${sec.caidas_recientes}</span>` : `<span style="color:#15803D;font-weight:700;">Sin caídas</span>`}</td>
+              <td><strong style="color:#15803D;">${esc(sec.mejor_pdv?.nombre || '—')}</strong> (${sec.mejor_pdv?.puntaje ?? 0}%)</td>
+              <td><strong style="color:${(sec.peor_pdv?.puntaje ?? 100) < 75 ? '#DC2626' : '#475569'};">${esc(sec.peor_pdv?.nombre || '—')}</strong> (${sec.peor_pdv?.puntaje ?? 0}%)</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Tabla 2: Top Hallazgos Críticos (Pareto) -->
+    <div class="section-block">
+      <div class="section-heading" style="color:#991B1B;">
+        <span>🚨 2. Pareto de Hallazgos Críticos y No Conformidades (${esc(areaLabel)})</span>
+        <span style="font-size:11px;color:#64748B;font-weight:600;">Top ${Math.min(hallazgos.length, 20)} incumplimientos recurrentes</span>
+      </div>
+      ${hallazgos.length === 0 ? `<div style="padding:14px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;color:#166534;font-weight:700;text-align:center;">🎉 No se registran incumplimientos (NO) en el área seleccionada.</div>` : `
+      <table>
+        <thead>
+          <tr>
+            <th style="background:#991B1B;border-color:#7F1D1D;width:36px;text-align:center;">#</th>
+            <th style="background:#991B1B;border-color:#7F1D1D;">Área</th>
+            <th style="background:#991B1B;border-color:#7F1D1D;">Sub-Área / Sección</th>
+            <th style="background:#991B1B;border-color:#7F1D1D;">Ítem / Aspecto Incumplido</th>
+            <th style="background:#991B1B;border-color:#7F1D1D;text-align:center;">Fallos (NO)</th>
+            <th style="background:#991B1B;border-color:#7F1D1D;text-align:center;">% Fallo</th>
+            <th style="background:#991B1B;border-color:#7F1D1D;">PDV(s) Afectado(s)</th>
+            <th style="background:#991B1B;border-color:#7F1D1D;">Observaciones del Auditor</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${hallazgos.slice(0, 20).map((h, i) => `<tr>
+            <td style="text-align:center;font-weight:800;color:#991B1B;">#${i + 1}</td>
+            <td><strong>${esc(h.area_nombre)}</strong></td>
+            <td>${esc(h.subarea_nombre)}</td>
+            <td><strong>${esc(h.item_nombre)}</strong></td>
+            <td style="text-align:center;"><span class="pill" style="background:#FEE2E2;color:#991B1B;">✕ ${h.total_fallos} / ${h.total_evaluaciones}</span></td>
+            <td style="text-align:center;font-weight:800;color:#DC2626;">${h.tasa_fallo}%</td>
+            <td>${esc((h.pdvs_afectados || []).join(', '))}</td>
+            <td style="font-size:11px;color:#334155;">${esc((h.observaciones_recientes || []).join(' | ') || 'Sin observación escrita')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`}
+    </div>
+
+    <!-- Tabla 3: Ranking por Punto de Venta -->
+    <div class="section-block">
+      <div class="section-heading">
+        <span>🏆 3. Ranking de Puntos de Venta en ${esc(areaLabel)}</span>
+        <span style="font-size:11px;color:#64748B;font-weight:600;">Comparativa Mes Anterior vs Mes Actual</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:45px;text-align:center;">Puesto</th>
+            <th>Punto de Venta</th>
+            <th>Ciudad</th>
+            <th style="text-align:center;">Mes Anterior</th>
+            <th style="text-align:center;">Mes Actual</th>
+            <th style="text-align:center;">Diferencia</th>
+            <th style="text-align:center;">Tendencia</th>
+            <th style="text-align:center;">Evaluaciones</th>
+            <th style="text-align:center;">Alertas</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${ranking.length === 0 ? `<tr><td colspan="9" style="text-align:center;padding:14px;">Sin puntos de venta evaluados.</td></tr>` : ranking.map((p, i) => {
+            const col = p.puntaje_mes_actual >= 90 ? '#15803D' : p.puntaje_mes_actual >= 75 ? '#B45309' : '#DC2626';
+            const tCol = p.tendencia === 'Mejoró' ? '#15803D' : p.tendencia === 'Disminuyó' ? '#DC2626' : '#854D0E';
+            const tBg = p.tendencia === 'Mejoró' ? '#DCFCE7' : p.tendencia === 'Disminuyó' ? '#FEE2E2' : '#FEF3C7';
+            return `<tr>
+              <td style="text-align:center;font-weight:800;">#${i + 1}</td>
+              <td><strong>${esc(p.pdv_nombre)}</strong></td>
+              <td>${esc(p.ciudad_nombre || '')}</td>
+              <td style="text-align:center;">${p.puntaje_mes_anterior}%</td>
+              <td style="text-align:center;font-weight:800;color:${col};">${p.puntaje_mes_actual}%</td>
+              <td style="text-align:center;font-weight:700;color:${tCol};">${p.diferencia_puntos > 0 ? `+${p.diferencia_puntos}` : p.diferencia_puntos} pts</td>
+              <td style="text-align:center;"><span class="pill" style="background:${tBg};color:${tCol};">${esc(p.tendencia)}</span></td>
+              <td style="text-align:center;">${p.total_evaluaciones}</td>
+              <td style="text-align:center;">${p.secciones_en_alerta > 0 ? `<span class="pill" style="background:#FEE2E2;color:#991B1B;">${p.secciones_en_alerta}</span>` : '0'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Tabla 4: Trazabilidad de Inspecciones -->
+    <div class="section-block">
+      <div class="section-heading">
+        <span>📜 4. Detalle de Inspecciones y Hallazgos por Sección (${esc(areaLabel)})</span>
+        <span style="font-size:11px;color:#64748B;font-weight:600;">Últimas ${historial.length} evaluaciones registradas</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Punto de Venta</th>
+            <th>Sección / Sub-Área</th>
+            <th style="text-align:center;">Puntaje</th>
+            <th style="text-align:center;">Concepto</th>
+            <th style="text-align:center;">SÍ / NO / NA</th>
+            <th>Hallazgos y Observaciones Registradas</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${historial.map(h => {
+            const pct = h.puntaje || 0;
+            const col = pct >= 90 ? '#15803D' : pct >= 75 ? '#B45309' : '#DC2626';
+            const bg = pct >= 90 ? '#DCFCE7' : pct >= 75 ? '#FEF3C7' : '#FEE2E2';
+            const conc = h.concepto_sanitario || (pct >= 90 ? 'Favorable' : pct >= 75 ? 'Condicionado' : 'Crítico');
+            return `<tr>
+              <td style="white-space:nowrap;">${esc(h.fecha)}</td>
+              <td><strong>${esc(h.pdv_nombre)}</strong></td>
+              <td>${esc(h.seccion_nombre)}</td>
+              <td style="text-align:center;font-weight:800;color:${col};">${pct}%</td>
+              <td style="text-align:center;"><span class="pill" style="background:${bg};color:${col};">${esc(conc)}</span></td>
+              <td style="text-align:center;white-space:nowrap;font-weight:700;"><span style="color:#15803D;">${h.preguntas_si}</span> / <span style="color:#DC2626;">${h.preguntas_no}</span> / <span style="color:#64748B;">${h.preguntas_na}</span></td>
+              <td style="font-size:11px;color:#334155;">${esc(h.hallazgos_resumen || (h.preguntas_no > 0 ? `${h.preguntas_no} hallazgo(s) sin observación` : '100% Conforme'))}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="footer-sign">
+      <div>Crepes en Punto · Sistema de Gestión Operativa y Aseguramiento de Calidad</div>
+      <div>Filtro activo: ${esc(areaLabel)} · ${esc(subAreaLabel)} · ${esc(pdvLabel)}</div>
+    </div>
+  </div>
+  <script>
+    window.onload = function() {
+      setTimeout(function() { window.print(); }, 350);
+    };
+  </script>
+</body>
+</html>`;
+
+    // Abrir ventana de impresión con el informe ejecutivo completo
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+      printWin.document.open();
+      printWin.document.write(reportHtml);
+      printWin.document.close();
+    } else {
+      window.print();
+    }
+
+    // Respaldar el informe HTML formateado en el repositorio central
+    try {
+      const safeArea = areaLabel.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_');
+      const blob = new Blob([reportHtml], { type: 'text/html;charset=utf-8' });
+      const fileName = `Informe_Ejecutivo_Calidad_${safeArea}_${dateStr}.html`;
+      const file = new File([blob], fileName, { type: 'text/html' });
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('categoria', 'analisis_calidad');
+      formData.append('tipo_documento', `Informe Ejecutivo Calidad (${areaLabel})`);
+      formData.append('observaciones', `Informe Ejecutivo de Calidad — Área: ${areaLabel} | Sub-Área: ${subAreaLabel} | PDV: ${pdvLabel} (${dateStr})`);
+      await fetch('/api/uploads', { method: 'POST', body: formData });
+    } catch (err) {
+      console.warn('Error respaldando informe ejecutivo en repositorio:', err);
+    }
   };
 
 

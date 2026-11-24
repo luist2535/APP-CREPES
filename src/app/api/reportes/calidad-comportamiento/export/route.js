@@ -128,24 +128,29 @@ export async function GET(request) {
       { width: 5 }, { width: 28 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 18 }
     ];
 
-    // Título
+    // Título dinámico según el Área y Sub-Área seleccionada
+    const areaDisplay = areaFiltro === 'all' ? 'TODAS LAS ÁREAS DE CALIDAD (BPM & L&D)' : areaFiltro.toUpperCase();
+    const subareaDisplay = subareaFiltro === 'all' ? 'Todas las Sub-Áreas' : subareaFiltro;
+    const itemDisplay = itemFiltro === 'all' ? 'Todos los Ítems' : itemFiltro;
+    const conceptoGlobal = promedioGeneral >= 90 ? 'FAVORABLE' : promedioGeneral >= 75 ? 'CONDICIONADO' : 'CRÍTICO';
+
     wsDashboard.mergeCells('B2:I2');
-    wsDashboard.getCell('B2').value = '📊 REPORTE EJECUTIVO - ANALÍTICA DE COMPORTAMIENTO DE CALIDAD';
+    wsDashboard.getCell('B2').value = `📊 INFORME EJECUTIVO DE CALIDAD — ${areaDisplay}${subareaFiltro !== 'all' ? ' › ' + subareaFiltro.toUpperCase() : ''}`;
     wsDashboard.getCell('B2').style = titleStyle;
     wsDashboard.getRow(2).height = 30;
 
-    // Subtítulo con fechas
+    // Subtítulo con fechas y filtros aplicados
     wsDashboard.mergeCells('B3:I3');
-    wsDashboard.getCell('B3').value = `Periodo: ${fechaInicio || 'Inicio'} al ${fechaFin || 'Fin'}  |  Área: ${areaFiltro}  |  Sub-área: ${subareaFiltro}  |  Generado: ${new Date().toLocaleString('es-ES')}`;
-    wsDashboard.getCell('B3').style = { font: { italic: true, size: 10, color: { argb: 'FF666666' } }, alignment: { horizontal: 'center' } };
+    wsDashboard.getCell('B3').value = `Periodo: ${fechaInicio || 'Inicio'} al ${fechaFin || 'Fin'}  |  Área: ${areaFiltro === 'all' ? 'Todas' : areaFiltro}  |  Sub-Área: ${subareaDisplay}  |  Ítem: ${itemDisplay}  |  Concepto Sanitario: ${conceptoGlobal} (${promedioGeneral}%)`;
+    wsDashboard.getCell('B3').style = { font: { bold: true, size: 10, color: { argb: 'FF1F4E79' } }, alignment: { horizontal: 'center' } };
 
     // KPIs principales (fila 5-7)
     const kpis = [
-      { label: 'PUNTAJE PROMEDIO GENERAL', value: promedioGeneral, suffix: '%', color: promedioGeneral >= 90 ? 'good' : promedioGeneral >= 75 ? 'warning' : 'bad' },
-      { label: 'TOTAL VISITAS ANALIZADAS', value: rawHistorial.length, suffix: '', color: 'neutral' },
-      { label: 'SECCIONES EVALUADAS', value: evolucionPorSeccion.length, suffix: '', color: 'neutral' },
-      { label: 'PDVs ANALIZADOS', value: rankingPdv.length, suffix: '', color: 'neutral' },
-      { label: 'ALERTAS DE DISMINUCIÓN', value: totalAlertas, suffix: '', color: totalAlertas > 0 ? 'bad' : 'good' },
+      { label: `PROMEDIO (${conceptoGlobal})`, value: promedioGeneral, suffix: '%', color: promedioGeneral >= 90 ? 'good' : promedioGeneral >= 75 ? 'warning' : 'bad' },
+      { label: 'CONFORMES (SÍ) / HALLAZGOS (NO)', value: `${summary.total_conformes_si || 0} SÍ / ${summary.total_hallazgos_no || 0} NO`, suffix: '', color: (summary.total_hallazgos_no || 0) > 0 ? 'warning' : 'good' },
+      { label: 'SECCIONES / SUB-ÁREAS', value: evolucionPorSeccion.length, suffix: '', color: 'neutral' },
+      { label: 'PDVs EVALUADOS', value: rankingPdv.length, suffix: '', color: 'neutral' },
+      { label: 'ALERTAS DE CAÍDA', value: totalAlertas, suffix: '', color: totalAlertas > 0 ? 'bad' : 'good' },
       { label: 'MES ACTUAL (' + mes_actual_label + ')', value: global_mes_actual, suffix: '%', color: global_mes_actual >= 90 ? 'good' : global_mes_actual >= 75 ? 'warning' : 'bad' },
       { label: 'MES ANTERIOR (' + mes_anterior_label + ')', value: global_mes_anterior, suffix: '%', color: global_mes_anterior >= 90 ? 'good' : global_mes_anterior >= 75 ? 'warning' : 'bad' },
       { label: 'VARIACIÓN GLOBAL', value: Math.round((global_mes_actual - global_mes_anterior) * 10) / 10, suffix: ' pts', color: global_mes_actual >= global_mes_anterior ? 'good' : 'bad' }
@@ -179,7 +184,7 @@ export async function GET(request) {
     wsDashboard.getCell(`B${chartStartRow}`).style = subtitleStyle;
 
     const chartDataStartRow = chartStartRow + 2;
-    const headersSec = ['Sección / Sub-Área', 'Puntaje Promedio', 'Visitas', 'Alertas', 'Mejor PDV', 'Peor PDV'];
+    const headersSec = ['Sección / Sub-Área', 'Puntaje Promedio', 'Concepto Sanitario', 'Visitas', 'Conformes (SÍ) / Hallazgos (NO)', 'Alertas', 'Mejor PDV', 'Peor PDV'];
     headersSec.forEach((h, i) => {
       const cell = wsDashboard.getCell(chartDataStartRow - 1, i + 2);
       cell.value = h;
@@ -193,15 +198,25 @@ export async function GET(request) {
       wsDashboard.getCell(r, 3).value = s.puntaje_promedio;
       wsDashboard.getCell(r, 3).style = numberStyle;
       applyScoreStyle(wsDashboard.getCell(r, 3), s.puntaje_promedio);
-      wsDashboard.getCell(r, 4).value = s.visitas_evaluadas;
-      wsDashboard.getCell(r, 4).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'center' } };
-      wsDashboard.getCell(r, 5).value = s.caidas_recientes;
+
+      const concCell = wsDashboard.getCell(r, 4);
+      concCell.value = s.concepto_sanitario || (s.puntaje_promedio >= 90 ? 'Favorable' : s.puntaje_promedio >= 75 ? 'Condicionado' : 'Crítico');
+      concCell.style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'center' } };
+      applyScoreStyle(concCell, s.puntaje_promedio);
+
+      wsDashboard.getCell(r, 5).value = s.visitas_evaluadas;
       wsDashboard.getCell(r, 5).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'center' } };
-      if (s.caidas_recientes > 0) { wsDashboard.getCell(r, 5).fill = badFill; wsDashboard.getCell(r, 5).font = badFont; }
-      wsDashboard.getCell(r, 6).value = `${s.mejor_pdv.nombre} (${s.mejor_pdv.puntaje}%)`;
-      wsDashboard.getCell(r, 6).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'left' } };
-      wsDashboard.getCell(r, 7).value = `${s.peor_pdv.nombre} (${s.peor_pdv.puntaje}%)`;
-      wsDashboard.getCell(r, 7).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'left' } };
+
+      wsDashboard.getCell(r, 6).value = `✓ ${s.total_si || 0} SÍ  /  ✕ ${s.total_no || 0} NO`;
+      wsDashboard.getCell(r, 6).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'center' }, font: (s.total_no > 0 ? badFont : goodFont) };
+
+      wsDashboard.getCell(r, 7).value = s.caidas_recientes;
+      wsDashboard.getCell(r, 7).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'center' } };
+      if (s.caidas_recientes > 0) { wsDashboard.getCell(r, 7).fill = badFill; wsDashboard.getCell(r, 7).font = badFont; }
+      wsDashboard.getCell(r, 8).value = `${s.mejor_pdv.nombre} (${s.mejor_pdv.puntaje}%)`;
+      wsDashboard.getCell(r, 8).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'left' } };
+      wsDashboard.getCell(r, 9).value = `${s.peor_pdv.nombre} (${s.peor_pdv.puntaje}%)`;
+      wsDashboard.getCell(r, 9).style = { ...dataStyle, alignment: { ...dataStyle.alignment, horizontal: 'left' } };
     });
 
     // Data Bars en columna C (Puntaje Promedio) - visualización en celda
@@ -691,7 +706,9 @@ export async function GET(request) {
     const buffer = await wb.xlsx.writeBuffer();
     const now = new Date();
     const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-    const fileName = `Analisis_Calidad_Comportamiento_${dateStr}.xlsx`;
+    const safeAreaSlug = areaFiltro === 'all' ? 'Todas_las_Areas' : areaFiltro.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_');
+    const safeSubSlug = subareaFiltro === 'all' ? '' : `_${subareaFiltro.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_')}`;
+    const fileName = `Informe_Calidad_${safeAreaSlug}${safeSubSlug}_${dateStr}.xlsx`;
 
     return new NextResponse(buffer, {
       status: 200,
